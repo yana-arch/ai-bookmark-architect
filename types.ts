@@ -46,4 +46,9 @@ export interface DetailedLog {
   type: 'info' | 'request' | 'response' | 'error';
   title: string;
   content: string | object;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
 }

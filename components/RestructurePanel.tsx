@@ -9,16 +9,20 @@ interface RestructurePanelProps {
     logs: string[];
     errorDetails: string | null;
     apiConfigs: ApiConfig[];
+    systemPrompt: string;
+    sessionTokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number };
     customInstructions: string;
     batchSize: number;
     maxRetries: number;
     hasPartialResults: boolean;
     onStart: () => void;
+    onStop: () => void;
     onApply: () => void;
     onDiscard: () => void;
     onContinue: () => void;
     onOpenApiModal: () => void;
     onOpenLogModal: () => void;
+    onSystemPromptChange: (prompt: string) => void;
     onCustomInstructionsChange: (instructions: string) => void;
     onBatchSizeChange: (size: number) => void;
     onMaxRetriesChange: (retries: number) => void;
@@ -26,8 +30,9 @@ interface RestructurePanelProps {
 
 const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
     const { 
-        appState, progress, logs, errorDetails, onStart, onApply, onDiscard, onContinue, 
+        appState, progress, logs, errorDetails, onStart, onStop, onApply, onDiscard, onContinue, 
         apiConfigs, onOpenApiModal, onOpenLogModal,
+        systemPrompt, onSystemPromptChange, sessionTokenUsage,
         customInstructions, onCustomInstructionsChange,
         batchSize, onBatchSizeChange, maxRetries, onMaxRetriesChange,
         hasPartialResults
@@ -44,6 +49,18 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
             </button>
         </div>
     );
+
+    const TokenUsageDisplay = () => sessionTokenUsage.totalTokens > 0 ? (
+        <div className="text-xs text-center text-gray-400 mb-4 p-2 bg-gray-900/50 rounded-md border border-gray-700/50">
+            <span>Tokens đã sử dụng: </span>
+            <span className="font-mono text-emerald-400 font-bold">{sessionTokenUsage.totalTokens}</span>
+            <span className="text-gray-500"> (Prompt: </span>
+            <span className="font-mono text-sky-400">{sessionTokenUsage.promptTokens}</span>
+            <span className="text-gray-500">, Response: </span>
+            <span className="font-mono text-yellow-400">{sessionTokenUsage.completionTokens}</span>
+            <span className="text-gray-500">)</span>
+        </div>
+    ) : null;
 
     const renderContent = () => {
         switch(appState) {
@@ -67,19 +84,33 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                                     </svg>
                                 </summary>
-                                <div className="mt-3">
-                                    <label htmlFor="ai-instructions" className="block text-xs text-gray-400 mb-1">
-                                        Chỉ dẫn về cách đặt tên và phân loại thư mục:
-                                    </label>
-                                    <textarea
-                                        id="ai-instructions"
-                                        value={customInstructions}
-                                        onChange={(e) => onCustomInstructionsChange(e.target.value)}
-                                        rows={3}
-                                        placeholder="Ví dụ: Chỉ sử dụng tiếng Anh cho tên thư mục. Giới hạn 2 cấp thư mục."
-                                        className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-y"
-                                    />
-                                    <div className="mt-4 grid grid-cols-2 gap-4">
+                                <div className="mt-3 space-y-4">
+                                    <div>
+                                        <label htmlFor="system-prompt" className="block text-xs text-gray-400 mb-1">
+                                            Chỉ dẫn hệ thống cho AI (System Prompt):
+                                        </label>
+                                        <textarea
+                                            id="system-prompt"
+                                            value={systemPrompt}
+                                            onChange={(e) => onSystemPromptChange(e.target.value)}
+                                            rows={5}
+                                            className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-y"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="ai-instructions" className="block text-xs text-gray-400 mb-1">
+                                            Chỉ dẫn bổ sung (tên thư mục, phân loại):
+                                        </label>
+                                        <textarea
+                                            id="ai-instructions"
+                                            value={customInstructions}
+                                            onChange={(e) => onCustomInstructionsChange(e.target.value)}
+                                            rows={3}
+                                            placeholder="Ví dụ: Chỉ sử dụng tiếng Anh cho tên thư mục. Giới hạn 2 cấp thư mục."
+                                            className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-y"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label htmlFor="batch-size" className="block text-xs text-gray-400 mb-1">
                                                 Số lượng bookmark mỗi batch
@@ -137,6 +168,12 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                                ))}
                             </ul>
                         </div>
+                        <button
+                            onClick={onStop}
+                            className="w-full mt-4 bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
+                        >
+                            Dừng Xử Lý
+                        </button>
                         <LogViewerButton />
                     </>
                 );
@@ -144,7 +181,8 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                  return (
                     <>
                         <h3 className="text-xl font-bold text-white mb-2">Xem lại Cấu trúc Mới</h3>
-                        <p className="text-sm text-gray-400 mb-6">AI đã đề xuất một cấu trúc mới. Áp dụng các thay đổi hoặc hủy bỏ.</p>
+                        <p className="text-sm text-gray-400 mb-4">AI đã đề xuất một cấu trúc mới. Áp dụng các thay đổi hoặc hủy bỏ.</p>
+                        <TokenUsageDisplay />
                          <div className="bg-gray-900/50 rounded-lg p-3 flex-1 overflow-y-auto mb-6">
                             <h4 className="text-sm font-semibold text-gray-300 mb-2">Nhật ký Tái cấu trúc</h4>
                             <ul className="text-xs text-gray-400 space-y-2">
@@ -175,11 +213,14 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                  return (
                     <>
                         <h3 className="text-xl font-bold text-white mb-2">Xử lý bị gián đoạn</h3>
+                        <TokenUsageDisplay />
                         <div className="bg-red-900/50 border border-red-700 text-red-300 px-4 py-3 rounded-lg relative mb-4" role="alert">
                             <div className="flex">
                                 <WarningIcon className="w-6 h-6 mr-3"/>
                                 <div>
-                                    <strong className="font-bold">Lỗi API hoặc hệ thống:</strong>
+                                    <strong className="font-bold">
+                                        {errorDetails?.toLowerCase().includes('dừng') ? 'Thông báo:' : 'Lỗi API hoặc hệ thống:'}
+                                    </strong>
                                     <span className="block sm:inline ml-1">{errorDetails}</span>
                                 </div>
                             </div>

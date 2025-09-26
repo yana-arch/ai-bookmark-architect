@@ -48,6 +48,16 @@ const LogEntry: React.FC<{ log: DetailedLog }> = ({ log }) => {
                 </button>
                 {copied && <span className="absolute top-10 right-2 text-xs text-emerald-400">Đã sao chép!</span>}
             </div>
+            {log.usage && (
+                <div className="mt-3 pt-3 border-t border-gray-700/50 text-xs text-gray-400 font-mono">
+                    <span className="font-semibold text-gray-300">TOKEN USAGE &mdash; </span>
+                    <span>Prompt: <span className="text-sky-300 font-semibold">{log.usage.promptTokens}</span></span>
+                    <span className="mx-2">|</span>
+                    <span>Completion: <span className="text-yellow-300 font-semibold">{log.usage.completionTokens}</span></span>
+                    <span className="mx-2">|</span>
+                    <span>Total: <span className="text-emerald-300 font-semibold">{log.usage.totalTokens}</span></span>
+                </div>
+            )}
         </div>
     );
 };
@@ -62,7 +72,7 @@ const LogModal: React.FC<LogModalProps> = ({ logs, onClose }) => {
                 </header>
                 <main className="flex-1 p-4 overflow-y-auto">
                     {logs.length > 0 ? (
-                        logs.map(log => <LogEntry key={log.id} log={log} />)
+                        logs.slice().reverse().map(log => <LogEntry key={log.id} log={log} />)
                     ) : (
                         <p className="text-center text-gray-500">Không có log nào để hiển thị.</p>
                     )}

@@ -39,6 +39,10 @@ const createMockData = (): Bookmark[] => {
   ];
 };
 
+const DEFAULT_SYSTEM_PROMPT = `You are an intelligent bookmark organizer. Your goal is to create a clean, hierarchical folder structure in VIETNAMESE. You will be given an *existing folder structure* and a *new list of bookmarks*. For each bookmark, you must:
+1.  Place it into the most logical folder path. **Crucially, if a suitable folder already exists, use it.** Do not create new folders that are synonyms or slight variations of existing ones. Consolidate them.
+2.  Generate 3-5 relevant, concise, VIETNAMESE tags for the bookmark.`;
+
 
 const App: React.FC = () => {
     const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
@@ -53,6 +57,8 @@ const App: React.FC = () => {
     const [errorDetails, setErrorDetails] = useState<string | null>(null);
     const [importFile, setImportFile] = useState<File | null>(null);
     const [customInstructions, setCustomInstructions] = useState<string>('');
+    const [systemPrompt, setSystemPrompt] = useState<string>(DEFAULT_SYSTEM_PROMPT);
+    const [sessionTokenUsage, setSessionTokenUsage] = useState({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
     const [batchSize, setBatchSize] = useState(5);
     const [maxRetries, setMaxRetries] = useState(2);
     const [isApiModalOpen, setIsApiModalOpen] = useState(false);
@@ -60,6 +66,7 @@ const App: React.FC = () => {
     const [allCategorizedBookmarks, setAllCategorizedBookmarks] = useState<CategorizedBookmark[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const importInputRef = useRef<HTMLInputElement>(null);
+    const stopProcessingRef = useRef(false);
 
     useEffect(() => {
         const loadData = async () => {
@@ -172,22 +179,29 @@ const App: React.FC = () => {
         
         return root.children;
     };
+    
+    const handleStopRestructuring = () => {
+        stopProcessingRef.current = true;
+    };
 
     const startRestructuring = async (isContinuation = false) => {
-        const addDetailedLog = (type: DetailedLog['type'], title: string, content: string | object) => {
+        const addDetailedLog = (type: DetailedLog['type'], title: string, content: string | object, usage?: DetailedLog['usage']) => {
             setDetailedLogs(prev => [...prev, {
                 id: `log-${Date.now()}-${Math.random()}`,
                 timestamp: new Date().toLocaleTimeString('en-GB'),
                 type,
                 title,
-                content
+                content,
+                usage
             }]);
         };
 
         if (!isContinuation) {
+            stopProcessingRef.current = false;
             setAllCategorizedBookmarks([]);
             setDetailedLogs([]);
             setLogs(['Bắt đầu quá trình tái cấu trúc...']);
+            setSessionTokenUsage({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
             addDetailedLog('info', 'Bắt đầu quá trình', `Tổng số bookmarks: ${bookmarks.length}, Cỡ batch: ${batchSize}, Thử lại tối đa: ${maxRetries}`);
         } else {
             setLogs(prev => [...prev, '--- TIẾP TỤC QUÁ TRÌNH ---']);
@@ -218,6 +232,16 @@ const App: React.FC = () => {
             : '';
 
         for (let i = 0; i < totalBatches; i++) {
+             if (stopProcessingRef.current) {
+                setAllCategorizedBookmarks(runningCategorizedBookmarks);
+                const stopMsg = "Quá trình đã được người dùng dừng lại.";
+                setLogs(prev => [...prev, stopMsg]);
+                addDetailedLog('info', 'Xử lý đã dừng', stopMsg);
+                setErrorDetails(stopMsg);
+                setAppState(AppState.ERROR);
+                return; // Stop processing
+            }
+
             const batch = bookmarksToProcess.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
             const progressCurrent = allCategorizedBookmarks.length + (i * BATCH_SIZE) + batch.length;
             const logMsg = `Đang xử lý batch ${i + 1}/${totalBatches} (bookmarks ${progressCurrent}/${bookmarks.length})...`;
@@ -253,12 +277,9 @@ const App: React.FC = () => {
                         // API Call Logic
                         if (currentKeyConfig.provider === 'openrouter') {
                             addDetailedLog('info', 'Sử dụng OpenRouter', `Model: ${currentKeyConfig.model}`);
-                            const systemPrompt = `You are an intelligent bookmark organizer. Your goal is to create a clean, hierarchical folder structure in VIETNAMESE. You will be given an *existing folder structure* and a *new list of bookmarks*. For each bookmark, you must:
-1.  Place it into the most logical folder path. **Crucially, if a suitable folder already exists, use it.** Do not create new folders that are synonyms or slight variations of existing ones. Consolidate them.
-2.  Generate 3-5 relevant, concise, VIETNAMESE tags for the bookmark.
-Output a JSON object with a single key 'bookmarks' which is an array where each object represents a bookmark with its original 'title', 'url', its final 'path' as an array of Vietnamese folder names (e.g., ['Phát triển Web', 'React']), and 'tags' as an array of Vietnamese strings (e.g., ['hướng dẫn', 'frontend', 'javascript']).`;
+                            const finalSystemPrompt = systemPrompt + "\n\nOutput a JSON object with a single key 'bookmarks' which is an array where each object represents a bookmark with its original 'title', 'url', its final 'path' as an array of Vietnamese folder names (e.g., ['Phát triển Web', 'React']), and 'tags' as an array of Vietnamese strings (e.g., ['hướng dẫn', 'frontend', 'javascript']).";
                             const userPrompt = `${userInstructionBlock}\n\nEXISTING STRUCTURE:\n${JSON.stringify(currentTree, null, 2)}\n\nBOOKMARKS TO CATEGORIZE:\n${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}`;
-                            const requestPayload = { model: currentKeyConfig.model, response_format: { type: "json_object" }, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }] };
+                            const requestPayload = { model: currentKeyConfig.model, response_format: { type: "json_object" }, messages: [{ role: "system", content: finalSystemPrompt }, { role: "user", content: userPrompt }] };
                             addDetailedLog('request', `Request đến OpenRouter (${currentKeyConfig.model})`, requestPayload);
 
                             const response = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', headers: { 'Authorization': `Bearer ${currentKeyConfig.apiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': `${location.protocol}//${location.host}`, 'X-Title': 'AI Bookmark Architect' }, body: JSON.stringify(requestPayload) });
@@ -273,16 +294,30 @@ Output a JSON object with a single key 'bookmarks' which is an array where each 
                                 }
                             }
                             const responseData = await response.json();
-                            addDetailedLog('response', `Response từ OpenRouter (${currentKeyConfig.model})`, responseData);
+                            const usage = responseData.usage;
+                            const tokenInfo = usage ? { promptTokens: usage.prompt_tokens, completionTokens: usage.completion_tokens, totalTokens: usage.total_tokens } : undefined;
+                            if (tokenInfo) {
+                                setSessionTokenUsage(prev => ({ promptTokens: prev.promptTokens + tokenInfo.promptTokens, completionTokens: prev.completionTokens + tokenInfo.completionTokens, totalTokens: prev.totalTokens + tokenInfo.totalTokens }));
+                            }
+                            addDetailedLog('response', `Response từ OpenRouter (${currentKeyConfig.model})`, responseData, tokenInfo);
                             const jsonContent = JSON.parse(responseData.choices[0].message.content);
                             categorizedBatch = jsonContent.bookmarks;
                         } else { // Gemini Provider
                             const ai = new GoogleGenAI({apiKey: currentKeyConfig.apiKey});
-                            const prompt = `You are an intelligent bookmark organizer. Your goal is to create a clean, hierarchical folder structure in VIETNAMESE...${userInstructionBlock}\n\nEXISTING STRUCTURE:\n${JSON.stringify(currentTree, null, 2)}\n\nBOOKMARKS TO CATEGORIZE:\n${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}\n\nOutput a JSON array...`;
-                            addDetailedLog('request', `Request đến Gemini (${currentKeyConfig.model})`, { prompt });
-                            const response = await ai.models.generateContent({ model: currentKeyConfig.model, contents: prompt, config: { responseMimeType: "application/json", responseSchema: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, url: { type: Type.STRING }, path: { type: Type.ARRAY, items: { type: Type.STRING } }, tags: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ['title', 'url', 'path', 'tags'] } } } });
-                            addDetailedLog('response', `Response từ Gemini (${currentKeyConfig.model})`, response);
-                            categorizedBatch = JSON.parse(response.text.trim());
+                            const systemInstruction = systemPrompt + userInstructionBlock;
+                            const userContent = `EXISTING STRUCTURE:\n${JSON.stringify(currentTree, null, 2)}\n\nBOOKMARKS TO CATEGORIZE:\n${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}`;
+                            
+                            addDetailedLog('request', `Request đến Gemini (${currentKeyConfig.model})`, { systemInstruction, userContent });
+                            
+                            const genAiResponse = await ai.models.generateContent({ model: currentKeyConfig.model, contents: userContent, config: { systemInstruction: systemInstruction, responseMimeType: "application/json", responseSchema: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, url: { type: Type.STRING }, path: { type: Type.ARRAY, items: { type: Type.STRING } }, tags: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ['title', 'url', 'path', 'tags'] } } } });
+                            
+                            const usage = genAiResponse.usageMetadata;
+                            const tokenInfo = usage ? { promptTokens: usage.promptTokenCount, completionTokens: usage.candidatesTokenCount, totalTokens: usage.totalTokenCount } : undefined;
+                            if (tokenInfo) {
+                                setSessionTokenUsage(prev => ({ promptTokens: prev.promptTokens + tokenInfo.promptTokens, completionTokens: prev.completionTokens + tokenInfo.completionTokens, totalTokens: prev.totalTokens + tokenInfo.totalTokens }));
+                            }
+                            addDetailedLog('response', `Response từ Gemini (${currentKeyConfig.model})`, genAiResponse, tokenInfo);
+                            categorizedBatch = JSON.parse(genAiResponse.text.trim());
                         }
 
                         runningCategorizedBookmarks.push(...categorizedBatch);
@@ -366,6 +401,7 @@ Output a JSON object with a single key 'bookmarks' which is an array where each 
         setProgress({current: 0, total: 0});
         setErrorDetails(null);
         setAllCategorizedBookmarks([]);
+        setSessionTokenUsage({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
     };
     
     const continueRestructuring = () => {
@@ -598,11 +634,15 @@ ${bookmarksHtml}</DL><p>`;
                                     logs={logs}
                                     errorDetails={errorDetails}
                                     apiConfigs={apiConfigs}
+                                    systemPrompt={systemPrompt}
+                                    onSystemPromptChange={setSystemPrompt}
+                                    sessionTokenUsage={sessionTokenUsage}
                                     customInstructions={customInstructions}
                                     batchSize={batchSize}
                                     maxRetries={maxRetries}
                                     hasPartialResults={allCategorizedBookmarks.length > 0}
                                     onStart={() => startRestructuring(false)}
+                                    onStop={handleStopRestructuring}
                                     onApply={applyChanges}
                                     onDiscard={discardChanges}
                                     onContinue={continueRestructuring}
