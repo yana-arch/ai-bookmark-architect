@@ -48,7 +48,7 @@ const LogEntry: React.FC<{ log: DetailedLog }> = ({ log }) => {
                 </button>
                 {copied && <span className="absolute top-10 right-2 text-xs text-emerald-400">Đã sao chép!</span>}
             </div>
-            {log.usage && (
+            {log.usage && log.usage.promptTokens !== undefined && log.usage.completionTokens !== undefined && log.usage.totalTokens !== undefined && (
                 <div className="mt-3 pt-3 border-t border-gray-700/50 text-xs text-gray-400 font-mono">
                     <span className="font-semibold text-gray-300">TOKEN USAGE &mdash; </span>
                     <span>Prompt: <span className="text-sky-300 font-semibold">{formatNumber(log.usage.promptTokens)}</span></span>

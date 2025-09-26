@@ -15,6 +15,7 @@ interface RestructurePanelProps {
     customInstructions: string;
     batchSize: number;
     maxRetries: number;
+    processingMode: 'single' | 'multi';
     hasPartialResults: boolean;
     onStart: () => void;
     onStop: () => void;
@@ -27,15 +28,17 @@ interface RestructurePanelProps {
     onCustomInstructionsChange: (instructions: string) => void;
     onBatchSizeChange: (size: number) => void;
     onMaxRetriesChange: (retries: number) => void;
+    onProcessingModeChange: (mode: 'single' | 'multi') => void;
 }
 
 const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
-    const { 
-        appState, progress, logs, errorDetails, onStart, onStop, onApply, onDiscard, onContinue, 
+    const {
+        appState, progress, logs, errorDetails, onStart, onStop, onApply, onDiscard, onContinue,
         apiConfigs, onOpenApiModal, onOpenLogModal,
         systemPrompt, onSystemPromptChange, sessionTokenUsage,
         customInstructions, onCustomInstructionsChange,
         batchSize, onBatchSizeChange, maxRetries, onMaxRetriesChange,
+        processingMode, onProcessingModeChange,
         hasPartialResults
     } = props;
     const progressPercentage = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
@@ -141,6 +144,41 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                                                 className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                             />
                                         </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-gray-400 mb-2">
+                                            Chế độ xử lý
+                                        </label>
+                                        <div className="flex space-x-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => onProcessingModeChange('single')}
+                                                className={`flex-1 py-2 text-sm rounded-md transition-colors ${
+                                                    processingMode === 'single'
+                                                        ? 'bg-blue-500 text-white font-bold'
+                                                        : 'bg-gray-700 hover:bg-gray-600'
+                                                }`}
+                                            >
+                                                Đơn luồng
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => onProcessingModeChange('multi')}
+                                                className={`flex-1 py-2 text-sm rounded-md transition-colors ${
+                                                    processingMode === 'multi'
+                                                        ? 'bg-emerald-500 text-white font-bold'
+                                                        : 'bg-gray-700 hover:bg-gray-600'
+                                                }`}
+                                            >
+                                                Đa luồng
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            {processingMode === 'single'
+                                                ? 'Xử lý tuần tự từng batch một'
+                                                : 'Xử lý song song nhiều batch cùng lúc'
+                                            }
+                                        </p>
                                     </div>
                                 </div>
                             </details>

@@ -70,6 +70,7 @@ const App: React.FC = () => {
     const [sessionTokenUsage, setSessionTokenUsage] = useState({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
     const [batchSize, setBatchSize] = useState(5);
     const [maxRetries, setMaxRetries] = useState(2);
+    const [processingMode, setProcessingMode] = useState<'single' | 'multi'>('multi');
     const [isApiModalOpen, setIsApiModalOpen] = useState(false);
     const [isLogModalOpen, setIsLogModalOpen] = useState(false);
     const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
@@ -82,6 +83,8 @@ const App: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const importInputRef = useRef<HTMLInputElement>(null);
     const stopProcessingRef = useRef(false);
+    const workersRef = useRef<Worker[]>([]);
+    const activeWorkersRef = useRef<Set<number>>(new Set());
 
     useEffect(() => {
         const loadData = async () => {
@@ -343,15 +346,15 @@ const App: React.FC = () => {
             stopProcessingRef.current = false;
             setAllCategorizedBookmarks([]);
             setDetailedLogs([]);
-            setLogs(['Bắt đầu quá trình tái cấu trúc...']);
+            setLogs(['Bắt đầu quá trình tái cấu trúc đa luồng...']);
             setSessionTokenUsage({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
-            addDetailedLog('info', 'Bắt đầu quá trình', `Tổng số bookmarks: ${bookmarks.length}, Cỡ batch: ${batchSize}, Thử lại tối đa: ${maxRetries}`);
+            addDetailedLog('info', 'Bắt đầu quá trình đa luồng', `Tổng số bookmarks: ${bookmarks.length}, Cỡ batch: ${batchSize}, Thử lại tối đa: ${maxRetries}`);
         } else {
             setLogs(prev => [...prev, '--- TIẾP TỤC QUÁ TRÌNH ---']);
             addDetailedLog('info', 'Tiếp tục quá trình', `Tiếp tục từ bookmark thứ ${allCategorizedBookmarks.length + 1}`);
         }
 
-        let availableKeys = apiConfigs.filter(c => c.status === 'active');
+        const availableKeys = apiConfigs.filter(c => c.status === 'active');
         if (availableKeys.length === 0) {
             setErrorDetails("Không có API key nào đang hoạt động. Vui lòng thêm hoặc kích hoạt một key hợp lệ.");
             setLogs(prev => [...prev, "Lỗi: Không tìm thấy API key đang hoạt động."]);
@@ -363,162 +366,374 @@ const App: React.FC = () => {
         setAppState(AppState.PROCESSING);
         setProgress({ current: allCategorizedBookmarks.length, total: bookmarks.length });
         setErrorDetails(null);
-        
+
         const bookmarksToProcess = bookmarks.slice(allCategorizedBookmarks.length);
         const BATCH_SIZE = Math.max(1, batchSize);
         const totalBatches = Math.ceil(bookmarksToProcess.length / BATCH_SIZE);
-        let keyIndex = 0;
-        let runningCategorizedBookmarks = [...allCategorizedBookmarks];
+        const MAX_CONCURRENT_WORKERS = 3; // Limit concurrent workers
 
+        let runningCategorizedBookmarks = [...allCategorizedBookmarks];
+        let completedBatches = 0;
+        let failedBatches = 0;
+        let nextBatchToStart = 0;
+        const batchResults: { [key: number]: CategorizedBookmark[] } = {};
         const userInstructionBlock = customInstructions.trim()
             ? `\n\nUSER'S CUSTOM INSTRUCTIONS (Follow these strictly):\n- ${customInstructions.trim().replace(/\n/g, '\n- ')}`
             : '';
 
-        for (let i = 0; i < totalBatches; i++) {
-             if (stopProcessingRef.current) {
-                setAllCategorizedBookmarks(runningCategorizedBookmarks);
+        // Initialize workers
+        const initializeWorkers = () => {
+            for (let i = 0; i < MAX_CONCURRENT_WORKERS; i++) {
+                const worker = new Worker(new URL('./src/aiWorker.ts', import.meta.url), { type: 'module' });
+                workersRef.current.push(worker);
+
+                worker.onmessage = (e) => {
+                    const { type, data, error, batchIndex } = e.data;
+
+                    if (type === 'log') {
+                        setLogs(prev => [...prev, `[Worker ${batchIndex}] ${data}`]);
+                        addDetailedLog('info', `Worker ${batchIndex}`, data);
+                    } else if (type === 'batch_result') {
+                        activeWorkersRef.current.delete(batchIndex);
+                        completedBatches++;
+                        batchResults[batchIndex] = data.categorizedBatch;
+
+                        // Update token usage
+                        if (data.usage) {
+                            setSessionTokenUsage(prev => ({
+                                promptTokens: prev.promptTokens + (data.usage.promptTokens || 0),
+                                completionTokens: prev.completionTokens + (data.usage.completionTokens || 0),
+                                totalTokens: prev.totalTokens + (data.usage.totalTokens || 0)
+                            }));
+                        }
+
+                        // Update progress
+                        const currentProgress = allCategorizedBookmarks.length + Object.values(batchResults).flat().length;
+                        setProgress({ current: currentProgress, total: bookmarks.length });
+
+                        // Update folders
+                        const allResults = Object.values(batchResults).flat();
+                        const currentFolders = arrayToTree(bookmarks.map(bm => {
+                            const categorized = [...runningCategorizedBookmarks, ...allResults].find(cb => cb.url === bm.url);
+                            return { ...bm, path: categorized?.path || [], tags: categorized?.tags || [] };
+                        }));
+                        setFolders(currentFolders);
+
+                        // Check if all batches are done
+                        if (completedBatches + failedBatches >= totalBatches) {
+                            finalizeProcessing();
+                        } else {
+                            // Start next batch
+                            startNextBatch();
+                        }
+                    } else if (type === 'batch_error') {
+                        activeWorkersRef.current.delete(batchIndex);
+                        failedBatches++;
+                        setLogs(prev => [...prev, `[Worker ${batchIndex}] Lỗi: ${error}`]);
+                        addDetailedLog('error', `Worker ${batchIndex} thất bại`, error);
+
+                        // Check if all batches are done
+                        if (completedBatches + failedBatches >= totalBatches) {
+                            finalizeProcessing();
+                        } else {
+                            // Start next batch
+                            startNextBatch();
+                        }
+                    } else if (type === 'detailed_log') {
+                        // Handle detailed logs from worker
+                        addDetailedLog(data.type, data.title, data.content, data.usage);
+                    } else if (type === 'gemini_request') {
+                        // Handle Gemini request from worker
+                        handleGeminiRequest(data, batchIndex, worker);
+                    }
+                };
+
+                worker.onerror = (error) => {
+                    console.error('Worker error:', error);
+                    setLogs(prev => [...prev, `Lỗi worker: ${error.message}`]);
+                };
+            }
+        };
+
+        const handleGeminiRequest = async (geminiData: any, batchIndex: number, worker: Worker) => {
+            try {
+                const ai = new GoogleGenAI({ apiKey: geminiData.apiKey });
+                const genAiResponse = await ai.models.generateContent({
+                    model: geminiData.model,
+                    contents: geminiData.userContent,
+                    config: {
+                        systemInstruction: geminiData.systemPrompt,
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    title: { type: Type.STRING },
+                                    url: { type: Type.STRING },
+                                    path: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                    tags: { type: Type.ARRAY, items: { type: Type.STRING } }
+                                },
+                                required: ['title', 'url', 'path', 'tags']
+                            }
+                        }
+                    }
+                });
+
+                const usage = genAiResponse.usageMetadata;
+                const tokenInfo = usage ? {
+                    promptTokens: usage.promptTokenCount,
+                    completionTokens: usage.candidatesTokenCount,
+                    totalTokens: usage.totalTokenCount
+                } : undefined;
+
+                const categorizedBatch = JSON.parse(genAiResponse.text.trim());
+
+                worker.postMessage({
+                    type: 'gemini_response',
+                    batchIndex,
+                    categorizedBatch,
+                    usage: tokenInfo
+                });
+            } catch (error: any) {
+                worker.postMessage({
+                    type: 'gemini_response',
+                    batchIndex,
+                    error: error.toString()
+                });
+            }
+        };
+
+        const startNextBatch = () => {
+            if (stopProcessingRef.current) {
+                cleanupWorkers();
                 const stopMsg = "Quá trình đã được người dùng dừng lại.";
                 setLogs(prev => [...prev, stopMsg]);
                 addDetailedLog('info', 'Xử lý đã dừng', stopMsg);
                 setErrorDetails(stopMsg);
                 setAppState(AppState.ERROR);
-                return; // Stop processing
+                return;
             }
 
-            const batch = bookmarksToProcess.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
-            const progressCurrent = allCategorizedBookmarks.length + (i * BATCH_SIZE) + batch.length;
-            const logMsg = `Đang xử lý batch ${i + 1}/${totalBatches} (bookmarks ${progressCurrent}/${bookmarks.length})...`;
-            
-            setProgress({ current: progressCurrent, total: bookmarks.length });
-            setLogs(prev => [...prev, logMsg]);
-            addDetailedLog('info', `Xử lý Batch ${i + 1}/${totalBatches}`, `Số lượng bookmarks: ${batch.length}`);
-            
-            let batchSuccess = false;
+            if (nextBatchToStart >= totalBatches) return;
 
-            while (!batchSuccess && keyIndex < availableKeys.length) {
-                const currentKeyConfig = availableKeys[keyIndex];
-                let retries = 0;
+            const batchIndex = nextBatchToStart;
+            nextBatchToStart++;
 
-                while (retries <= maxRetries) {
-                    try {
-                        if (retries > 0) {
-                            const retryMsg = `Thử lại lần ${retries}/${maxRetries} với key "${currentKeyConfig.name}"...`;
-                            setLogs(prev => [...prev, retryMsg]);
-                            addDetailedLog('info', 'Thử lại yêu cầu', retryMsg);
-                        } else {
-                            const attemptMsg = `Sử dụng key: ${currentKeyConfig.name} (${currentKeyConfig.provider})`;
-                            setLogs(prev => [...prev, attemptMsg]);
-                            addDetailedLog('info', 'Thử nghiệm API Key', `Key: ${currentKeyConfig.name}, Provider: ${currentKeyConfig.provider}`);
-                        }
-                        
-                        let categorizedBatch: CategorizedBookmark[] = [];
-                        const currentTree = arrayToTree(bookmarks.map(bm => {
+            const batch = bookmarksToProcess.slice(batchIndex * BATCH_SIZE, (batchIndex + 1) * BATCH_SIZE);
+            const currentTree = arrayToTree(bookmarks.map(bm => {
+                const categorized = [...runningCategorizedBookmarks, ...Object.values(batchResults).flat()].find(cb => cb.url === bm.url);
+                return { ...bm, path: categorized?.path || [], tags: categorized?.tags || [] };
+            }));
+
+            // Find available worker
+            const availableWorker = workersRef.current.find((_, index) => !activeWorkersRef.current.has(index));
+            if (availableWorker) {
+                activeWorkersRef.current.add(batchIndex);
+                availableWorker.postMessage({
+                    type: 'process_batch',
+                    data: {
+                        batch,
+                        apiConfigs: availableKeys,
+                        systemPrompt,
+                        userInstructionBlock,
+                        currentTree,
+                        batchIndex,
+                        maxRetries
+                    }
+                });
+            }
+        };
+
+        const finalizeProcessing = () => {
+            cleanupWorkers();
+
+            const allResults = Object.values(batchResults).flat();
+            runningCategorizedBookmarks.push(...allResults);
+            setAllCategorizedBookmarks(runningCategorizedBookmarks);
+
+            if (failedBatches > 0) {
+                const errorMsg = `${failedBatches} batch thất bại. Bạn có thể thử lại với các key khác.`;
+                setLogs(prev => [...prev, errorMsg]);
+                addDetailedLog('error', 'Một số batch thất bại', errorMsg);
+                setErrorDetails(errorMsg);
+                setAppState(AppState.ERROR);
+            } else {
+                setAppState(AppState.REVIEW);
+                const successMsg = 'Tái cấu trúc đa luồng hoàn tất! Xem lại các thay đổi.';
+                setLogs(prev => [...prev, successMsg]);
+                addDetailedLog('info', 'Hoàn tất', successMsg);
+            }
+        };
+
+        const cleanupWorkers = () => {
+            workersRef.current.forEach(worker => {
+                worker.postMessage({ type: 'cancel' });
+                worker.terminate();
+            });
+            workersRef.current = [];
+            activeWorkersRef.current.clear();
+        };
+
+        // Start processing based on mode
+        if (processingMode === 'multi') {
+            initializeWorkers();
+            for (let i = 0; i < Math.min(MAX_CONCURRENT_WORKERS, totalBatches); i++) {
+                startNextBatch();
+            }
+        } else {
+            // Single-threaded processing (original sequential approach)
+            await processSequentially();
+        }
+
+        // Sequential processing function (original logic)
+        async function processSequentially() {
+            for (let i = 0; i < totalBatches; i++) {
+                if (stopProcessingRef.current) {
+                    const stopMsg = "Quá trình đã được người dùng dừng lại.";
+                    setLogs(prev => [...prev, stopMsg]);
+                    addDetailedLog('info', 'Xử lý đã dừng', stopMsg);
+                    setErrorDetails(stopMsg);
+                    setAppState(AppState.ERROR);
+                    return;
+                }
+
+                const batch = bookmarksToProcess.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
+                const progressCurrent = allCategorizedBookmarks.length + (i * BATCH_SIZE) + batch.length;
+                const logMsg = `Đang xử lý batch ${i + 1}/${totalBatches} (bookmarks ${progressCurrent}/${bookmarks.length})...`;
+
+                setProgress({ current: progressCurrent, total: bookmarks.length });
+                setLogs(prev => [...prev, logMsg]);
+                addDetailedLog('info', `Xử lý Batch ${i + 1}/${totalBatches}`, `Số lượng bookmarks: ${batch.length}`);
+
+                let batchSuccess = false;
+
+                while (!batchSuccess && availableKeys.length > 0) {
+                    const currentKeyConfig = availableKeys[0]; // Use first available key for sequential
+                    let retries = 0;
+
+                    while (retries <= maxRetries) {
+                        try {
+                            if (retries > 0) {
+                                const retryMsg = `Thử lại lần ${retries}/${maxRetries} với key "${currentKeyConfig.name}"...`;
+                                setLogs(prev => [...prev, retryMsg]);
+                                addDetailedLog('info', 'Thử lại yêu cầu', retryMsg);
+                            } else {
+                                const attemptMsg = `Sử dụng key: ${currentKeyConfig.name} (${currentKeyConfig.provider})`;
+                                setLogs(prev => [...prev, attemptMsg]);
+                                addDetailedLog('info', 'Thử nghiệm API Key', `Key: ${currentKeyConfig.name}, Provider: ${currentKeyConfig.provider}`);
+                            }
+
+                            let categorizedBatch: CategorizedBookmark[] = [];
+                            const currentTree = arrayToTree(bookmarks.map(bm => {
                                 const categorized = runningCategorizedBookmarks.find(cb => cb.url === bm.url);
                                 return { ...bm, path: categorized?.path || [], tags: categorized?.tags || [] };
                             }));
-                        
-                        // API Call Logic
-                        if (currentKeyConfig.provider === 'openrouter') {
-                            addDetailedLog('info', 'Sử dụng OpenRouter', `Model: ${currentKeyConfig.model}`);
-                            const finalSystemPrompt = systemPrompt + "\n\nOutput a JSON object with a single key 'bookmarks' which is an array where each object represents a bookmark with its original 'title', 'url', its final 'path' as an array of Vietnamese folder names (e.g., ['Phát triển Web', 'React']), and 'tags' as an array of Vietnamese strings (e.g., ['hướng dẫn', 'frontend', 'javascript']).";
-                            const userPrompt = `${userInstructionBlock}\n\nEXISTING STRUCTURE:\n${JSON.stringify(currentTree, null, 2)}\n\nBOOKMARKS TO CATEGORIZE:\n${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}`;
-                            const requestPayload = { model: currentKeyConfig.model, response_format: { type: "json_object" }, messages: [{ role: "system", content: finalSystemPrompt }, { role: "user", content: userPrompt }] };
-                            addDetailedLog('request', `Request đến OpenRouter (${currentKeyConfig.model})`, requestPayload);
 
-                            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', headers: { 'Authorization': `Bearer ${currentKeyConfig.apiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': `${location.protocol}//${location.host}`, 'X-Title': 'AI Bookmark Architect' }, body: JSON.stringify(requestPayload) });
+                            // API Call Logic
+                            if (currentKeyConfig.provider === 'openrouter') {
+                                addDetailedLog('info', 'Sử dụng OpenRouter', `Model: ${currentKeyConfig.model}`);
+                                const finalSystemPrompt = systemPrompt + "\n\nOutput a JSON object with a single key 'bookmarks' which is an array where each object represents a bookmark with its original 'title', 'url', its final 'path' as an array of Vietnamese folder names (e.g., ['Phát triển Web', 'React']), and 'tags' as an array of Vietnamese strings (e.g., ['hướng dẫn', 'frontend', 'javascript']).";
+                                const userPrompt = `${userInstructionBlock}\n\nEXISTING STRUCTURE:\n${JSON.stringify(currentTree, null, 2)}\n\nBOOKMARKS TO CATEGORIZE:\n${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}`;
+                                const requestPayload = { model: currentKeyConfig.model, response_format: { type: "json_object" }, messages: [{ role: "system", content: finalSystemPrompt }, { role: "user", content: userPrompt }] };
+                                addDetailedLog('request', `Request đến OpenRouter (${currentKeyConfig.model})`, requestPayload);
 
-                            if (!response.ok) {
-                                const errorText = await response.text();
-                                try {
-                                    const errorData = JSON.parse(errorText);
-                                    throw new Error(`OpenRouter API Error: ${response.status} ${response.statusText} - ${errorData.error?.message || 'Unknown error'}`);
-                                } catch (e) {
-                                    throw new Error(`OpenRouter API Error: ${response.status} ${response.statusText} - ${errorText}`);
+                                const response = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', headers: { 'Authorization': `Bearer ${currentKeyConfig.apiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': `${location.protocol}//${location.host}`, 'X-Title': 'AI Bookmark Architect' }, body: JSON.stringify(requestPayload) });
+
+                                if (!response.ok) {
+                                    const errorText = await response.text();
+                                    try {
+                                        const errorData = JSON.parse(errorText);
+                                        throw new Error(`OpenRouter API Error: ${response.status} ${response.statusText} - ${errorData.error?.message || 'Unknown error'}`);
+                                    } catch (e) {
+                                        throw new Error(`OpenRouter API Error: ${response.status} ${response.statusText} - ${errorText}`);
+                                    }
                                 }
-                            }
-                            const responseData = await response.json();
-                            const usage = responseData.usage;
-                            const tokenInfo = usage ? { promptTokens: usage.prompt_tokens, completionTokens: usage.completion_tokens, totalTokens: usage.total_tokens } : undefined;
-                            if (tokenInfo) {
-                                setSessionTokenUsage(prev => ({ promptTokens: prev.promptTokens + tokenInfo.promptTokens, completionTokens: prev.completionTokens + tokenInfo.completionTokens, totalTokens: prev.totalTokens + tokenInfo.totalTokens }));
-                            }
-                            addDetailedLog('response', `Response từ OpenRouter (${currentKeyConfig.model})`, responseData, tokenInfo);
-                            const jsonContent = JSON.parse(responseData.choices[0].message.content);
-                            categorizedBatch = jsonContent.bookmarks;
-                        } else { // Gemini Provider
-                            const ai = new GoogleGenAI({apiKey: currentKeyConfig.apiKey});
-                            const systemInstruction = systemPrompt + userInstructionBlock;
-                            const userContent = `EXISTING STRUCTURE:\n${JSON.stringify(currentTree, null, 2)}\n\nBOOKMARKS TO CATEGORIZE:\n${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}`;
-                            
-                            addDetailedLog('request', `Request đến Gemini (${currentKeyConfig.model})`, { systemInstruction, userContent });
-                            
-                            const genAiResponse = await ai.models.generateContent({ model: currentKeyConfig.model, contents: userContent, config: { systemInstruction: systemInstruction, responseMimeType: "application/json", responseSchema: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, url: { type: Type.STRING }, path: { type: Type.ARRAY, items: { type: Type.STRING } }, tags: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ['title', 'url', 'path', 'tags'] } } } });
-                            
-                            const usage = genAiResponse.usageMetadata;
-                            const tokenInfo = usage ? { promptTokens: usage.promptTokenCount, completionTokens: usage.candidatesTokenCount, totalTokens: usage.totalTokenCount } : undefined;
-                            if (tokenInfo) {
-                                setSessionTokenUsage(prev => ({ promptTokens: prev.promptTokens + tokenInfo.promptTokens, completionTokens: prev.completionTokens + tokenInfo.completionTokens, totalTokens: prev.totalTokens + tokenInfo.totalTokens }));
-                            }
-                            addDetailedLog('response', `Response từ Gemini (${currentKeyConfig.model})`, genAiResponse, tokenInfo);
-                            categorizedBatch = JSON.parse(genAiResponse.text.trim());
-                        }
+                                const responseData = await response.json();
+                                const usage = responseData.usage;
+                                const tokenInfo = usage ? { promptTokens: usage.prompt_tokens, completionTokens: usage.completion_tokens, totalTokens: usage.total_tokens } : undefined;
+                                if (tokenInfo) {
+                                    setSessionTokenUsage(prev => ({ promptTokens: prev.promptTokens + tokenInfo.promptTokens, completionTokens: prev.completionTokens + tokenInfo.completionTokens, totalTokens: prev.totalTokens + tokenInfo.totalTokens }));
+                                }
+                                addDetailedLog('response', `Response từ OpenRouter (${currentKeyConfig.model})`, responseData, tokenInfo);
+                                const jsonContent = JSON.parse(responseData.choices[0].message.content);
+                                categorizedBatch = jsonContent.bookmarks;
+                            } else { // Gemini Provider
+                                const ai = new GoogleGenAI({apiKey: currentKeyConfig.apiKey});
+                                const systemInstruction = systemPrompt + userInstructionBlock;
+                                const userContent = `EXISTING STRUCTURE:\n${JSON.stringify(currentTree, null, 2)}\n\nBOOKMARKS TO CATEGORIZE:\n${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}`;
 
-                        runningCategorizedBookmarks.push(...categorizedBatch);
-                        const currentFolders = arrayToTree(bookmarks.map(bm => {
-                            const categorized = runningCategorizedBookmarks.find(cb => cb.url === bm.url);
-                            return { ...bm, path: categorized?.path || [], tags: categorized?.tags || [] };
-                        }));
-                        setFolders(currentFolders);
-                        
-                        batchSuccess = true;
-                        break;
-                    } catch (error: any) {
-                        const errorMessage = error.toString();
-                        setLogs(prev => [...prev, `Lỗi với key "${currentKeyConfig.name}": ${errorMessage.substring(0, 100)}...`]);
-                        addDetailedLog('error', `Lỗi với key "${currentKeyConfig.name}" (Lần thử ${retries + 1})`, { message: errorMessage, details: error });
+                                addDetailedLog('request', `Request đến Gemini (${currentKeyConfig.model})`, { systemInstruction, userContent });
 
-                        const isFatalError = errorMessage.includes('429') || errorMessage.toLowerCase().includes('quota') || errorMessage.includes('API key');
-                        if (isFatalError) {
-                             const quotaErrorMsg = `Key "${currentKeyConfig.name}" đã gặp lỗi nghiêm trọng (hết hạn mức hoặc không hợp lệ). Đang chuyển key...`;
-                             setLogs(prev => [...prev, quotaErrorMsg]);
-                             addDetailedLog('error', 'Lỗi nghiêm trọng của Key', quotaErrorMsg);
-                             await handleToggleApiConfigStatus(currentKeyConfig.id, 'error');
-                             break;
+                                const genAiResponse = await ai.models.generateContent({ model: currentKeyConfig.model, contents: userContent, config: { systemInstruction: systemInstruction, responseMimeType: "application/json", responseSchema: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, url: { type: Type.STRING }, path: { type: Type.ARRAY, items: { type: Type.STRING } }, tags: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ['title', 'url', 'path', 'tags'] } } } });
+
+                                const usage = genAiResponse.usageMetadata;
+                                const tokenInfo = usage ? { promptTokens: usage.promptTokenCount, completionTokens: usage.candidatesTokenCount, totalTokens: usage.totalTokenCount } : undefined;
+                                if (tokenInfo) {
+                                    setSessionTokenUsage(prev => ({ promptTokens: prev.promptTokens + tokenInfo.promptTokens, completionTokens: prev.completionTokens + tokenInfo.completionTokens, totalTokens: prev.totalTokens + tokenInfo.totalTokens }));
+                                }
+                                addDetailedLog('response', `Response từ Gemini (${currentKeyConfig.model})`, genAiResponse, tokenInfo);
+                                categorizedBatch = JSON.parse(genAiResponse.text.trim());
+                            }
+
+                            runningCategorizedBookmarks.push(...categorizedBatch);
+                            const currentFolders = arrayToTree(bookmarks.map(bm => {
+                                const categorized = runningCategorizedBookmarks.find(cb => cb.url === bm.url);
+                                return { ...bm, path: categorized?.path || [], tags: categorized?.tags || [] };
+                            }));
+                            setFolders(currentFolders);
+
+                            batchSuccess = true;
+                            break;
+                        } catch (error: any) {
+                            const errorMessage = error.toString();
+                            setLogs(prev => [...prev, `Lỗi với key "${currentKeyConfig.name}": ${errorMessage.substring(0, 100)}...`]);
+                            addDetailedLog('error', `Lỗi với key "${currentKeyConfig.name}" (Lần thử ${retries + 1})`, { message: errorMessage, details: error });
+
+                            const isFatalError = errorMessage.includes('429') || errorMessage.toLowerCase().includes('quota') || errorMessage.includes('API key');
+                            if (isFatalError) {
+                                 const quotaErrorMsg = `Key "${currentKeyConfig.name}" đã gặp lỗi nghiêm trọng (hết hạn mức hoặc không hợp lệ). Đang chuyển key...`;
+                                 setLogs(prev => [...prev, quotaErrorMsg]);
+                                 addDetailedLog('error', 'Lỗi nghiêm trọng của Key', quotaErrorMsg);
+                                 await handleToggleApiConfigStatus(currentKeyConfig.id, 'error');
+                                 availableKeys.shift(); // Remove this key
+                                 break;
+                            }
+
+                            retries++;
+                            if (retries > maxRetries) {
+                                const maxRetriesMsg = `Đã đạt số lần thử lại tối đa cho key "${currentKeyConfig.name}". Đang chuyển key...`;
+                                 setLogs(prev => [...prev, maxRetriesMsg]);
+                                 addDetailedLog('error', 'Đạt giới hạn thử lại', maxRetriesMsg);
+                                 availableKeys.shift(); // Remove this key
+                                 break;
+                            }
                         }
-                        
-                        retries++;
-                        if (retries > maxRetries) {
-                            const maxRetriesMsg = `Đã đạt số lần thử lại tối đa cho key "${currentKeyConfig.name}". Đang chuyển key...`;
-                             setLogs(prev => [...prev, maxRetriesMsg]);
-                             addDetailedLog('error', 'Đạt giới hạn thử lại', maxRetriesMsg);
-                             break;
-                        }
+                    }
+
+                    if (!batchSuccess && availableKeys.length === 0) {
+                        break; // No more keys to try
                     }
                 }
 
-                if (batchSuccess) {
-                    keyIndex = 0; // Reset key index on successful batch
-                } else {
-                    keyIndex++;
+                if (!batchSuccess) {
+                    setAllCategorizedBookmarks(runningCategorizedBookmarks);
+                    const finalErrorMsg = `Xử lý batch ${i+1} thất bại sau khi thử tất cả các key.`;
+                    setLogs(prev => [...prev, finalErrorMsg]);
+                    addDetailedLog('error', 'Batch thất bại', finalErrorMsg);
+                    setErrorDetails(finalErrorMsg + " Bạn có thể thêm API key mới và tiếp tục.");
+                    setAppState(AppState.ERROR);
+                    return;
                 }
             }
 
-            if (!batchSuccess) {
-                setAllCategorizedBookmarks(runningCategorizedBookmarks);
-                const finalErrorMsg = `Xử lý batch ${i+1} thất bại sau khi thử tất cả các key.`;
-                setLogs(prev => [...prev, finalErrorMsg]);
-                addDetailedLog('error', 'Batch thất bại', finalErrorMsg);
-                setErrorDetails(finalErrorMsg + " Bạn có thể thêm API key mới và tiếp tục.");
-                setAppState(AppState.ERROR);
-                return; // Stop processing
-            }
-        } 
-        setAllCategorizedBookmarks(runningCategorizedBookmarks);
-        
-        setAppState(AppState.REVIEW);
-        const successMsg = 'Tái cấu trúc hoàn tất! Xem lại các thay đổi.';
-        setLogs(prev => [...prev, successMsg]);
-        addDetailedLog('info', 'Hoàn tất', successMsg);
+            setAllCategorizedBookmarks(runningCategorizedBookmarks);
+
+            setAppState(AppState.REVIEW);
+            const successMsg = 'Tái cấu trúc đơn luồng hoàn tất! Xem lại các thay đổi.';
+            setLogs(prev => [...prev, successMsg]);
+            addDetailedLog('info', 'Hoàn tất', successMsg);
+        }
     };
     
     const applyChanges = async () => {
@@ -820,6 +1035,7 @@ ${bookmarksHtml}</DL><p>`;
                                     customInstructions={customInstructions}
                                     batchSize={batchSize}
                                     maxRetries={maxRetries}
+                                    processingMode={processingMode}
                                     hasPartialResults={allCategorizedBookmarks.length > 0}
                                     onStart={() => startRestructuring(false)}
                                     onStop={handleStopRestructuring}
@@ -831,6 +1047,7 @@ ${bookmarksHtml}</DL><p>`;
                                     onCustomInstructionsChange={setCustomInstructions}
                                     onBatchSizeChange={setBatchSize}
                                     onMaxRetriesChange={setMaxRetries}
+                                    onProcessingModeChange={setProcessingMode}
                                 />
                             </div>
                         )}
