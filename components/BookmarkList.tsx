@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { Bookmark } from '../types';
 import { OpenBookIcon } from './Icons';
@@ -12,15 +11,26 @@ const BookmarkItem: React.FC<{ bookmark: Bookmark }> = ({ bookmark }) => {
     const faviconUrl = `https://www.google.com/s2/favicons?sz=32&domain_url=${bookmark.url}`;
 
     return (
-        <div className="flex items-center p-3 hover:bg-gray-700/40 rounded-lg transition-colors duration-150">
-            <img src={faviconUrl} alt="" className="w-5 h-5 mr-4 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-200 truncate">{bookmark.title}</p>
-                <p className="text-xs text-gray-500 truncate">{bookmark.url}</p>
+        <div className="p-3 hover:bg-gray-700/40 rounded-lg transition-colors duration-150">
+            <div className="flex items-center">
+                <img src={faviconUrl} alt="" className="w-5 h-5 mr-4 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-200 truncate">{bookmark.title}</p>
+                    <p className="text-xs text-gray-500 truncate">{bookmark.url}</p>
+                </div>
+                <a href={bookmark.url} target="_blank" rel="noopener noreferrer" className="ml-4 text-xs font-semibold bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full hover:bg-emerald-500/30 transition-colors flex-shrink-0">
+                    Mở
+                </a>
             </div>
-            <button className="ml-4 text-xs font-semibold bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full hover:bg-emerald-500/30 transition-colors">
-                Thử AI
-            </button>
+            {bookmark.tags && bookmark.tags.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2 pl-9">
+                    {bookmark.tags.map((tag, index) => (
+                        <span key={index} className="px-2 py-0.5 text-xs font-medium bg-gray-600/50 text-gray-300 rounded-full">
+                            {tag}
+                        </span>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };

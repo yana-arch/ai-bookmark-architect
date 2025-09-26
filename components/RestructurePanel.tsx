@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { AppState } from '../types';
 import type { ApiConfig } from '../types';
@@ -11,22 +10,39 @@ interface RestructurePanelProps {
     errorDetails: string | null;
     apiConfigs: ApiConfig[];
     customInstructions: string;
+    batchSize: number;
+    maxRetries: number;
     onStart: () => void;
     onApply: () => void;
     onDiscard: () => void;
     onRetry: () => void;
     onOpenApiModal: () => void;
+    onOpenLogModal: () => void;
     onCustomInstructionsChange: (instructions: string) => void;
+    onBatchSizeChange: (size: number) => void;
+    onMaxRetriesChange: (retries: number) => void;
 }
 
 const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
     const { 
         appState, progress, logs, errorDetails, onStart, onApply, onDiscard, onRetry, 
-        apiConfigs, onOpenApiModal,
-        customInstructions, onCustomInstructionsChange 
+        apiConfigs, onOpenApiModal, onOpenLogModal,
+        customInstructions, onCustomInstructionsChange,
+        batchSize, onBatchSizeChange, maxRetries, onMaxRetriesChange
     } = props;
     const progressPercentage = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
     
+    const LogViewerButton = () => (
+        <div className="mt-4">
+            <button
+                onClick={onOpenLogModal}
+                className="w-full text-sm text-sky-300 border border-sky-300/50 rounded-md py-2 hover:bg-sky-300/10 transition-colors"
+            >
+                Xem Log Kỹ Thuật
+            </button>
+        </div>
+    );
+
     const renderContent = () => {
         switch(appState) {
             case AppState.LOADED:
@@ -44,7 +60,7 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                         <div className="mt-6">
                             <details className="group">
                                 <summary className="text-sm font-medium text-gray-400 cursor-pointer list-none flex items-center justify-between group-hover:text-white transition-colors">
-                                    <span>Chỉ dẫn cho AI (Tùy chọn)</span>
+                                    <span>Tùy chọn & Chỉ dẫn cho AI</span>
                                     <svg className="w-4 h-4 transition-transform duration-200 transform-gpu group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                                     </svg>
@@ -57,10 +73,40 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                                         id="ai-instructions"
                                         value={customInstructions}
                                         onChange={(e) => onCustomInstructionsChange(e.target.value)}
-                                        rows={4}
+                                        rows={3}
                                         placeholder="Ví dụ: Chỉ sử dụng tiếng Anh cho tên thư mục. Giới hạn 2 cấp thư mục."
                                         className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-y"
                                     />
+                                    <div className="mt-4 grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label htmlFor="batch-size" className="block text-xs text-gray-400 mb-1">
+                                                Số lượng bookmark mỗi batch
+                                            </label>
+                                            <input
+                                                type="number"
+                                                id="batch-size"
+                                                value={batchSize}
+                                                onChange={(e) => onBatchSizeChange(parseInt(e.target.value, 10))}
+                                                min="1"
+                                                max="50"
+                                                className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label htmlFor="max-retries" className="block text-xs text-gray-400 mb-1">
+                                                Số lần thử lại trên mỗi key
+                                            </label>
+                                            <input
+                                                type="number"
+                                                id="max-retries"
+                                                value={maxRetries}
+                                                onChange={(e) => onMaxRetriesChange(parseInt(e.target.value, 10))}
+                                                min="0"
+                                                max="5"
+                                                className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </details>
                         </div>
@@ -87,6 +133,7 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                                ))}
                             </ul>
                         </div>
+                        <LogViewerButton />
                     </>
                 );
             case AppState.REVIEW:
@@ -105,7 +152,8 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                                ))}
                             </ul>
                         </div>
-                        <div className="space-y-3">
+                        <LogViewerButton />
+                        <div className="space-y-3 mt-4">
                             <button 
                                 onClick={onApply}
                                 className="w-full bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-600 transition-all duration-200 transform hover:scale-105 shadow-lg">
@@ -140,7 +188,8 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                                ))}
                             </ul>
                         </div>
-                        <div className="space-y-3">
+                        <LogViewerButton />
+                        <div className="space-y-3 mt-4">
                             <button 
                                 onClick={onApply}
                                 className="w-full bg-emerald-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-600 transition-colors">

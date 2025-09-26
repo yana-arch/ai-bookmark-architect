@@ -1,4 +1,3 @@
-// Fix: Define and export all necessary types and enums. All database logic has been moved to db.ts.
 export enum AppState {
   EMPTY = 'EMPTY',
   LOADED = 'LOADED',
@@ -14,10 +13,11 @@ export interface Bookmark {
   url: string;
   parentId: string | null;
   path?: string[];
+  tags?: string[];
 }
 
 export interface Folder {
-  id: string;
+  id:string;
   name: string;
   children: (Folder | Bookmark)[];
   parentId: string | null;
@@ -25,6 +25,7 @@ export interface Folder {
 
 export type CategorizedBookmark = Bookmark & {
   path: string[];
+  tags: string[];
 };
 
 export type ApiKeyStatus = 'active' | 'inactive' | 'error';
@@ -36,4 +37,12 @@ export interface ApiConfig {
   apiKey: string;
   model: string;
   status: ApiKeyStatus;
+}
+
+export interface DetailedLog {
+  id: string;
+  timestamp: string;
+  type: 'info' | 'request' | 'response' | 'error';
+  title: string;
+  content: string | object;
 }

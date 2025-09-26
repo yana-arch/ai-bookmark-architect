@@ -2,13 +2,14 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { AILogoIcon } from './components/Icons';
 // Fix: Consolidate type imports into a single statement.
-import { AppState, type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig } from './types';
+import { AppState, type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog } from './types';
 import Sidebar from './components/Sidebar';
 import BookmarkList from './components/BookmarkList';
 import RestructurePanel from './components/RestructurePanel';
 import FileDropzone from './components/FileDropzone';
 import ImportModal from './components/ImportModal';
 import ApiConfigModal from './components/ApiConfigModal';
+import LogModal from './components/LogModal';
 import * as db from './db';
 
 const createMockData = (): Bookmark[] => {
@@ -46,12 +47,16 @@ const App: React.FC = () => {
     const [appState, setAppState] = useState<AppState>(AppState.EMPTY);
     const [progress, setProgress] = useState({ current: 0, total: 0 });
     const [logs, setLogs] = useState<string[]>([]);
+    const [detailedLogs, setDetailedLogs] = useState<DetailedLog[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [apiConfigs, setApiConfigs] = useState<ApiConfig[]>([]);
     const [errorDetails, setErrorDetails] = useState<string | null>(null);
     const [importFile, setImportFile] = useState<File | null>(null);
     const [customInstructions, setCustomInstructions] = useState<string>('');
+    const [batchSize, setBatchSize] = useState(5);
+    const [maxRetries, setMaxRetries] = useState(2);
     const [isApiModalOpen, setIsApiModalOpen] = useState(false);
+    const [isLogModalOpen, setIsLogModalOpen] = useState(false);
     const importInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -160,20 +165,33 @@ const App: React.FC = () => {
     };
 
     const startRestructuring = async () => {
+        const addDetailedLog = (type: DetailedLog['type'], title: string, content: string | object) => {
+            setDetailedLogs(prev => [...prev, {
+                id: `log-${Date.now()}-${Math.random()}`,
+                timestamp: new Date().toLocaleTimeString('en-GB'),
+                type,
+                title,
+                content
+            }]);
+        };
+
         let availableKeys = apiConfigs.filter(c => c.status === 'active');
         if (availableKeys.length === 0) {
             setErrorDetails("Không có API key nào đang hoạt động. Vui lòng thêm một key hợp lệ.");
             setLogs(["Lỗi: Không tìm thấy API key đang hoạt động."]);
+            addDetailedLog('error', "Không tìm thấy API key", "Không có API key nào được cấu hình hoặc đang hoạt động.");
             setAppState(AppState.ERROR);
             return;
         }
 
         setAppState(AppState.PROCESSING);
         setLogs(['Bắt đầu quá trình tái cấu trúc...']);
+        setDetailedLogs([]);
+        addDetailedLog('info', 'Bắt đầu quá trình', `Tổng số bookmarks: ${bookmarks.length}, Cỡ batch: ${batchSize}, Thử lại tối đa: ${maxRetries}`);
         setProgress({ current: 0, total: 0 });
         setErrorDetails(null);
 
-        const BATCH_SIZE = 5;
+        const BATCH_SIZE = Math.max(1, batchSize); // Ensure batch size is at least 1
         const totalBatches = Math.ceil(bookmarks.length / BATCH_SIZE);
         setProgress({ current: 0, total: totalBatches });
 
@@ -187,135 +205,172 @@ const App: React.FC = () => {
 
         for (let i = 0; i < totalBatches; i++) {
             const batch = bookmarks.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
+            const logMsg = `Đang xử lý batch ${i + 1}/${totalBatches}...`;
             setProgress({ current: i + 1, total: totalBatches });
-            setLogs(prev => [...prev, `Đang xử lý batch ${i + 1}/${totalBatches}...`]);
+            setLogs(prev => [...prev, logMsg]);
+            addDetailedLog('info', `Xử lý Batch ${i + 1}`, `Số lượng bookmarks: ${batch.length}`);
             
             let batchSuccess = false;
-            let attempt = 0;
-            
-            while(!batchSuccess && keyIndex < availableKeys.length) {
+
+            while (!batchSuccess && keyIndex < availableKeys.length) {
                 const currentKeyConfig = availableKeys[keyIndex];
-                attempt++;
-                setLogs(prev => [...prev, `Thử nghiệm ${attempt} với key: ${currentKeyConfig.name} (${currentKeyConfig.provider})`]);
-                let categorizedBatch: CategorizedBookmark[] = [];
+                let retries = 0;
 
-                try {
-                     if (currentKeyConfig.provider === 'openrouter') {
-                        setLogs(prev => [...prev, `Sử dụng OpenRouter với model: ${currentKeyConfig.model}`]);
+                while (retries <= maxRetries) {
+                    try {
+                        if (retries > 0) {
+                            const retryMsg = `Thử lại lần ${retries}/${maxRetries} với key "${currentKeyConfig.name}"...`;
+                            setLogs(prev => [...prev, retryMsg]);
+                            addDetailedLog('info', 'Thử lại yêu cầu', retryMsg);
+                        } else {
+                            const attemptMsg = `Sử dụng key: ${currentKeyConfig.name} (${currentKeyConfig.provider})`;
+                            setLogs(prev => [...prev, attemptMsg]);
+                            addDetailedLog('info', 'Thử nghiệm API Key', `Key: ${currentKeyConfig.name}, Provider: ${currentKeyConfig.provider}`);
+                        }
                         
-                        const systemPrompt = `You are an intelligent bookmark organizer. Your goal is to create a clean, hierarchical folder structure in VIETNAMESE. You will be given an *existing folder structure* and a *new list of bookmarks*. For each bookmark, place it into the most logical folder path. **Crucially, if a suitable folder already exists, use it.** Do not create new folders that are synonyms or slight variations of existing ones. Consolidate them. If you must create a new folder, make its name clear and distinct. You can create nested folders. The folder structure should be logical and not too deep. Output a JSON object with a single key 'bookmarks' which is an array where each object represents a bookmark with its original 'title', 'url', and its final 'path' as an array of Vietnamese folder names (e.g., ['Phát triển Web', 'React', 'Hooks']).`;
-                        const userPrompt = `
-                            ${userInstructionBlock}
-
-                            EXISTING STRUCTURE:
-                            ${JSON.stringify(currentTree, null, 2)}
-
-                            BOOKMARKS TO CATEGORIZE:
-                            ${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}
-                        `;
+                        let categorizedBatch: CategorizedBookmark[] = [];
                         
-                        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${currentKeyConfig.apiKey}`,
-                                'Content-Type': 'application/json',
-                                'HTTP-Referer': `${location.protocol}//${location.host}`,
-                                'X-Title': 'AI Bookmark Architect',
-                            },
-                            body: JSON.stringify({
+                        // API Call Logic
+                        if (currentKeyConfig.provider === 'openrouter') {
+                            addDetailedLog('info', 'Sử dụng OpenRouter', `Model: ${currentKeyConfig.model}`);
+                            
+                            const systemPrompt = `You are an intelligent bookmark organizer. Your goal is to create a clean, hierarchical folder structure in VIETNAMESE. You will be given an *existing folder structure* and a *new list of bookmarks*. For each bookmark, you must:
+1.  Place it into the most logical folder path. **Crucially, if a suitable folder already exists, use it.** Do not create new folders that are synonyms or slight variations of existing ones. Consolidate them.
+2.  Generate 3-5 relevant, concise, VIETNAMESE tags for the bookmark.
+Output a JSON object with a single key 'bookmarks' which is an array where each object represents a bookmark with its original 'title', 'url', its final 'path' as an array of Vietnamese folder names (e.g., ['Phát triển Web', 'React']), and 'tags' as an array of Vietnamese strings (e.g., ['hướng dẫn', 'frontend', 'javascript']).`;
+                            const userPrompt = `
+                                ${userInstructionBlock}
+
+                                EXISTING STRUCTURE:
+                                ${JSON.stringify(currentTree, null, 2)}
+
+                                BOOKMARKS TO CATEGORIZE:
+                                ${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}
+                            `;
+                            const requestPayload = {
                                 model: currentKeyConfig.model,
                                 response_format: { type: "json_object" },
                                 messages: [
                                     { role: "system", content: systemPrompt },
                                     { role: "user", content: userPrompt }
                                 ]
-                            })
-                        });
+                            };
+                            addDetailedLog('request', `Request đến OpenRouter (${currentKeyConfig.model})`, requestPayload);
 
-                        if (!response.ok) {
-                            const errorData = await response.json();
-                            throw new Error(`OpenRouter API Error: ${response.status} ${response.statusText} - ${errorData.error?.message || 'Unknown error'}`);
-                        }
-                        
-                        const responseData = await response.json();
-                        const jsonContent = JSON.parse(responseData.choices[0].message.content);
-                        categorizedBatch = jsonContent.bookmarks;
+                            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${currentKeyConfig.apiKey}`,
+                                    'Content-Type': 'application/json',
+                                    'HTTP-Referer': `${location.protocol}//${location.host}`,
+                                    'X-Title': 'AI Bookmark Architect',
+                                },
+                                body: JSON.stringify(requestPayload)
+                            });
 
-                    } else { // Gemini Provider
-                        const ai = new GoogleGenAI({apiKey: currentKeyConfig.apiKey});
-                        const prompt = `You are an intelligent bookmark organizer. Your goal is to create a clean, hierarchical folder structure in VIETNAMESE. You will be given an *existing folder structure* and a *new list of bookmarks*. For each bookmark, place it into the most logical folder path.
-                        **Crucially, if a suitable folder already exists, use it.** Do not create new folders that are synonyms or slight variations of existing ones (e.g., if 'Phát triển Web' exists, do not create 'Web Dev'). Consolidate them.
-                        If you must create a new folder, make its name clear and distinct. You can create nested folders.
-                        The folder structure should be logical and not too deep.
-                        ${userInstructionBlock}
-                        
-                        EXISTING STRUCTURE:
-                        ${JSON.stringify(currentTree, null, 2)}
-                        
-                        BOOKMARKS TO CATEGORIZE:
-                        ${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}
-                        
-                        Output a JSON array where each object represents a bookmark with its original 'title', 'url', and its final 'path' as an array of Vietnamese folder names (e.g., ['Phát triển Web', 'React', 'Hooks']).`;
-                        
-                        const response = await ai.models.generateContent({
-                            model: currentKeyConfig.model,
-                            contents: prompt,
-                            config: {
-                                responseMimeType: "application/json",
-                                responseSchema: {
-                                    type: Type.ARRAY,
-                                    items: {
-                                        type: Type.OBJECT,
-                                        properties: {
-                                            title: { type: Type.STRING },
-                                            url: { type: Type.STRING },
-                                            path: { type: Type.ARRAY, items: { type: Type.STRING } }
-                                        },
-                                        required: ['title', 'url', 'path']
+                            if (!response.ok) {
+                                const errorData = await response.json();
+                                throw new Error(`OpenRouter API Error: ${response.status} ${response.statusText} - ${errorData.error?.message || 'Unknown error'}`);
+                            }
+                            
+                            const responseData = await response.json();
+                            addDetailedLog('response', `Response từ OpenRouter (${currentKeyConfig.model})`, responseData);
+                            const jsonContent = JSON.parse(responseData.choices[0].message.content);
+                            categorizedBatch = jsonContent.bookmarks;
+                        } else { // Gemini Provider
+                            const ai = new GoogleGenAI({apiKey: currentKeyConfig.apiKey});
+                            const prompt = `You are an intelligent bookmark organizer. Your goal is to create a clean, hierarchical folder structure in VIETNAMESE. You will be given an *existing folder structure* and a *new list of bookmarks*. For each bookmark, you must:
+1.  Place it into the most logical folder path. **Crucially, if a suitable folder already exists, use it.** Do not create new folders that are synonyms or slight variations of existing ones. Consolidate them.
+2.  Generate 3-5 relevant, concise, VIETNAMESE tags for the bookmark.
+                            
+                            ${userInstructionBlock}
+                            
+                            EXISTING STRUCTURE:
+                            ${JSON.stringify(currentTree, null, 2)}
+                            
+                            BOOKMARKS TO CATEGORIZE:
+                            ${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}
+                            
+                            Output a JSON array where each object represents a bookmark with its original 'title', 'url', its final 'path' as an array of folder names, and 'tags' as an array of strings.`;
+                            
+                            addDetailedLog('request', `Request đến Gemini (${currentKeyConfig.model})`, { prompt });
+                            const response = await ai.models.generateContent({
+                                model: currentKeyConfig.model,
+                                contents: prompt,
+                                config: {
+                                    responseMimeType: "application/json",
+                                    responseSchema: {
+                                        type: Type.ARRAY,
+                                        items: {
+                                            type: Type.OBJECT,
+                                            properties: {
+                                                title: { type: Type.STRING },
+                                                url: { type: Type.STRING },
+                                                path: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                                tags: { type: Type.ARRAY, items: { type: Type.STRING } }
+                                            },
+                                            required: ['title', 'url', 'path', 'tags']
+                                        }
                                     }
                                 }
-                            }
-                        });
-
-                        categorizedBatch = JSON.parse(response.text.trim());
-                    }
-
-                    allCategorizedBookmarks.push(...categorizedBatch);
-                    const combinedBookmarksForTree = bookmarks.map(bm => {
-                        const categorized = allCategorizedBookmarks.find(cb => cb.url === bm.url);
-                        return { ...bm, path: categorized?.path || [] };
-                    });
-                    currentTree = arrayToTree(combinedBookmarksForTree);
-                    
-                    batchSuccess = true;
-                } catch (error: any) {
-                    const errorMessage = error.toString();
-                     setLogs(prev => [...prev, `Lỗi với key "${currentKeyConfig.name}": ${errorMessage}`]);
-
-                    if (errorMessage.includes('429') || errorMessage.toLowerCase().includes('quota')) {
-                        keyIndex++; 
-                        if(keyIndex >= availableKeys.length) {
-                             setLogs(prev => [...prev, `Tất cả API keys đã hết hạn mức.`]);
-                             setErrorDetails("Tất cả các API key đã hết hạn mức. Quá trình xử lý đã dừng lại. Kết quả một phần có sẵn để xem xét.");
-                             setAppState(AppState.ERROR);
-                             break;
+                            });
+                            
+                            addDetailedLog('response', `Response từ Gemini (${currentKeyConfig.model})`, response);
+                            categorizedBatch = JSON.parse(response.text.trim());
                         }
-                    } else {
-                        setErrorDetails(`Lỗi không thể phục hồi ở batch ${i + 1}: ${errorMessage}`);
-                        setAppState(AppState.ERROR);
-                        break;
+
+                        allCategorizedBookmarks.push(...categorizedBatch);
+                        const combinedBookmarksForTree = bookmarks.map(bm => {
+                            const categorized = allCategorizedBookmarks.find(cb => cb.url === bm.url);
+                            return { ...bm, path: categorized?.path || [], tags: categorized?.tags || [] };
+                        });
+                        currentTree = arrayToTree(combinedBookmarksForTree);
+                        
+                        batchSuccess = true;
+                        break; // Success, break retry loop
+                    } catch (error: any) {
+                        const errorMessage = error.toString();
+                        setLogs(prev => [...prev, `Lỗi với key "${currentKeyConfig.name}": ${errorMessage.substring(0, 100)}...`]);
+                        addDetailedLog('error', `Lỗi với key "${currentKeyConfig.name}" (Lần thử ${retries + 1})`, { message: errorMessage, details: error });
+
+                        const isQuotaError = errorMessage.includes('429') || errorMessage.toLowerCase().includes('quota');
+                        if (isQuotaError) {
+                             const quotaErrorMsg = `Key "${currentKeyConfig.name}" đã hết hạn mức. Đang chuyển key...`;
+                             setLogs(prev => [...prev, quotaErrorMsg]);
+                             addDetailedLog('error', 'Hết hạn mức', quotaErrorMsg);
+                             break; // Break retry loop, move to next key
+                        }
+                        
+                        retries++;
+                        if (retries > maxRetries) {
+                            const maxRetriesMsg = `Đã đạt số lần thử lại tối đa cho key "${currentKeyConfig.name}". Đang chuyển key...`;
+                             setLogs(prev => [...prev, maxRetriesMsg]);
+                             addDetailedLog('error', 'Đạt giới hạn thử lại', maxRetriesMsg);
+                             break; // Break retry loop, move to next key
+                        }
                     }
+                } // End retry while loop
+
+                if (batchSuccess) {
+                    break; // Batch processed, break key-switching loop
+                } else {
+                    keyIndex++; // This key failed, try next one
                 }
-            } 
+            } // End key-switching while loop
 
             if (!batchSuccess) {
-                break;
+                const finalErrorMsg = `Xử lý batch ${i+1} thất bại sau khi thử tất cả các key.`;
+                setLogs(prev => [...prev, finalErrorMsg]);
+                addDetailedLog('error', 'Batch thất bại', finalErrorMsg);
+                setErrorDetails(finalErrorMsg + " Kết quả một phần có sẵn để xem xét.");
+                setAppState(AppState.ERROR);
+                break; // Stop processing further batches
             }
         } 
         
         const finalCategorized = bookmarks.map(bm => {
             const found = allCategorizedBookmarks.find(cb => cb.url === bm.url);
-            return { ...bm, path: found?.path || []};
+            return { ...bm, path: found?.path || [], tags: found?.tags || [] };
         });
         
         const newFolders = arrayToTree(finalCategorized);
@@ -323,14 +378,21 @@ const App: React.FC = () => {
         
         if(appState !== AppState.ERROR) {
             setAppState(AppState.REVIEW);
-            setLogs(prev => [...prev, 'Tái cấu trúc hoàn tất! Xem lại các thay đổi.']);
+            const successMsg = 'Tái cấu trúc hoàn tất! Xem lại các thay đổi.';
+            setLogs(prev => [...prev, successMsg]);
+            addDetailedLog('info', 'Hoàn tất', successMsg);
         } else {
-             setLogs(prev => [...prev, 'Quá trình dừng lại do lỗi. Xem lại kết quả đã xử lý.']);
+             const partialMsg = 'Quá trình dừng lại do lỗi. Xem lại kết quả đã xử lý.';
+             setLogs(prev => [...prev, partialMsg]);
+             addDetailedLog('info', 'Dừng do lỗi', partialMsg);
         }
     };
     
     const applyChanges = async () => {
+       const updatedBookmarks = flattenFoldersToBookmarks(folders);
+       await db.saveBookmarks(updatedBookmarks);
        await db.saveFolders(folders);
+       setBookmarks(updatedBookmarks);
        setAppState(AppState.STRUCTURED);
        setLogs([]);
        setProgress({current: 0, total: 0});
@@ -341,6 +403,7 @@ const App: React.FC = () => {
         setFolders([]);
         setAppState(AppState.LOADED);
         setLogs([]);
+        setDetailedLogs([]);
         setProgress({current: 0, total: 0});
         setErrorDetails(null);
     };
@@ -406,7 +469,8 @@ const App: React.FC = () => {
 
             items.forEach(item => {
                 if ('url' in item) { // It's a bookmark
-                    html += `${indent}<DT><A HREF="${item.url}">${item.title}</A>\n`;
+                    const tagsAttribute = item.tags && item.tags.length > 0 ? ` TAGS="${item.tags.join(',')}"` : '';
+                    html += `${indent}<DT><A HREF="${item.url}"${tagsAttribute}>${item.title}</A>\n`;
                 } else { // It's a folder
                     html += `${indent}<DT><H3>${item.name}</H3>\n`;
                     if (item.children && item.children.length > 0) {
@@ -483,6 +547,12 @@ ${bookmarksHtml}</DL><p>`;
                     onDeleteApiConfig={handleDeleteApiConfig}
                 />
             )}
+            {isLogModalOpen && (
+                <LogModal 
+                    logs={detailedLogs}
+                    onClose={() => setIsLogModalOpen(false)}
+                />
+            )}
             <div className="w-full max-w-7xl mx-auto flex h-full p-4">
                 <main className="flex flex-1 bg-[#282C34] rounded-xl shadow-2xl overflow-hidden">
                     <Sidebar
@@ -522,12 +592,17 @@ ${bookmarksHtml}</DL><p>`;
                                     errorDetails={errorDetails}
                                     apiConfigs={apiConfigs}
                                     customInstructions={customInstructions}
+                                    batchSize={batchSize}
+                                    maxRetries={maxRetries}
                                     onStart={startRestructuring}
                                     onApply={applyChanges}
                                     onDiscard={discardChanges}
                                     onRetry={retry}
                                     onOpenApiModal={() => setIsApiModalOpen(true)}
+                                    onOpenLogModal={() => setIsLogModalOpen(true)}
                                     onCustomInstructionsChange={setCustomInstructions}
+                                    onBatchSizeChange={setBatchSize}
+                                    onMaxRetriesChange={setMaxRetries}
                                 />
                             </div>
                         )}
@@ -564,6 +639,19 @@ function getBookmarksInFolder(folder: Folder | null): Bookmark[] {
         }
     }
     recurse(folder);
+    return bookmarks;
+}
+
+function flattenFoldersToBookmarks(items: (Folder | Bookmark)[]): Bookmark[] {
+    const bookmarks: Bookmark[] = [];
+    const recurse = (item: Folder | Bookmark) => {
+        if ('url' in item) {
+            bookmarks.push(item);
+        } else if (item.children) {
+            item.children.forEach(recurse);
+        }
+    };
+    items.forEach(recurse);
     return bookmarks;
 }
 
