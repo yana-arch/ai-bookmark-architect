@@ -764,7 +764,7 @@ ${bookmarksHtml}</DL><p>`;
                     />
                 )}
             </Suspense>
-            <div className="w-full max-w-7xl mx-auto flex h-full p-4">
+            <div className="w-full max-w-10xl mx-auto flex h-full p-4">
                 <main className="flex flex-1 bg-[#282C34] rounded-xl shadow-2xl overflow-hidden">
                     <Sidebar
                         folders={foldersWithCounts as Folder[]}
