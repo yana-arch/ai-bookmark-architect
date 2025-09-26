@@ -12,10 +12,11 @@ interface RestructurePanelProps {
     customInstructions: string;
     batchSize: number;
     maxRetries: number;
+    hasPartialResults: boolean;
     onStart: () => void;
     onApply: () => void;
     onDiscard: () => void;
-    onRetry: () => void;
+    onContinue: () => void;
     onOpenApiModal: () => void;
     onOpenLogModal: () => void;
     onCustomInstructionsChange: (instructions: string) => void;
@@ -25,10 +26,11 @@ interface RestructurePanelProps {
 
 const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
     const { 
-        appState, progress, logs, errorDetails, onStart, onApply, onDiscard, onRetry, 
+        appState, progress, logs, errorDetails, onStart, onApply, onDiscard, onContinue, 
         apiConfigs, onOpenApiModal, onOpenLogModal,
         customInstructions, onCustomInstructionsChange,
-        batchSize, onBatchSizeChange, maxRetries, onMaxRetriesChange
+        batchSize, onBatchSizeChange, maxRetries, onMaxRetriesChange,
+        hasPartialResults
     } = props;
     const progressPercentage = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
     
@@ -53,9 +55,9 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                         <p className="text-sm text-gray-400 mb-6">Sắp xếp lại các bookmarks của bạn vào một cấu trúc thư mục thông minh.</p>
                         <button 
                             onClick={onStart}
-                            disabled={apiConfigs.length === 0}
+                            disabled={apiConfigs.filter(c => c.status === 'active').length === 0}
                             className="w-full bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-600 transition-all duration-200 transform hover:scale-105 shadow-lg disabled:bg-gray-600 disabled:cursor-not-allowed disabled:scale-100">
-                            {apiConfigs.length === 0 ? 'Vui lòng thêm API Key' : 'BẮT ĐẦU TÁI CẤU TRÚC'}
+                            {apiConfigs.filter(c => c.status === 'active').length === 0 ? 'Vui lòng thêm API Key' : 'BẮT ĐẦU TÁI CẤU TRÚC'}
                         </button>
                         <div className="mt-6">
                             <details className="group">
@@ -116,16 +118,18 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                 return (
                     <>
                         <h3 className="text-xl font-bold text-white mb-2">
-                            Batch {progress.current}/{progress.total}: Đang Xử Lý...
+                           Đang Xử Lý...
                         </h3>
-                        <p className="text-sm text-gray-400 mb-6">Đang phân tích và gộp các thư mục...</p>
+                         <p className="text-sm text-gray-400 mb-6">
+                            Đã xử lý {progress.current} / {progress.total} bookmarks.
+                        </p>
                         <div className="w-full bg-gray-700 rounded-full h-2.5 mb-6">
                             <div className="bg-emerald-500 h-2.5 rounded-full" style={{ width: `${progressPercentage}%`, transition: 'width 0.5s ease-in-out' }}></div>
                         </div>
                         <div className="bg-gray-900/50 rounded-lg p-3 flex-1 overflow-y-auto">
                             <h4 className="text-sm font-semibold text-gray-300 mb-2">Tech diễn giải</h4>
                             <ul className="text-xs text-gray-400 space-y-2">
-                               {logs.map((log, index) => (
+                               {logs.slice(-10).map((log, index) => (
                                    <li key={index} className="flex items-start">
                                        <span className="text-emerald-400 mr-2">&rarr;</span>
                                        <span>{log}</span>
@@ -175,7 +179,7 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                             <div className="flex">
                                 <WarningIcon className="w-6 h-6 mr-3"/>
                                 <div>
-                                    <strong className="font-bold">Lỗi trùng lặp hoặc API xảy ra:</strong>
+                                    <strong className="font-bold">Lỗi API hoặc hệ thống:</strong>
                                     <span className="block sm:inline ml-1">{errorDetails}</span>
                                 </div>
                             </div>
@@ -190,15 +194,24 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                         </div>
                         <LogViewerButton />
                         <div className="space-y-3 mt-4">
+                             {hasPartialResults && (
+                                <button 
+                                    onClick={onContinue}
+                                    className="w-full bg-sky-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-sky-600 transition-colors transform hover:scale-105 shadow-lg">
+                                    Tiếp tục xử lí
+                                </button>
+                            )}
+                             {hasPartialResults && (
+                                <button 
+                                    onClick={onApply}
+                                    className="w-full bg-emerald-500/80 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-500 transition-colors">
+                                    Áp dụng kết quả đã xử lý
+                                </button>
+                            )}
                             <button 
-                                onClick={onApply}
-                                className="w-full bg-emerald-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-600 transition-colors">
-                                Áp dụng kết quả đã xử lý
-                            </button>
-                            <button 
-                                onClick={onRetry}
+                                onClick={onDiscard}
                                 className="w-full bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors">
-                                Thử Lại
+                                Bắt đầu lại
                             </button>
                         </div>
                     </>
