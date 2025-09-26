@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { AILogoIcon } from './components/Icons';
 // Fix: Consolidate type imports into a single statement.
@@ -8,6 +8,8 @@ import Sidebar from './components/Sidebar';
 import BookmarkList from './components/BookmarkList';
 import RestructurePanel from './components/RestructurePanel';
 import FileDropzone from './components/FileDropzone';
+import ImportModal from './components/ImportModal';
+import ApiConfigModal from './components/ApiConfigModal';
 import * as db from './db';
 
 const createMockData = (): Bookmark[] => {
@@ -48,6 +50,10 @@ const App: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [apiConfigs, setApiConfigs] = useState<ApiConfig[]>([]);
     const [errorDetails, setErrorDetails] = useState<string | null>(null);
+    const [importFile, setImportFile] = useState<File | null>(null);
+    const [customInstructions, setCustomInstructions] = useState<string>('');
+    const [isApiModalOpen, setIsApiModalOpen] = useState(false);
+    const importInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         const loadData = async () => {
@@ -77,6 +83,19 @@ const App: React.FC = () => {
         };
         loadData();
     }, []);
+    
+    const parseBookmarksHTML = (htmlString: string): Bookmark[] => {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlString, 'text/html');
+        const links = Array.from(doc.querySelectorAll('a'));
+        
+        return links.map((link, index) => ({
+            id: `bm-${Date.now()}-${index}`,
+            title: link.textContent || 'No Title',
+            url: link.href,
+            parentId: null
+        }));
+    };
 
     const handleFileLoaded = async (loadedBookmarks: Bookmark[]) => {
         await db.saveBookmarks(loadedBookmarks);
@@ -178,10 +197,15 @@ const App: React.FC = () => {
 
                 try {
                     const ai = new GoogleGenAI({apiKey: currentKeyConfig.apiKey});
+                    const userInstructionBlock = customInstructions.trim()
+                        ? `\n\nUSER'S CUSTOM INSTRUCTIONS (Follow these strictly):\n- ${customInstructions.trim().replace(/\n/g, '\n- ')}`
+                        : '';
+
                     const prompt = `You are an intelligent bookmark organizer. Your goal is to create a clean, hierarchical folder structure in VIETNAMESE. You will be given an *existing folder structure* and a *new list of bookmarks*. For each bookmark, place it into the most logical folder path.
                     **Crucially, if a suitable folder already exists, use it.** Do not create new folders that are synonyms or slight variations of existing ones (e.g., if 'Phát triển Web' exists, do not create 'Web Dev'). Consolidate them.
                     If you must create a new folder, make its name clear and distinct. You can create nested folders.
                     The folder structure should be logical and not too deep.
+                    ${userInstructionBlock}
                     
                     EXISTING STRUCTURE:
                     ${JSON.stringify(currentTree, null, 2)}
@@ -294,6 +318,91 @@ const App: React.FC = () => {
         }
     };
 
+    const handleImportClick = () => {
+        importInputRef.current?.click();
+    };
+
+    const handleFileSelectedForImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (event.target.files && event.target.files.length > 0) {
+            setImportFile(event.target.files[0]);
+            event.target.value = '';
+        }
+    };
+
+    const processImport = async (mode: 'merge' | 'overwrite') => {
+        if (!importFile) return;
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            const content = event.target?.result as string;
+            if (content) {
+                const parsedBookmarks = parseBookmarksHTML(content);
+                
+                let combinedBookmarks: Bookmark[] = [];
+                if (mode === 'merge') {
+                    const existingUrls = new Set(bookmarks.map(bm => bm.url));
+                    const newBookmarks = parsedBookmarks.filter(bm => !existingUrls.has(bm.url));
+                    combinedBookmarks = [...bookmarks, ...newBookmarks];
+                } else { // overwrite
+                    combinedBookmarks = parsedBookmarks;
+                }
+                
+                await db.saveBookmarks(combinedBookmarks);
+                await db.saveFolders([]); // Clear structure on any import
+                setBookmarks(combinedBookmarks);
+                setFolders([]);
+                setSelectedFolderId('root');
+                setAppState(AppState.LOADED);
+            }
+        };
+        reader.readAsText(importFile);
+        setImportFile(null);
+    };
+    
+    const handleExportBookmarks = () => {
+        const buildHtml = (items: (Folder | Bookmark)[], level: number): string => {
+            let html = '';
+            const indent = ' '.repeat(level * 4);
+
+            items.forEach(item => {
+                if ('url' in item) { // It's a bookmark
+                    html += `${indent}<DT><A HREF="${item.url}">${item.title}</A>\n`;
+                } else { // It's a folder
+                    html += `${indent}<DT><H3>${item.name}</H3>\n`;
+                    if (item.children && item.children.length > 0) {
+                        html += `${indent}<DL><p>\n`;
+                        html += buildHtml(item.children, level + 1);
+                        html += `${indent}</DL><p>\n`;
+                    }
+                }
+            });
+            return html;
+        };
+        
+        const itemsToExport = folders.length > 0 ? folders : bookmarks;
+        const bookmarksHtml = buildHtml(itemsToExport, 1);
+        
+        const fullHtml = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<!-- This is an automatically generated file.
+     It will be read and overwritten.
+     DO NOT EDIT! -->
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+<TITLE>Bookmarks</TITLE>
+<H1>Bookmarks</H1>
+<DL><p>
+${bookmarksHtml}</DL><p>`;
+
+        const blob = new Blob([fullHtml], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'bookmarks_export.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
     const selectedFolder = selectedFolderId === 'root' 
         ? { id: 'root', name: 'Tất cả Bookmarks', children: [], parentId: null } 
         : findFolder(folders, selectedFolderId);
@@ -312,6 +421,28 @@ const App: React.FC = () => {
 
     return (
         <div className="flex h-screen w-full bg-[#1E2127] text-gray-300 font-sans">
+            <input 
+                type="file" 
+                ref={importInputRef}
+                className="hidden" 
+                accept=".html"
+                onChange={handleFileSelectedForImport}
+            />
+            {importFile && (
+                <ImportModal 
+                    fileName={importFile.name}
+                    onImport={processImport}
+                    onCancel={() => setImportFile(null)}
+                />
+            )}
+            {isApiModalOpen && (
+                <ApiConfigModal
+                    onClose={() => setIsApiModalOpen(false)}
+                    apiConfigs={apiConfigs}
+                    onSaveApiConfig={handleSaveApiConfig}
+                    onDeleteApiConfig={handleDeleteApiConfig}
+                />
+            )}
             <div className="w-full max-w-7xl mx-auto flex h-full p-4">
                 <main className="flex flex-1 bg-[#282C34] rounded-xl shadow-2xl overflow-hidden">
                     <Sidebar
@@ -319,6 +450,8 @@ const App: React.FC = () => {
                         selectedFolderId={selectedFolderId}
                         onSelectFolder={setSelectedFolderId}
                         onClearData={handleClearData}
+                        onImport={handleImportClick}
+                        onExport={handleExportBookmarks}
                     />
 
                     <div className="flex-1 flex flex-col min-w-0">
@@ -348,12 +481,13 @@ const App: React.FC = () => {
                                     logs={logs}
                                     errorDetails={errorDetails}
                                     apiConfigs={apiConfigs}
+                                    customInstructions={customInstructions}
                                     onStart={startRestructuring}
                                     onApply={applyChanges}
                                     onDiscard={discardChanges}
                                     onRetry={retry}
-                                    onSaveApiConfig={handleSaveApiConfig}
-                                    onDeleteApiConfig={handleDeleteApiConfig}
+                                    onOpenApiModal={() => setIsApiModalOpen(true)}
+                                    onCustomInstructionsChange={setCustomInstructions}
                                 />
                             </div>
                         )}

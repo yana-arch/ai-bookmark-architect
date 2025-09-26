@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export const FolderIcon: React.FC<{ className?: string, isOpen?: boolean }> = ({ className, isOpen }) => (
@@ -67,5 +68,17 @@ export const WarningIcon: React.FC<{ className?: string }> = ({ className }) => 
 export const CogIcon: React.FC<{ className?: string }> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
       <path fillRule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.85 1.567L9.05 5.85c-.09.55-.443.99-.944 1.134l-2.958.75c-.98.25-1.68.99-1.68 1.95v.19c0 .96.7 1.7 1.68 1.95l2.958.75c.5.144.854.584.943 1.134l.178 2.082c.15.904.933 1.567 1.85 1.567h1.844c.917 0 1.699-.663 1.85-1.567l.178-2.082c.09-.55.443-.99.943-1.134l2.958-.75c.98-.25 1.68-.99 1.68-1.95v-.19c0-.96-.7-1.7-1.68-1.95l-2.958-.75c-.5-.144-.854-.584-.943-1.134l-.178-2.082A1.901 1.901 0 0 0 12.922 2.25H11.08Zm-2.363 8.25a.75.75 0 0 1 .75-.75h3.126a.75.75 0 0 1 0 1.5H9.465a.75.75 0 0 1-.75-.75Z" clipRule="evenodd" />
+    </svg>
+);
+
+export const ImportIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+       <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+    </svg>
+);
+
+export const ExportIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+       <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
     </svg>
 );

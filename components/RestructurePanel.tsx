@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+
+import React from 'react';
 import { AppState } from '../types';
 import type { ApiConfig } from '../types';
-import { WarningIcon, CogIcon, TrashIcon } from './Icons';
+import { WarningIcon, CogIcon } from './Icons';
 
 interface RestructurePanelProps {
     appState: AppState;
@@ -9,82 +10,21 @@ interface RestructurePanelProps {
     logs: string[];
     errorDetails: string | null;
     apiConfigs: ApiConfig[];
+    customInstructions: string;
     onStart: () => void;
     onApply: () => void;
     onDiscard: () => void;
     onRetry: () => void;
-    onSaveApiConfig: (config: ApiConfig) => void;
-    onDeleteApiConfig: (id: string) => void;
+    onOpenApiModal: () => void;
+    onCustomInstructionsChange: (instructions: string) => void;
 }
-
-const ApiConfigManager: React.FC<{
-    apiConfigs: ApiConfig[],
-    onSaveApiConfig: (config: ApiConfig) => void;
-    onDeleteApiConfig: (id: string) => void;
-}> = ({ apiConfigs, onSaveApiConfig, onDeleteApiConfig }) => {
-    const [name, setName] = useState('');
-    const [apiKey, setApiKey] = useState('');
-
-    const handleAddKey = (e: React.FormEvent) => {
-        e.preventDefault();
-        if(!name.trim() || !apiKey.trim()) {
-            alert("Vui lòng nhập tên và API key.");
-            return;
-        }
-        onSaveApiConfig({
-            id: `key-${Date.now()}`,
-            name,
-            provider: 'gemini',
-            apiKey,
-            model: 'gemini-2.5-flash',
-            status: 'active'
-        });
-        setName('');
-        setApiKey('');
-    };
-
-    return (
-        <div className="mt-auto pt-6 border-t border-gray-700/50">
-            <h4 className="text-base font-bold text-white mb-3 flex items-center">
-                <CogIcon className="w-5 h-5 mr-2 text-gray-400" />
-                Thêm API Key & Xử Lý
-            </h4>
-
-            <div className="space-y-2 mb-4">
-                {apiConfigs.map(config => (
-                    <div key={config.id} className="flex items-center justify-between bg-gray-900/50 p-2 rounded-md text-sm">
-                        <span className="text-gray-300 font-medium truncate">{config.name}</span>
-                        <TrashIcon onClick={() => onDeleteApiConfig(config.id)} className="w-4 h-4 text-gray-500 hover:text-red-500 cursor-pointer transition-colors" />
-                    </div>
-                ))}
-            </div>
-            
-            <form onSubmit={handleAddKey} className="space-y-3">
-                <input 
-                    type="text"
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    placeholder="Tên gợi nhớ (e.g., Key cá nhân)"
-                    className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-                 <input 
-                    type="password"
-                    value={apiKey}
-                    onChange={e => setApiKey(e.target.value)}
-                    placeholder="Dán API Key của bạn vào đây"
-                    className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-                <button type="submit" className="w-full text-sm bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors">
-                    Thêm & Lưu API Key
-                </button>
-            </form>
-        </div>
-    )
-}
-
 
 const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
-    const { appState, progress, logs, errorDetails, onStart, onApply, onDiscard, onRetry, apiConfigs, onSaveApiConfig, onDeleteApiConfig } = props;
+    const { 
+        appState, progress, logs, errorDetails, onStart, onApply, onDiscard, onRetry, 
+        apiConfigs, onOpenApiModal,
+        customInstructions, onCustomInstructionsChange 
+    } = props;
     const progressPercentage = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
     
     const renderContent = () => {
@@ -93,19 +33,36 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
             case AppState.STRUCTURED:
                  return (
                     <>
-                        <h3 className="text-xl font-bold text-white mb-2">AI Restructuring</h3>
+                        <h3 className="text-xl font-bold text-white mb-2">Tái cấu trúc bằng AI</h3>
                         <p className="text-sm text-gray-400 mb-6">Sắp xếp lại các bookmarks của bạn vào một cấu trúc thư mục thông minh.</p>
                         <button 
                             onClick={onStart}
                             disabled={apiConfigs.length === 0}
                             className="w-full bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-600 transition-all duration-200 transform hover:scale-105 shadow-lg disabled:bg-gray-600 disabled:cursor-not-allowed disabled:scale-100">
-                            {apiConfigs.length === 0 ? 'Vui lòng thêm API Key' : 'KÍCH HOẠT TÁI CẤU TRÚC'}
+                            {apiConfigs.length === 0 ? 'Vui lòng thêm API Key' : 'BẮT ĐẦU TÁI CẤU TRÚC'}
                         </button>
-                        <div className="mt-4 text-xs text-gray-500 text-center">
-                            <label className="flex items-center justify-center space-x-2">
-                                <input type="checkbox" className="form-checkbox bg-gray-700 border-gray-600 rounded text-emerald-500 focus:ring-emerald-500" />
-                                <span>Xem trước mỗi mục được áp dụng</span>
-                            </label>
+                        <div className="mt-6">
+                            <details className="group">
+                                <summary className="text-sm font-medium text-gray-400 cursor-pointer list-none flex items-center justify-between group-hover:text-white transition-colors">
+                                    <span>Chỉ dẫn cho AI (Tùy chọn)</span>
+                                    <svg className="w-4 h-4 transition-transform duration-200 transform-gpu group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                                    </svg>
+                                </summary>
+                                <div className="mt-3">
+                                    <label htmlFor="ai-instructions" className="block text-xs text-gray-400 mb-1">
+                                        Chỉ dẫn về cách đặt tên và phân loại thư mục:
+                                    </label>
+                                    <textarea
+                                        id="ai-instructions"
+                                        value={customInstructions}
+                                        onChange={(e) => onCustomInstructionsChange(e.target.value)}
+                                        rows={4}
+                                        placeholder="Ví dụ: Chỉ sử dụng tiếng Anh cho tên thư mục. Giới hạn 2 cấp thư mục."
+                                        className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-y"
+                                    />
+                                </div>
+                            </details>
                         </div>
                     </>
                 );
@@ -206,11 +163,15 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                 {renderContent()}
             </div>
             {(appState === AppState.LOADED || appState === AppState.STRUCTURED || appState === AppState.ERROR) && (
-                <ApiConfigManager 
-                    apiConfigs={apiConfigs}
-                    onSaveApiConfig={onSaveApiConfig}
-                    onDeleteApiConfig={onDeleteApiConfig}
-                />
+                 <div className="mt-auto pt-6 border-t border-gray-700/50">
+                    <button 
+                        onClick={onOpenApiModal} 
+                        className="w-full flex items-center justify-center text-sm bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                        <CogIcon className="w-5 h-5 mr-2" />
+                        Quản lý API Keys
+                    </button>
+                </div>
             )}
         </aside>
     );
