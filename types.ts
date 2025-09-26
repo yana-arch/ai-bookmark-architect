@@ -36,6 +36,17 @@ export type CategorizedBookmark = Bookmark & {
 
 export type ApiKeyStatus = 'active' | 'inactive' | 'error';
 
+export interface InstructionPreset {
+  id: string;
+  name: string;
+  description: string;
+  folderStructure: string[]; // Predefined folder names
+  namingRules: string[]; // Rules for naming conventions
+  customInstructions: string; // Additional instructions
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface ApiConfig {
   id: string;
   name: string;

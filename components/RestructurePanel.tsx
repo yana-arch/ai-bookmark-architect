@@ -24,6 +24,7 @@ interface RestructurePanelProps {
     onContinue: () => void;
     onOpenApiModal: () => void;
     onOpenLogModal: () => void;
+    onOpenInstructionPresetModal: () => void;
     onSystemPromptChange: (prompt: string) => void;
     onCustomInstructionsChange: (instructions: string) => void;
     onBatchSizeChange: (size: number) => void;
@@ -34,7 +35,7 @@ interface RestructurePanelProps {
 const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
     const {
         appState, progress, logs, errorDetails, onStart, onStop, onApply, onDiscard, onContinue,
-        apiConfigs, onOpenApiModal, onOpenLogModal,
+        apiConfigs, onOpenApiModal, onOpenLogModal, onOpenInstructionPresetModal,
         systemPrompt, onSystemPromptChange, sessionTokenUsage,
         customInstructions, onCustomInstructionsChange,
         batchSize, onBatchSizeChange, maxRetries, onMaxRetriesChange,
@@ -103,9 +104,17 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                                         />
                                     </div>
                                     <div>
-                                        <label htmlFor="ai-instructions" className="block text-xs text-gray-400 mb-1">
-                                            Chỉ dẫn bổ sung (tên thư mục, phân loại):
-                                        </label>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label htmlFor="ai-instructions" className="block text-xs text-gray-400">
+                                                Chỉ dẫn bổ sung (tên thư mục, phân loại):
+                                            </label>
+                                            <button
+                                                onClick={onOpenInstructionPresetModal}
+                                                className="text-xs text-blue-400 hover:text-blue-300 underline"
+                                            >
+                                                Quản lý Preset
+                                            </button>
+                                        </div>
                                         <textarea
                                             id="ai-instructions"
                                             value={customInstructions}
@@ -118,7 +127,7 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label htmlFor="batch-size" className="block text-xs text-gray-400 mb-1">
-                                                Số lượng bookmark mỗi batch
+                                                Số lượng bookmark/batch
                                             </label>
                                             <input
                                                 type="number"

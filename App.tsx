@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspens
 import { GoogleGenAI, Type } from "@google/genai";
 import { AILogoIcon } from './components/Icons';
 // Fix: Consolidate type imports into a single statement.
-import { AppState, BrokenLinkCheckState, type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, ApiKeyStatus, type DuplicateStats } from './types';
+import { AppState, BrokenLinkCheckState, type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, ApiKeyStatus, type DuplicateStats, type InstructionPreset } from './types';
 import Sidebar from './components/Sidebar';
 import BookmarkList from './components/BookmarkList';
 import RestructurePanel from './components/RestructurePanel';
@@ -16,6 +16,7 @@ const ApiConfigModal = lazy(() => import('./components/ApiConfigModal'));
 const LogModal = lazy(() => import('./components/LogModal'));
 const DuplicateModal = lazy(() => import('./components/DuplicateModal'));
 const BrokenLinkModal = lazy(() => import('./components/BrokenLinkModal'));
+const InstructionPresetModal = lazy(() => import('./components/InstructionPresetModal'));
 
 const createMockData = (): Bookmark[] => {
   return [
@@ -75,6 +76,9 @@ const App: React.FC = () => {
     const [isLogModalOpen, setIsLogModalOpen] = useState(false);
     const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
     const [isBrokenLinkModalOpen, setIsBrokenLinkModalOpen] = useState(false);
+    const [isInstructionPresetModalOpen, setIsInstructionPresetModalOpen] = useState(false);
+    const [instructionPresets, setInstructionPresets] = useState<InstructionPreset[]>([]);
+    const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
     const [duplicateStats, setDuplicateStats] = useState<DuplicateStats>({ count: 0, byHost: {} });
     const [brokenLinks, setBrokenLinks] = useState<Bookmark[]>([]);
     const [brokenLinkCheckState, setBrokenLinkCheckState] = useState<BrokenLinkCheckState>(BrokenLinkCheckState.IDLE);
@@ -92,12 +96,14 @@ const App: React.FC = () => {
             const savedFolders = await db.getFolders();
             const savedBookmarks = await db.getBookmarks();
             const savedApiConfigs = await db.getApiConfigs();
-            
+            const savedInstructionPresets = await db.getInstructionPresets();
+
             setApiConfigs(savedApiConfigs || []);
+            setInstructionPresets(savedInstructionPresets || []);
 
             if (savedFolders && savedFolders.length > 0) {
                 setFolders(savedFolders);
-                setBookmarks(savedBookmarks); 
+                setBookmarks(savedBookmarks);
                 setAppState(AppState.STRUCTURED);
                 setSelectedFolderId('root');
             } else if (savedBookmarks && savedBookmarks.length > 0) {
@@ -861,6 +867,40 @@ ${bookmarksHtml}</DL><p>`;
         URL.revokeObjectURL(url);
     }, [folders, bookmarks]);
 
+    // Instruction Preset handlers
+    const handleSaveInstructionPreset = useCallback(async (preset: InstructionPreset) => {
+        await db.saveInstructionPreset(preset);
+        setInstructionPresets(prev => {
+            const existingIndex = prev.findIndex(p => p.id === preset.id);
+            if (existingIndex > -1) {
+                const newPresets = [...prev];
+                newPresets[existingIndex] = preset;
+                return newPresets;
+            }
+            return [...prev, preset];
+        });
+    }, []);
+
+    const handleDeleteInstructionPreset = useCallback(async (id: string) => {
+        await db.deleteInstructionPreset(id);
+        setInstructionPresets(prev => prev.filter(p => p.id !== id));
+        if (selectedPresetId === id) {
+            setSelectedPresetId(null);
+        }
+    }, [selectedPresetId]);
+
+    const handleSelectPreset = useCallback((presetId: string | null) => {
+        setSelectedPresetId(presetId);
+        if (presetId) {
+            const preset = instructionPresets.find(p => p.id === presetId);
+            if (preset) {
+                // Apply preset to current settings
+                setCustomInstructions(preset.customInstructions);
+                // You could also update system prompt or other settings here
+            }
+        }
+    }, [instructionPresets]);
+
     const foldersWithCounts = useMemo(() => {
         const addCounts = (items: (Folder | Bookmark)[]): (Folder | Bookmark)[] => {
             return items.map(item => {
@@ -978,6 +1018,15 @@ ${bookmarksHtml}</DL><p>`;
                         onClean={handleCleanBrokenLinks}
                     />
                 )}
+                {isInstructionPresetModalOpen && (
+                    <InstructionPresetModal
+                        isOpen={isInstructionPresetModalOpen}
+                        onClose={() => setIsInstructionPresetModalOpen(false)}
+                        onSave={handleSaveInstructionPreset}
+                        onDelete={handleDeleteInstructionPreset}
+                        presets={instructionPresets}
+                    />
+                )}
             </Suspense>
             <div className="w-full max-w-10xl mx-auto flex h-full p-4">
                 <main className="flex flex-1 bg-[#282C34] rounded-xl shadow-2xl overflow-hidden">
@@ -1044,6 +1093,7 @@ ${bookmarksHtml}</DL><p>`;
                                     onContinue={continueRestructuring}
                                     onOpenApiModal={() => setIsApiModalOpen(true)}
                                     onOpenLogModal={() => setIsLogModalOpen(true)}
+                                    onOpenInstructionPresetModal={() => setIsInstructionPresetModalOpen(true)}
                                     onCustomInstructionsChange={setCustomInstructions}
                                     onBatchSizeChange={setBatchSize}
                                     onMaxRetriesChange={setMaxRetries}

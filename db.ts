@@ -1,19 +1,20 @@
 import { openDB, IDBPDatabase } from 'idb';
 // Fix: Import ApiConfig type.
-import type { Bookmark, Folder, ApiConfig } from './types';
+import type { Bookmark, Folder, ApiConfig, InstructionPreset } from './types';
 
 const DB_NAME = 'AIBookmarkArchitectDB';
 const BOOKMARKS_STORE = 'bookmarks';
 const FOLDERS_STORE = 'folders';
 // Fix: Add API_CONFIGS_STORE constant.
 const API_CONFIGS_STORE = 'apiConfigs';
+const INSTRUCTION_PRESETS_STORE = 'instructionPresets';
 
 let dbPromise: Promise<IDBPDatabase>;
 
 const initDB = () => {
     if (!dbPromise) {
-        // Fix: Bump DB version to 3 and add indexes for better query performance.
-        dbPromise = openDB(DB_NAME, 3, {
+        // Fix: Bump DB version to 4 and add instruction presets store.
+        dbPromise = openDB(DB_NAME, 4, {
             upgrade(db, oldVersion) {
                 if (oldVersion < 1) {
                     if (!db.objectStoreNames.contains(BOOKMARKS_STORE)) {
@@ -44,6 +45,11 @@ const initDB = () => {
                         bookmarksStore.createIndex('url', 'url', { unique: false });
                         bookmarksStore.createIndex('parentId', 'parentId', { unique: false });
                         bookmarksStore.createIndex('title', 'title', { unique: false });
+                    }
+                }
+                if (oldVersion < 4) {
+                    if (!db.objectStoreNames.contains(INSTRUCTION_PRESETS_STORE)) {
+                        db.createObjectStore(INSTRUCTION_PRESETS_STORE, { keyPath: 'id' });
                     }
                 }
             },
@@ -107,4 +113,25 @@ export const getApiConfigs = async (): Promise<ApiConfig[]> => {
 export const deleteApiConfig = async (id: string): Promise<void> => {
     const db = await initDB();
     await db.delete(API_CONFIGS_STORE, id);
+};
+
+// Instruction Presets CRUD operations
+export const saveInstructionPreset = async (preset: InstructionPreset): Promise<void> => {
+    const db = await initDB();
+    await db.put(INSTRUCTION_PRESETS_STORE, preset);
+};
+
+export const getInstructionPresets = async (): Promise<InstructionPreset[]> => {
+    const db = await initDB();
+    return db.getAll(INSTRUCTION_PRESETS_STORE);
+};
+
+export const getInstructionPreset = async (id: string): Promise<InstructionPreset | undefined> => {
+    const db = await initDB();
+    return db.get(INSTRUCTION_PRESETS_STORE, id);
+};
+
+export const deleteInstructionPreset = async (id: string): Promise<void> => {
+    const db = await initDB();
+    await db.delete(INSTRUCTION_PRESETS_STORE, id);
 };
