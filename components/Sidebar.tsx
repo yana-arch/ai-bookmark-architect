@@ -1,18 +1,24 @@
 
+
 import React, { useState } from 'react';
-import type { Folder, Bookmark } from '../types';
-import { FolderIcon, ChevronRightIcon, TrashIcon, ImportIcon, ExportIcon, SearchIcon, XIcon } from './Icons';
+import { AppState, BrokenLinkCheckState, type Folder, type Bookmark } from '../types';
+import { FolderIcon, ChevronRightIcon, TrashIcon, ImportIcon, ExportIcon, SearchIcon, XIcon, DocumentDuplicateIcon, BrokenLinkIcon } from './Icons';
 
 interface SidebarProps {
     folders: Folder[];
     selectedFolderId: string | null;
     totalBookmarks: number;
     searchQuery: string;
+    duplicateCount: number;
     onSelectFolder: (id: string | null) => void;
     onClearData: () => void;
     onImport: () => void;
     onExport: () => void;
     onSearchChange: (query: string) => void;
+    onOpenDuplicateModal: () => void;
+    onStartBrokenLinkCheck: () => void;
+    brokenLinkCheckState: BrokenLinkCheckState;
+    brokenLinkCheckProgress: { current: number; total: number };
 }
 
 const FolderItem: React.FC<{
@@ -67,7 +73,13 @@ const FolderItem: React.FC<{
 };
 
 
-const Sidebar: React.FC<SidebarProps> = ({ folders, selectedFolderId, onSelectFolder, onClearData, onImport, onExport, searchQuery, onSearchChange, totalBookmarks }) => {
+const Sidebar: React.FC<SidebarProps> = ({ 
+    folders, selectedFolderId, onSelectFolder, onClearData, onImport, onExport, 
+    searchQuery, onSearchChange, totalBookmarks, duplicateCount, onOpenDuplicateModal,
+    onStartBrokenLinkCheck, brokenLinkCheckState, brokenLinkCheckProgress
+}) => {
+    const isCheckingLinks = brokenLinkCheckState === BrokenLinkCheckState.CHECKING;
+
     return (
         <aside className="w-72 bg-[#21252C] p-3 flex-shrink-0 flex flex-col">
             <div className="flex items-center justify-between mb-4">
@@ -135,6 +147,28 @@ const Sidebar: React.FC<SidebarProps> = ({ folders, selectedFolderId, onSelectFo
                         />
                 ))}
             </nav>
+            <div className="mt-auto pt-3 border-t border-gray-700/50 space-y-2">
+                {duplicateCount > 0 && (
+                    <button 
+                        onClick={onOpenDuplicateModal}
+                        className="w-full flex items-center justify-center text-sm bg-yellow-600/20 text-yellow-300 font-bold py-2 px-3 rounded-lg hover:bg-yellow-600/30 transition-colors"
+                    >
+                        <DocumentDuplicateIcon className="w-5 h-5 mr-2" />
+                        Tìm thấy {duplicateCount} mục trùng lặp
+                    </button>
+                )}
+                <button
+                    onClick={onStartBrokenLinkCheck}
+                    disabled={isCheckingLinks}
+                    className="w-full flex items-center justify-center text-sm bg-sky-600/20 text-sky-300 font-bold py-2 px-3 rounded-lg hover:bg-sky-600/30 transition-colors disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-wait"
+                >
+                    <BrokenLinkIcon className={`w-5 h-5 mr-2 ${isCheckingLinks ? 'animate-spin' : ''}`} />
+                    {isCheckingLinks
+                        ? `Đang kiểm tra... (${brokenLinkCheckProgress.current}/${brokenLinkCheckProgress.total})`
+                        : "Kiểm tra liên kết hỏng"
+                    }
+                </button>
+            </div>
         </aside>
     );
 };

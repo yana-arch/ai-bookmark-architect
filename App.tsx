@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { GoogleGenAI, Type } from "@google/genai";
 import { AILogoIcon } from './components/Icons';
 // Fix: Consolidate type imports into a single statement.
-import { AppState, type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, ApiKeyStatus } from './types';
+import { AppState, BrokenLinkCheckState, type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, ApiKeyStatus, type DuplicateStats } from './types';
 import Sidebar from './components/Sidebar';
 import BookmarkList from './components/BookmarkList';
 import RestructurePanel from './components/RestructurePanel';
@@ -10,6 +10,8 @@ import FileDropzone from './components/FileDropzone';
 import ImportModal from './components/ImportModal';
 import ApiConfigModal from './components/ApiConfigModal';
 import LogModal from './components/LogModal';
+import DuplicateModal from './components/DuplicateModal';
+import BrokenLinkModal from './components/BrokenLinkModal';
 import * as db from './db';
 
 const createMockData = (): Bookmark[] => {
@@ -36,6 +38,10 @@ const createMockData = (): Bookmark[] => {
     // Productivity & Tools
     { id: 'bm-14', title: 'Notion - Không gian làm việc tất cả trong một', url: 'https://www.notion.so/', parentId: null },
     { id: 'bm-15', title: 'GitHub - Nơi thế giới xây dựng phần mềm', url: 'https://github.com/', parentId: null },
+    
+    // DUPLICATE MOCK DATA
+    { id: 'bm-16', title: 'React Docs (Bản sao)', url: 'https://react.dev/', parentId: null },
+    { id: 'bm-17', title: 'Figma Mirror', url: 'https://www.figma.com/', parentId: null },
   ];
 };
 
@@ -63,6 +69,12 @@ const App: React.FC = () => {
     const [maxRetries, setMaxRetries] = useState(2);
     const [isApiModalOpen, setIsApiModalOpen] = useState(false);
     const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+    const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+    const [isBrokenLinkModalOpen, setIsBrokenLinkModalOpen] = useState(false);
+    const [duplicateStats, setDuplicateStats] = useState<DuplicateStats>({ count: 0, byHost: {} });
+    const [brokenLinks, setBrokenLinks] = useState<Bookmark[]>([]);
+    const [brokenLinkCheckState, setBrokenLinkCheckState] = useState<BrokenLinkCheckState>(BrokenLinkCheckState.IDLE);
+    const [brokenLinkCheckProgress, setBrokenLinkCheckProgress] = useState({ current: 0, total: 0 });
     const [allCategorizedBookmarks, setAllCategorizedBookmarks] = useState<CategorizedBookmark[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const importInputRef = useRef<HTMLInputElement>(null);
@@ -96,6 +108,45 @@ const App: React.FC = () => {
         };
         loadData();
     }, []);
+
+    const getHostname = (url: string): string => {
+        try {
+            return new URL(url).hostname;
+        } catch (e) {
+            return 'invalid_url';
+        }
+    };
+
+    useEffect(() => {
+        const findDuplicates = () => {
+            const urlMap = new Map<string, Bookmark[]>();
+            bookmarks.forEach(bm => {
+                const existing = urlMap.get(bm.url);
+                if (existing) {
+                    existing.push(bm);
+                } else {
+                    urlMap.set(bm.url, [bm]);
+                }
+            });
+
+            const duplicates = Array.from(urlMap.values()).filter(group => group.length > 1);
+            const totalDuplicates = duplicates.reduce((acc, group) => acc + group.length - 1, 0);
+
+            if (totalDuplicates > 0) {
+                const byHost: { [host: string]: number } = {};
+                duplicates.forEach(group => {
+                    const host = getHostname(group[0].url);
+                    const duplicateCount = group.length - 1;
+                    byHost[host] = (byHost[host] || 0) + duplicateCount;
+                });
+                setDuplicateStats({ count: totalDuplicates, byHost });
+            } else {
+                setDuplicateStats({ count: 0, byHost: {} });
+            }
+        };
+
+        findDuplicates();
+    }, [bookmarks]);
     
     const parseBookmarksHTML = (htmlString: string): Bookmark[] => {
         const parser = new DOMParser();
@@ -142,6 +193,93 @@ const App: React.FC = () => {
         if (config) {
             await handleSaveApiConfig({ ...config, status });
         }
+    };
+
+    const handleCleanDuplicates = async () => {
+        const seenUrls = new Set<string>();
+        const uniqueBookmarks: Bookmark[] = [];
+        // Iterate backwards to keep the "last" (most recent) bookmark
+        for (let i = bookmarks.length - 1; i >= 0; i--) {
+            const bm = bookmarks[i];
+            if (!seenUrls.has(bm.url)) {
+                uniqueBookmarks.push(bm);
+                seenUrls.add(bm.url);
+            }
+        }
+        
+        const cleanedBookmarks = uniqueBookmarks.reverse(); // Restore original order
+        await db.saveBookmarks(cleanedBookmarks);
+        setBookmarks(cleanedBookmarks);
+        
+        // If the current structure is based on the old bookmarks, clear it
+        if (appState === AppState.STRUCTURED || appState === AppState.REVIEW || appState === AppState.ERROR) {
+            await db.saveFolders([]);
+            setFolders([]);
+            setAppState(AppState.LOADED);
+        }
+
+        setIsDuplicateModalOpen(false);
+    };
+
+    const isLinkBroken = async (url: string): Promise<boolean> => {
+        try {
+            await fetch(url, { mode: 'no-cors', signal: AbortSignal.timeout(5000) });
+            return false;
+        } catch (e) {
+            return true;
+        }
+    };
+
+    const handleStartBrokenLinkCheck = async () => {
+        if (brokenLinkCheckState === BrokenLinkCheckState.CHECKING) return;
+        setBrokenLinkCheckState(BrokenLinkCheckState.CHECKING);
+        setBrokenLinkCheckProgress({ current: 0, total: bookmarks.length });
+        const foundBrokenLinks: Bookmark[] = [];
+        const BATCH_SIZE = 10;
+        const DELAY_MS = 200;
+
+        for (let i = 0; i < bookmarks.length; i += BATCH_SIZE) {
+            const batch = bookmarks.slice(i, i + BATCH_SIZE);
+            const promises = batch.map(bm => isLinkBroken(bm.url).then(isBroken => ({ isBroken, bm })));
+            
+            const results = await Promise.all(promises);
+            results.forEach(result => {
+                if (result.isBroken) {
+                    foundBrokenLinks.push(result.bm);
+                }
+            });
+
+            setBrokenLinkCheckProgress(prev => ({ ...prev, current: i + batch.length }));
+            if (i + BATCH_SIZE < bookmarks.length) {
+                 await new Promise(resolve => setTimeout(resolve, DELAY_MS));
+            }
+        }
+
+        setBrokenLinks(foundBrokenLinks);
+        setBrokenLinkCheckState(BrokenLinkCheckState.IDLE);
+        
+        if (foundBrokenLinks.length > 0) {
+            setIsBrokenLinkModalOpen(true);
+        } else {
+            alert('Không tìm thấy liên kết hỏng nào.');
+        }
+    };
+
+    const handleCleanBrokenLinks = async () => {
+        const brokenLinkIds = new Set(brokenLinks.map(bl => bl.id));
+        const cleanedBookmarks = bookmarks.filter(bm => !brokenLinkIds.has(bm.id));
+
+        await db.saveBookmarks(cleanedBookmarks);
+        setBookmarks(cleanedBookmarks);
+
+        if (appState === AppState.STRUCTURED || appState === AppState.REVIEW || appState === AppState.ERROR) {
+            await db.saveFolders([]);
+            setFolders([]);
+            setAppState(AppState.LOADED);
+        }
+
+        setIsBrokenLinkModalOpen(false);
+        setBrokenLinks([]);
     };
 
     const arrayToTree = (bookmarks: (Bookmark & { path?: string[] })[]): (Folder | Bookmark)[] => {
@@ -589,6 +727,20 @@ ${bookmarksHtml}</DL><p>`;
                     onClose={() => setIsLogModalOpen(false)}
                 />
             )}
+            {isDuplicateModalOpen && (
+                <DuplicateModal
+                    stats={duplicateStats}
+                    onClose={() => setIsDuplicateModalOpen(false)}
+                    onClean={handleCleanDuplicates}
+                />
+            )}
+            {isBrokenLinkModalOpen && (
+                <BrokenLinkModal
+                    brokenLinks={brokenLinks}
+                    onClose={() => setIsBrokenLinkModalOpen(false)}
+                    onClean={handleCleanBrokenLinks}
+                />
+            )}
             <div className="w-full max-w-7xl mx-auto flex h-full p-4">
                 <main className="flex flex-1 bg-[#282C34] rounded-xl shadow-2xl overflow-hidden">
                     <Sidebar
@@ -601,6 +753,11 @@ ${bookmarksHtml}</DL><p>`;
                         searchQuery={searchQuery}
                         onSearchChange={setSearchQuery}
                         totalBookmarks={bookmarks.length}
+                        duplicateCount={duplicateStats.count}
+                        onOpenDuplicateModal={() => setIsDuplicateModalOpen(true)}
+                        onStartBrokenLinkCheck={handleStartBrokenLinkCheck}
+                        brokenLinkCheckState={brokenLinkCheckState}
+                        brokenLinkCheckProgress={brokenLinkCheckProgress}
                     />
 
                     <div className="flex-1 flex flex-col min-w-0">

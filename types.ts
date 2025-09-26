@@ -7,6 +7,11 @@ export enum AppState {
   ERROR = 'ERROR',
 }
 
+export enum BrokenLinkCheckState {
+  IDLE = 'IDLE',
+  CHECKING = 'CHECKING',
+}
+
 export interface Bookmark {
   id: string;
   title: string;
@@ -51,4 +56,9 @@ export interface DetailedLog {
     completionTokens: number;
     totalTokens: number;
   };
+}
+
+export interface DuplicateStats {
+  count: number;
+  byHost: { [host: string]: number };
 }
