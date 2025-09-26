@@ -21,6 +21,7 @@ export interface Folder {
   name: string;
   children: (Folder | Bookmark)[];
   parentId: string | null;
+  bookmarkCount?: number;
 }
 
 export type CategorizedBookmark = Bookmark & {

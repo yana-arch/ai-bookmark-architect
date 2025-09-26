@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { AILogoIcon } from './components/Icons';
 // Fix: Consolidate type imports into a single statement.
@@ -58,6 +58,7 @@ const App: React.FC = () => {
     const [isApiModalOpen, setIsApiModalOpen] = useState(false);
     const [isLogModalOpen, setIsLogModalOpen] = useState(false);
     const [allCategorizedBookmarks, setAllCategorizedBookmarks] = useState<CategorizedBookmark[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
     const importInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -466,6 +467,35 @@ ${bookmarksHtml}</DL><p>`;
         URL.revokeObjectURL(url);
     };
 
+    const foldersWithCounts = useMemo(() => {
+        const addCounts = (items: (Folder | Bookmark)[]): (Folder | Bookmark)[] => {
+            return items.map(item => {
+                if ('url' in item) {
+                    return item;
+                }
+                const folder = item as Folder;
+                const bookmarkCount = getBookmarksInFolder(folder).length;
+                return {
+                    ...folder,
+                    bookmarkCount,
+                    children: addCounts(folder.children),
+                };
+            });
+        };
+        return addCounts(folders);
+    }, [folders]);
+
+    const filteredBookmarks = useMemo(() => {
+        if (!searchQuery.trim()) {
+            return [];
+        }
+        const lowercasedQuery = searchQuery.toLowerCase();
+        return bookmarks.filter(bm =>
+            bm.title.toLowerCase().includes(lowercasedQuery) ||
+            bm.url.toLowerCase().includes(lowercasedQuery)
+        );
+    }, [searchQuery, bookmarks]);
+
     const selectedFolder = selectedFolderId === 'root' 
         ? { id: 'root', name: 'Tất cả Bookmarks', children: [], parentId: null } 
         : findFolder(folders, selectedFolderId);
@@ -481,6 +511,16 @@ ${bookmarksHtml}</DL><p>`;
             </div>
         );
     }
+    
+    const isSearching = searchQuery.trim() !== '';
+    const bookmarksToDisplay = isSearching ? filteredBookmarks : displayedBookmarks;
+    const listTitle = isSearching
+        ? `Kết quả tìm kiếm cho "${searchQuery}"`
+        : (selectedFolder?.name || "Tất cả Bookmarks");
+    const noBookmarksMessage = isSearching
+        ? `Không tìm thấy kết quả nào cho "${searchQuery}".`
+        : "Không có bookmark nào trong thư mục này.";
+
 
     return (
         <div className="flex h-screen w-full bg-[#1E2127] text-gray-300 font-sans">
@@ -516,12 +556,15 @@ ${bookmarksHtml}</DL><p>`;
             <div className="w-full max-w-7xl mx-auto flex h-full p-4">
                 <main className="flex flex-1 bg-[#282C34] rounded-xl shadow-2xl overflow-hidden">
                     <Sidebar
-                        folders={folders}
+                        folders={foldersWithCounts as Folder[]}
                         selectedFolderId={selectedFolderId}
                         onSelectFolder={setSelectedFolderId}
                         onClearData={handleClearData}
                         onImport={handleImportClick}
                         onExport={handleExportBookmarks}
+                        searchQuery={searchQuery}
+                        onSearchChange={setSearchQuery}
+                        totalBookmarks={bookmarks.length}
                     />
 
                     <div className="flex-1 flex flex-col min-w-0">
@@ -542,8 +585,9 @@ ${bookmarksHtml}</DL><p>`;
                         {(appState !== AppState.EMPTY) && (
                             <div className="flex flex-1 min-h-0">
                                 <BookmarkList
-                                    bookmarks={displayedBookmarks}
-                                    folderName={selectedFolder?.name || "Tất cả Bookmarks"}
+                                    bookmarks={bookmarksToDisplay}
+                                    folderName={listTitle}
+                                    noBookmarksMessage={noBookmarksMessage}
                                 />
                                 <RestructurePanel
                                     appState={appState}
@@ -602,7 +646,9 @@ function getBookmarksInFolder(folder: Folder | null): Bookmark[] {
             current.children.forEach(recurse);
         }
     }
-    recurse(folder);
+    if (folder.children) {
+        folder.children.forEach(recurse);
+    }
     return bookmarks;
 }
 

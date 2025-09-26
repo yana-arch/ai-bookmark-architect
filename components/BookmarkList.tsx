@@ -5,6 +5,7 @@ import { OpenBookIcon } from './Icons';
 interface BookmarkListProps {
     bookmarks: Bookmark[];
     folderName: string;
+    noBookmarksMessage: string;
 }
 
 const BookmarkItem: React.FC<{ bookmark: Bookmark }> = ({ bookmark }) => {
@@ -36,7 +37,7 @@ const BookmarkItem: React.FC<{ bookmark: Bookmark }> = ({ bookmark }) => {
 };
 
 
-const BookmarkList: React.FC<BookmarkListProps> = ({ bookmarks, folderName }) => {
+const BookmarkList: React.FC<BookmarkListProps> = ({ bookmarks, folderName, noBookmarksMessage }) => {
     return (
         <div className="flex-1 bg-[#282C34] flex flex-col overflow-y-auto">
              <div className="p-4 border-b border-gray-700/50 sticky top-0 bg-[#282C34] z-10">
@@ -50,7 +51,7 @@ const BookmarkList: React.FC<BookmarkListProps> = ({ bookmarks, folderName }) =>
                     bookmarks.map(bm => <BookmarkItem key={bm.id} bookmark={bm} />)
                 ) : (
                     <div className="text-center text-gray-500 py-10">
-                        <p>Không có bookmark nào trong thư mục này.</p>
+                        <p>{noBookmarksMessage}</p>
                     </div>
                 )}
             </div>
