@@ -2,6 +2,7 @@ import React from 'react';
 import { AppState } from '../types';
 import type { ApiConfig } from '../types';
 import { WarningIcon, CogIcon } from './Icons';
+import { formatNumber } from '../src/utils';
 
 interface RestructurePanelProps {
     appState: AppState;
@@ -53,11 +54,12 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
     const TokenUsageDisplay = () => sessionTokenUsage.totalTokens > 0 ? (
         <div className="text-xs text-center text-gray-400 mb-4 p-2 bg-gray-900/50 rounded-md border border-gray-700/50">
             <span>Tokens đã sử dụng: </span>
-            <span className="font-mono text-emerald-400 font-bold">{sessionTokenUsage.totalTokens}</span>
+            <span className="font-mono text-emerald-400 font-bold">{formatNumber(sessionTokenUsage.totalTokens)}</span>
+            <br/>
             <span className="text-gray-500"> (Prompt: </span>
-            <span className="font-mono text-sky-400">{sessionTokenUsage.promptTokens}</span>
+            <span className="font-mono text-sky-400">{formatNumber(sessionTokenUsage.promptTokens)}</span>
             <span className="text-gray-500">, Response: </span>
-            <span className="font-mono text-yellow-400">{sessionTokenUsage.completionTokens}</span>
+            <span className="font-mono text-yellow-400">{formatNumber(sessionTokenUsage.completionTokens)}</span>
             <span className="text-gray-500">)</span>
         </div>
     ) : null;
@@ -152,21 +154,43 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                            Đang Xử Lý...
                         </h3>
                          <p className="text-sm text-gray-400 mb-6">
-                            Đã xử lý {progress.current} / {progress.total} bookmarks.
+                            Đã xử lý {formatNumber(progress.current)} / {formatNumber(progress.total)} bookmarks.
                         </p>
                         <div className="w-full bg-gray-700 rounded-full h-2.5 mb-6">
                             <div className="bg-emerald-500 h-2.5 rounded-full" style={{ width: `${progressPercentage}%`, transition: 'width 0.5s ease-in-out' }}></div>
                         </div>
                         <div className="bg-gray-900/50 rounded-lg p-3 flex-1 overflow-y-auto">
-                            <h4 className="text-sm font-semibold text-gray-300 mb-2">Tech diễn giải</h4>
-                            <ul className="text-xs text-gray-400 space-y-2">
-                               {logs.slice(-10).map((log, index) => (
-                                   <li key={index} className="flex items-start">
-                                       <span className="text-emerald-400 mr-2">&rarr;</span>
-                                       <span>{log}</span>
-                                    </li>
-                               ))}
-                            </ul>
+                            <h4 className="text-sm font-semibold text-gray-300 mb-3">Nhật ký tái cấu trúc</h4>
+                            <div className="space-y-2">
+                               {logs.slice(-10).map((log, index) => {
+                                   const isError = log.toLowerCase().includes('lỗi') || log.toLowerCase().includes('error');
+                                   const isSuccess = log.toLowerCase().includes('hoàn tất') || log.toLowerCase().includes('success');
+                                   const isProcessing = log.toLowerCase().includes('đang xử lý') || log.toLowerCase().includes('processing');
+                                   const isInfo = !isError && !isSuccess && !isProcessing;
+
+                                   let iconColor = 'text-gray-400';
+                                   let bgColor = 'bg-gray-800/50';
+                                   if (isError) {
+                                       iconColor = 'text-red-400';
+                                       bgColor = 'bg-red-900/20';
+                                   } else if (isSuccess) {
+                                       iconColor = 'text-emerald-400';
+                                       bgColor = 'bg-emerald-900/20';
+                                   } else if (isProcessing) {
+                                       iconColor = 'text-sky-400';
+                                       bgColor = 'bg-sky-900/20';
+                                   }
+
+                                   return (
+                                       <div key={index} className={`flex items-start p-2 rounded-md ${bgColor} border-l-2 ${isError ? 'border-red-500' : isSuccess ? 'border-emerald-500' : isProcessing ? 'border-sky-500' : 'border-gray-600'}`}>
+                                           <span className={`text-xs mr-3 mt-0.5 ${iconColor}`}>
+                                               {isError ? '✗' : isSuccess ? '✓' : isProcessing ? '⟳' : 'ℹ'}
+                                           </span>
+                                           <span className="text-xs text-gray-300 flex-1">{log}</span>
+                                       </div>
+                                   );
+                               })}
+                            </div>
                         </div>
                         <button
                             onClick={onStop}
@@ -184,15 +208,37 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                         <p className="text-sm text-gray-400 mb-4">AI đã đề xuất một cấu trúc mới. Áp dụng các thay đổi hoặc hủy bỏ.</p>
                         <TokenUsageDisplay />
                          <div className="bg-gray-900/50 rounded-lg p-3 flex-1 overflow-y-auto mb-6">
-                            <h4 className="text-sm font-semibold text-gray-300 mb-2">Nhật ký Tái cấu trúc</h4>
-                            <ul className="text-xs text-gray-400 space-y-2">
-                               {logs.slice(-10).map((log, index) => (
-                                   <li key={index} className="flex items-start">
-                                       <span className="text-emerald-400 mr-2">&rarr;</span>
-                                       <span>{log}</span>
-                                    </li>
-                               ))}
-                            </ul>
+                            <h4 className="text-sm font-semibold text-gray-300 mb-3">Nhật ký tái cấu trúc</h4>
+                            <div className="space-y-2">
+                               {logs.slice(-10).map((log, index) => {
+                                   const isError = log.toLowerCase().includes('lỗi') || log.toLowerCase().includes('error');
+                                   const isSuccess = log.toLowerCase().includes('hoàn tất') || log.toLowerCase().includes('success');
+                                   const isProcessing = log.toLowerCase().includes('đang xử lý') || log.toLowerCase().includes('processing');
+                                   const isInfo = !isError && !isSuccess && !isProcessing;
+
+                                   let iconColor = 'text-gray-400';
+                                   let bgColor = 'bg-gray-800/50';
+                                   if (isError) {
+                                       iconColor = 'text-red-400';
+                                       bgColor = 'bg-red-900/20';
+                                   } else if (isSuccess) {
+                                       iconColor = 'text-emerald-400';
+                                       bgColor = 'bg-emerald-900/20';
+                                   } else if (isProcessing) {
+                                       iconColor = 'text-sky-400';
+                                       bgColor = 'bg-sky-900/20';
+                                   }
+
+                                   return (
+                                       <div key={index} className={`flex items-start p-2 rounded-md ${bgColor} border-l-2 ${isError ? 'border-red-500' : isSuccess ? 'border-emerald-500' : isProcessing ? 'border-sky-500' : 'border-gray-600'}`}>
+                                           <span className={`text-xs mr-3 mt-0.5 ${iconColor}`}>
+                                               {isError ? '✗' : isSuccess ? '✓' : isProcessing ? '⟳' : 'ℹ'}
+                                           </span>
+                                           <span className="text-xs text-gray-300 flex-1">{log}</span>
+                                       </div>
+                                   );
+                               })}
+                            </div>
                         </div>
                         <LogViewerButton />
                         <div className="space-y-3 mt-4">

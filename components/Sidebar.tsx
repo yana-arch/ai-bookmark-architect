@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { AppState, BrokenLinkCheckState, type Folder, type Bookmark } from '../types';
 import { FolderIcon, ChevronRightIcon, TrashIcon, ImportIcon, ExportIcon, SearchIcon, XIcon, DocumentDuplicateIcon, BrokenLinkIcon } from './Icons';
+import { formatNumber } from '../src/utils';
 
 interface SidebarProps {
     folders: Folder[];
@@ -52,7 +53,7 @@ const FolderItem: React.FC<{
                 <FolderIcon className="w-5 h-5 mr-3 text-yellow-500 flex-shrink-0" isOpen={isOpen} />
                 <span className="truncate font-medium flex-1">{folder.name}</span>
                  {typeof folder.bookmarkCount !== 'undefined' && (
-                    <span className="ml-2 text-xs font-mono bg-gray-700 px-1.5 py-0.5 rounded">{folder.bookmarkCount}</span>
+                    <span className="ml-2 text-xs font-mono bg-gray-700 px-1.5 py-0.5 rounded">{formatNumber(folder.bookmarkCount)}</span>
                 )}
             </div>
             {isOpen && subFolders.length > 0 && (
@@ -133,7 +134,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 >
                     <FolderIcon className="w-5 h-5 mr-3 text-sky-400 flex-shrink-0" />
                     <span className="truncate font-medium flex-1">Tất cả Bookmarks</span>
-                    <span className="ml-2 text-xs font-mono bg-gray-700 px-1.5 py-0.5 rounded">{totalBookmarks}</span>
+                    <span className="ml-2 text-xs font-mono bg-gray-700 px-1.5 py-0.5 rounded">{formatNumber(totalBookmarks)}</span>
                 </div>
                 {folders
                     .filter((item): item is Folder => !('url' in item))
@@ -155,7 +156,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         className="w-full flex items-center justify-center text-sm bg-yellow-600/20 text-yellow-300 font-bold py-2 px-3 rounded-lg hover:bg-yellow-600/30 transition-colors"
                     >
                         <DocumentDuplicateIcon className="w-5 h-5 mr-2" />
-                        Tìm thấy {duplicateCount} mục trùng lặp
+                        Tìm thấy {formatNumber(duplicateCount)} mục trùng lặp
                     </button>
                 )}
                 <button
@@ -165,7 +166,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 >
                     <BrokenLinkIcon className={`w-5 h-5 mr-2 ${isCheckingLinks ? 'animate-spin' : ''}`} />
                     {isCheckingLinks
-                        ? `Đang kiểm tra... (${brokenLinkCheckProgress.current}/${brokenLinkCheckProgress.total})`
+                        ? `Đang kiểm tra... (${formatNumber(brokenLinkCheckProgress.current)}/${formatNumber(brokenLinkCheckProgress.total)})`
                         : "Kiểm tra liên kết hỏng"
                     }
                 </button>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { DetailedLog } from '../types';
 import { ClipboardIcon } from './Icons';
-
+import { formatNumber } from '../src/utils';
 interface LogModalProps {
     logs: DetailedLog[];
     onClose: () => void;
@@ -51,11 +51,11 @@ const LogEntry: React.FC<{ log: DetailedLog }> = ({ log }) => {
             {log.usage && (
                 <div className="mt-3 pt-3 border-t border-gray-700/50 text-xs text-gray-400 font-mono">
                     <span className="font-semibold text-gray-300">TOKEN USAGE &mdash; </span>
-                    <span>Prompt: <span className="text-sky-300 font-semibold">{log.usage.promptTokens}</span></span>
+                    <span>Prompt: <span className="text-sky-300 font-semibold">{formatNumber(log.usage.promptTokens)}</span></span>
                     <span className="mx-2">|</span>
-                    <span>Completion: <span className="text-yellow-300 font-semibold">{log.usage.completionTokens}</span></span>
+                    <span>Completion: <span className="text-yellow-300 font-semibold">{formatNumber(log.usage.completionTokens)}</span></span>
                     <span className="mx-2">|</span>
-                    <span>Total: <span className="text-emerald-300 font-semibold">{log.usage.totalTokens}</span></span>
+                    <span>Total: <span className="text-emerald-300 font-semibold">{formatNumber(log.usage.totalTokens)}</span></span>
                 </div>
             )}
         </div>
