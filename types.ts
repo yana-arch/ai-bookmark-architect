@@ -32,7 +32,7 @@ export type ApiKeyStatus = 'active' | 'inactive' | 'error';
 export interface ApiConfig {
   id: string;
   name: string;
-  provider: 'gemini';
+  provider: 'gemini' | 'openrouter';
   apiKey: string;
   model: string;
   status: ApiKeyStatus;

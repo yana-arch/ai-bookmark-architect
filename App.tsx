@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { AILogoIcon } from './components/Icons';
@@ -182,6 +181,10 @@ const App: React.FC = () => {
         let currentTree: (Folder | Bookmark)[] = [];
         let keyIndex = 0;
 
+        const userInstructionBlock = customInstructions.trim()
+            ? `\n\nUSER'S CUSTOM INSTRUCTIONS (Follow these strictly):\n- ${customInstructions.trim().replace(/\n/g, '\n- ')}`
+            : '';
+
         for (let i = 0; i < totalBatches; i++) {
             const batch = bookmarks.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
             setProgress({ current: i + 1, total: totalBatches });
@@ -193,83 +196,122 @@ const App: React.FC = () => {
             while(!batchSuccess && keyIndex < availableKeys.length) {
                 const currentKeyConfig = availableKeys[keyIndex];
                 attempt++;
-                setLogs(prev => [...prev, `Attempt ${attempt} with key: ${currentKeyConfig.name}`]);
+                setLogs(prev => [...prev, `Thử nghiệm ${attempt} với key: ${currentKeyConfig.name} (${currentKeyConfig.provider})`]);
+                let categorizedBatch: CategorizedBookmark[] = [];
 
                 try {
-                    const ai = new GoogleGenAI({apiKey: currentKeyConfig.apiKey});
-                    const userInstructionBlock = customInstructions.trim()
-                        ? `\n\nUSER'S CUSTOM INSTRUCTIONS (Follow these strictly):\n- ${customInstructions.trim().replace(/\n/g, '\n- ')}`
-                        : '';
+                     if (currentKeyConfig.provider === 'openrouter') {
+                        setLogs(prev => [...prev, `Sử dụng OpenRouter với model: ${currentKeyConfig.model}`]);
+                        
+                        const systemPrompt = `You are an intelligent bookmark organizer. Your goal is to create a clean, hierarchical folder structure in VIETNAMESE. You will be given an *existing folder structure* and a *new list of bookmarks*. For each bookmark, place it into the most logical folder path. **Crucially, if a suitable folder already exists, use it.** Do not create new folders that are synonyms or slight variations of existing ones. Consolidate them. If you must create a new folder, make its name clear and distinct. You can create nested folders. The folder structure should be logical and not too deep. Output a JSON object with a single key 'bookmarks' which is an array where each object represents a bookmark with its original 'title', 'url', and its final 'path' as an array of Vietnamese folder names (e.g., ['Phát triển Web', 'React', 'Hooks']).`;
+                        const userPrompt = `
+                            ${userInstructionBlock}
 
-                    const prompt = `You are an intelligent bookmark organizer. Your goal is to create a clean, hierarchical folder structure in VIETNAMESE. You will be given an *existing folder structure* and a *new list of bookmarks*. For each bookmark, place it into the most logical folder path.
-                    **Crucially, if a suitable folder already exists, use it.** Do not create new folders that are synonyms or slight variations of existing ones (e.g., if 'Phát triển Web' exists, do not create 'Web Dev'). Consolidate them.
-                    If you must create a new folder, make its name clear and distinct. You can create nested folders.
-                    The folder structure should be logical and not too deep.
-                    ${userInstructionBlock}
-                    
-                    EXISTING STRUCTURE:
-                    ${JSON.stringify(currentTree, null, 2)}
-                    
-                    BOOKMARKS TO CATEGORIZE:
-                    ${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}
-                    
-                    Output a JSON array where each object represents a bookmark with its original 'title', 'url', and its final 'path' as an array of Vietnamese folder names (e.g., ['Phát triển Web', 'React', 'Hooks']).`;
-                    
-                    const response = await ai.models.generateContent({
-                        model: "gemini-2.5-flash",
-                        contents: prompt,
-                        config: {
-                            responseMimeType: "application/json",
-                            responseSchema: {
-                                type: Type.ARRAY,
-                                items: {
-                                    type: Type.OBJECT,
-                                    properties: {
-                                        title: { type: Type.STRING },
-                                        url: { type: Type.STRING },
-                                        path: { type: Type.ARRAY, items: { type: Type.STRING } }
-                                    },
-                                    required: ['title', 'url', 'path']
+                            EXISTING STRUCTURE:
+                            ${JSON.stringify(currentTree, null, 2)}
+
+                            BOOKMARKS TO CATEGORIZE:
+                            ${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}
+                        `;
+                        
+                        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${currentKeyConfig.apiKey}`,
+                                'Content-Type': 'application/json',
+                                'HTTP-Referer': `${location.protocol}//${location.host}`,
+                                'X-Title': 'AI Bookmark Architect',
+                            },
+                            body: JSON.stringify({
+                                model: currentKeyConfig.model,
+                                response_format: { type: "json_object" },
+                                messages: [
+                                    { role: "system", content: systemPrompt },
+                                    { role: "user", content: userPrompt }
+                                ]
+                            })
+                        });
+
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(`OpenRouter API Error: ${response.status} ${response.statusText} - ${errorData.error?.message || 'Unknown error'}`);
+                        }
+                        
+                        const responseData = await response.json();
+                        const jsonContent = JSON.parse(responseData.choices[0].message.content);
+                        categorizedBatch = jsonContent.bookmarks;
+
+                    } else { // Gemini Provider
+                        const ai = new GoogleGenAI({apiKey: currentKeyConfig.apiKey});
+                        const prompt = `You are an intelligent bookmark organizer. Your goal is to create a clean, hierarchical folder structure in VIETNAMESE. You will be given an *existing folder structure* and a *new list of bookmarks*. For each bookmark, place it into the most logical folder path.
+                        **Crucially, if a suitable folder already exists, use it.** Do not create new folders that are synonyms or slight variations of existing ones (e.g., if 'Phát triển Web' exists, do not create 'Web Dev'). Consolidate them.
+                        If you must create a new folder, make its name clear and distinct. You can create nested folders.
+                        The folder structure should be logical and not too deep.
+                        ${userInstructionBlock}
+                        
+                        EXISTING STRUCTURE:
+                        ${JSON.stringify(currentTree, null, 2)}
+                        
+                        BOOKMARKS TO CATEGORIZE:
+                        ${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}
+                        
+                        Output a JSON array where each object represents a bookmark with its original 'title', 'url', and its final 'path' as an array of Vietnamese folder names (e.g., ['Phát triển Web', 'React', 'Hooks']).`;
+                        
+                        const response = await ai.models.generateContent({
+                            model: currentKeyConfig.model,
+                            contents: prompt,
+                            config: {
+                                responseMimeType: "application/json",
+                                responseSchema: {
+                                    type: Type.ARRAY,
+                                    items: {
+                                        type: Type.OBJECT,
+                                        properties: {
+                                            title: { type: Type.STRING },
+                                            url: { type: Type.STRING },
+                                            path: { type: Type.ARRAY, items: { type: Type.STRING } }
+                                        },
+                                        required: ['title', 'url', 'path']
+                                    }
                                 }
                             }
-                        }
-                    });
+                        });
 
-                    const categorizedBatch: CategorizedBookmark[] = JSON.parse(response.text.trim());
+                        categorizedBatch = JSON.parse(response.text.trim());
+                    }
+
                     allCategorizedBookmarks.push(...categorizedBatch);
-
                     const combinedBookmarksForTree = bookmarks.map(bm => {
                         const categorized = allCategorizedBookmarks.find(cb => cb.url === bm.url);
                         return { ...bm, path: categorized?.path || [] };
                     });
                     currentTree = arrayToTree(combinedBookmarksForTree);
                     
-                    batchSuccess = true; // Move to next batch
+                    batchSuccess = true;
                 } catch (error: any) {
                     const errorMessage = error.toString();
                      setLogs(prev => [...prev, `Lỗi với key "${currentKeyConfig.name}": ${errorMessage}`]);
 
                     if (errorMessage.includes('429') || errorMessage.toLowerCase().includes('quota')) {
-                        keyIndex++; // Try next key
+                        keyIndex++; 
                         if(keyIndex >= availableKeys.length) {
                              setLogs(prev => [...prev, `Tất cả API keys đã hết hạn mức.`]);
                              setErrorDetails("Tất cả các API key đã hết hạn mức. Quá trình xử lý đã dừng lại. Kết quả một phần có sẵn để xem xét.");
                              setAppState(AppState.ERROR);
-                             break; // Exit the while loop
+                             break;
                         }
                     } else {
                         setErrorDetails(`Lỗi không thể phục hồi ở batch ${i + 1}: ${errorMessage}`);
                         setAppState(AppState.ERROR);
-                        break; // Exit while loop for unrecoverable error
+                        break;
                     }
                 }
-            } // end while for key retries
+            } 
 
             if (!batchSuccess) {
-                // Failed to process this batch with any key
-                break; // Exit for loop over batches
+                break;
             }
-        } // end for loop over batches
+        } 
         
         const finalCategorized = bookmarks.map(bm => {
             const found = allCategorizedBookmarks.find(cb => cb.url === bm.url);
@@ -304,8 +346,6 @@ const App: React.FC = () => {
     };
     
     const retry = () => {
-        // More sophisticated retry could start from the failed batch.
-        // For now, it's a soft reset to the loaded state.
         discardChanges();
     };
 
