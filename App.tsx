@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, useReducer } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { AILogoIcon } from './components/Icons';
 // Fix: Consolidate type imports into a single statement.
@@ -7,12 +7,15 @@ import Sidebar from './components/Sidebar';
 import BookmarkList from './components/BookmarkList';
 import RestructurePanel from './components/RestructurePanel';
 import FileDropzone from './components/FileDropzone';
-import ImportModal from './components/ImportModal';
-import ApiConfigModal from './components/ApiConfigModal';
-import LogModal from './components/LogModal';
-import DuplicateModal from './components/DuplicateModal';
-import BrokenLinkModal from './components/BrokenLinkModal';
 import * as db from './db';
+import { searchCache, cacheKeys, generateHash, cacheStats } from './src/cache';
+
+// Lazy load modals for better performance
+const ImportModal = lazy(() => import('./components/ImportModal'));
+const ApiConfigModal = lazy(() => import('./components/ApiConfigModal'));
+const LogModal = lazy(() => import('./components/LogModal'));
+const DuplicateModal = lazy(() => import('./components/DuplicateModal'));
+const BrokenLinkModal = lazy(() => import('./components/BrokenLinkModal'));
 
 const createMockData = (): Bookmark[] => {
   return [
@@ -145,7 +148,9 @@ const App: React.FC = () => {
             }
         };
 
-        findDuplicates();
+        // Debounce duplicate detection to avoid excessive calculations
+        const timeoutId = setTimeout(findDuplicates, 300);
+        return () => clearTimeout(timeoutId);
     }, [bookmarks]);
     
     const parseBookmarksHTML = (htmlString: string): Bookmark[] => {
@@ -161,16 +166,16 @@ const App: React.FC = () => {
         }));
     };
 
-    const handleFileLoaded = async (loadedBookmarks: Bookmark[]) => {
+    const handleFileLoaded = useCallback(async (loadedBookmarks: Bookmark[]) => {
         await db.saveBookmarks(loadedBookmarks);
         await db.saveFolders([]); // Clear any old folder structure
         setBookmarks(loadedBookmarks);
         setFolders([]);
         setSelectedFolderId('root');
         setAppState(AppState.LOADED);
-    };
+    }, []);
     
-    const handleSaveApiConfig = async (config: ApiConfig) => {
+    const handleSaveApiConfig = useCallback(async (config: ApiConfig) => {
         await db.saveApiConfig(config);
         setApiConfigs(prev => {
             const existingIndex = prev.findIndex(c => c.id === config.id);
@@ -181,21 +186,21 @@ const App: React.FC = () => {
             }
             return [...prev, config];
         });
-    };
+    }, []);
 
-    const handleDeleteApiConfig = async (id: string) => {
+    const handleDeleteApiConfig = useCallback(async (id: string) => {
         await db.deleteApiConfig(id);
         setApiConfigs(prev => prev.filter(c => c.id !== id));
-    };
+    }, []);
 
-    const handleToggleApiConfigStatus = async (id: string, status: ApiKeyStatus) => {
+    const handleToggleApiConfigStatus = useCallback(async (id: string, status: ApiKeyStatus) => {
         const config = apiConfigs.find(c => c.id === id);
         if (config) {
             await handleSaveApiConfig({ ...config, status });
         }
-    };
+    }, [apiConfigs, handleSaveApiConfig]);
 
-    const handleCleanDuplicates = async () => {
+    const handleCleanDuplicates = useCallback(async () => {
         const seenUrls = new Set<string>();
         const uniqueBookmarks: Bookmark[] = [];
         // Iterate backwards to keep the "last" (most recent) bookmark
@@ -206,11 +211,11 @@ const App: React.FC = () => {
                 seenUrls.add(bm.url);
             }
         }
-        
+
         const cleanedBookmarks = uniqueBookmarks.reverse(); // Restore original order
         await db.saveBookmarks(cleanedBookmarks);
         setBookmarks(cleanedBookmarks);
-        
+
         // If the current structure is based on the old bookmarks, clear it
         if (appState === AppState.STRUCTURED || appState === AppState.REVIEW || appState === AppState.ERROR) {
             await db.saveFolders([]);
@@ -219,7 +224,7 @@ const App: React.FC = () => {
         }
 
         setIsDuplicateModalOpen(false);
-    };
+    }, [bookmarks, appState]);
 
     const isLinkBroken = async (url: string): Promise<boolean> => {
         try {
@@ -230,7 +235,7 @@ const App: React.FC = () => {
         }
     };
 
-    const handleStartBrokenLinkCheck = async () => {
+    const handleStartBrokenLinkCheck = useCallback(async () => {
         if (brokenLinkCheckState === BrokenLinkCheckState.CHECKING) return;
         setBrokenLinkCheckState(BrokenLinkCheckState.CHECKING);
         setBrokenLinkCheckProgress({ current: 0, total: bookmarks.length });
@@ -241,7 +246,7 @@ const App: React.FC = () => {
         for (let i = 0; i < bookmarks.length; i += BATCH_SIZE) {
             const batch = bookmarks.slice(i, i + BATCH_SIZE);
             const promises = batch.map(bm => isLinkBroken(bm.url).then(isBroken => ({ isBroken, bm })));
-            
+
             const results = await Promise.all(promises);
             results.forEach(result => {
                 if (result.isBroken) {
@@ -257,15 +262,15 @@ const App: React.FC = () => {
 
         setBrokenLinks(foundBrokenLinks);
         setBrokenLinkCheckState(BrokenLinkCheckState.IDLE);
-        
+
         if (foundBrokenLinks.length > 0) {
             setIsBrokenLinkModalOpen(true);
         } else {
             alert('Không tìm thấy liên kết hỏng nào.');
         }
-    };
+    }, [brokenLinkCheckState, bookmarks.length]);
 
-    const handleCleanBrokenLinks = async () => {
+    const handleCleanBrokenLinks = useCallback(async () => {
         const brokenLinkIds = new Set(brokenLinks.map(bl => bl.id));
         const cleanedBookmarks = bookmarks.filter(bm => !brokenLinkIds.has(bm.id));
 
@@ -280,7 +285,7 @@ const App: React.FC = () => {
 
         setIsBrokenLinkModalOpen(false);
         setBrokenLinks([]);
-    };
+    }, [brokenLinks, bookmarks, appState]);
 
     const arrayToTree = (bookmarks: (Bookmark & { path?: string[] })[]): (Folder | Bookmark)[] => {
         const root: Folder = { id: 'root', name: 'Thư Mục', children: [], parentId: null };
@@ -546,27 +551,27 @@ const App: React.FC = () => {
         startRestructuring(true);
     };
 
-    const handleClearData = async () => {
+    const handleClearData = useCallback(async () => {
         if (window.confirm("Bạn có chắc chắn muốn xóa tất cả dữ liệu bookmarks không? Hành động này không thể hoàn tác.")) {
             await db.clearAllData();
             setBookmarks([]);
             setFolders([]);
             setAppState(AppState.EMPTY);
         }
-    };
+    }, []);
 
-    const handleImportClick = () => {
+    const handleImportClick = useCallback(() => {
         importInputRef.current?.click();
-    };
+    }, []);
 
-    const handleFileSelectedForImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileSelectedForImport = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files && event.target.files.length > 0) {
             setImportFile(event.target.files[0]);
             event.target.value = '';
         }
-    };
+    }, []);
 
-    const processImport = async (mode: 'merge' | 'overwrite') => {
+    const processImport = useCallback(async (mode: 'merge' | 'overwrite') => {
         if (!importFile) return;
 
         const reader = new FileReader();
@@ -574,7 +579,7 @@ const App: React.FC = () => {
             const content = event.target?.result as string;
             if (content) {
                 const parsedBookmarks = parseBookmarksHTML(content);
-                
+
                 let combinedBookmarks: Bookmark[] = [];
                 if (mode === 'merge') {
                     const existingUrls = new Set(bookmarks.map(bm => bm.url));
@@ -583,7 +588,7 @@ const App: React.FC = () => {
                 } else { // overwrite
                     combinedBookmarks = parsedBookmarks;
                 }
-                
+
                 await db.saveBookmarks(combinedBookmarks);
                 await db.saveFolders([]); // Clear structure on any import
                 setBookmarks(combinedBookmarks);
@@ -594,9 +599,9 @@ const App: React.FC = () => {
         };
         reader.readAsText(importFile);
         setImportFile(null);
-    };
-    
-    const handleExportBookmarks = () => {
+    }, [importFile, bookmarks]);
+
+    const handleExportBookmarks = useCallback(() => {
         const buildHtml = (items: (Folder | Bookmark)[], level: number): string => {
             let html = '';
             const indent = ' '.repeat(level * 4);
@@ -616,10 +621,10 @@ const App: React.FC = () => {
             });
             return html;
         };
-        
+
         const itemsToExport = folders.length > 0 ? folders : bookmarks;
         const bookmarksHtml = buildHtml(itemsToExport, 1);
-        
+
         const fullHtml = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
 <!-- This is an automatically generated file.
      It will be read and overwritten.
@@ -639,7 +644,7 @@ ${bookmarksHtml}</DL><p>`;
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    };
+    }, [folders, bookmarks]);
 
     const foldersWithCounts = useMemo(() => {
         const addCounts = (items: (Folder | Bookmark)[]): (Folder | Bookmark)[] => {
@@ -663,11 +668,27 @@ ${bookmarksHtml}</DL><p>`;
         if (!searchQuery.trim()) {
             return [];
         }
+
+        const bookmarksHash = generateHash(bookmarks);
+        const cacheKey = cacheKeys.searchResults(searchQuery, bookmarksHash);
+
+        // Try to get from cache first
+        const cached = searchCache.get(cacheKey);
+        if (cached) {
+            return cached;
+        }
+
+        // Perform search
         const lowercasedQuery = searchQuery.toLowerCase();
-        return bookmarks.filter(bm =>
+        const results = bookmarks.filter(bm =>
             bm.title.toLowerCase().includes(lowercasedQuery) ||
             bm.url.toLowerCase().includes(lowercasedQuery)
         );
+
+        // Cache the results
+        searchCache.set(cacheKey, results, 10 * 60 * 1000); // Cache for 10 minutes
+
+        return results;
     }, [searchQuery, bookmarks]);
 
     const selectedFolder = selectedFolderId === 'root' 
@@ -705,42 +726,44 @@ ${bookmarksHtml}</DL><p>`;
                 accept=".html"
                 onChange={handleFileSelectedForImport}
             />
-            {importFile && (
-                <ImportModal 
-                    fileName={importFile.name}
-                    onImport={processImport}
-                    onCancel={() => setImportFile(null)}
-                />
-            )}
-            {isApiModalOpen && (
-                <ApiConfigModal
-                    onClose={() => setIsApiModalOpen(false)}
-                    apiConfigs={apiConfigs}
-                    onSaveApiConfig={handleSaveApiConfig}
-                    onDeleteApiConfig={handleDeleteApiConfig}
-                    onToggleApiConfigStatus={handleToggleApiConfigStatus}
-                />
-            )}
-            {isLogModalOpen && (
-                <LogModal 
-                    logs={detailedLogs}
-                    onClose={() => setIsLogModalOpen(false)}
-                />
-            )}
-            {isDuplicateModalOpen && (
-                <DuplicateModal
-                    stats={duplicateStats}
-                    onClose={() => setIsDuplicateModalOpen(false)}
-                    onClean={handleCleanDuplicates}
-                />
-            )}
-            {isBrokenLinkModalOpen && (
-                <BrokenLinkModal
-                    brokenLinks={brokenLinks}
-                    onClose={() => setIsBrokenLinkModalOpen(false)}
-                    onClean={handleCleanBrokenLinks}
-                />
-            )}
+            <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="text-white">Đang tải...</div></div>}>
+                {importFile && (
+                    <ImportModal
+                        fileName={importFile.name}
+                        onImport={processImport}
+                        onCancel={() => setImportFile(null)}
+                    />
+                )}
+                {isApiModalOpen && (
+                    <ApiConfigModal
+                        onClose={() => setIsApiModalOpen(false)}
+                        apiConfigs={apiConfigs}
+                        onSaveApiConfig={handleSaveApiConfig}
+                        onDeleteApiConfig={handleDeleteApiConfig}
+                        onToggleApiConfigStatus={handleToggleApiConfigStatus}
+                    />
+                )}
+                {isLogModalOpen && (
+                    <LogModal
+                        logs={detailedLogs}
+                        onClose={() => setIsLogModalOpen(false)}
+                    />
+                )}
+                {isDuplicateModalOpen && (
+                    <DuplicateModal
+                        stats={duplicateStats}
+                        onClose={() => setIsDuplicateModalOpen(false)}
+                        onClean={handleCleanDuplicates}
+                    />
+                )}
+                {isBrokenLinkModalOpen && (
+                    <BrokenLinkModal
+                        brokenLinks={brokenLinks}
+                        onClose={() => setIsBrokenLinkModalOpen(false)}
+                        onClean={handleCleanBrokenLinks}
+                    />
+                )}
+            </Suspense>
             <div className="w-full max-w-7xl mx-auto flex h-full p-4">
                 <main className="flex flex-1 bg-[#282C34] rounded-xl shadow-2xl overflow-hidden">
                     <Sidebar

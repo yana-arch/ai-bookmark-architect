@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Bookmark } from '../types';
 import { OpenBookIcon } from './Icons';
 
@@ -36,25 +36,117 @@ const BookmarkItem: React.FC<{ bookmark: Bookmark }> = ({ bookmark }) => {
     );
 };
 
+// Virtual scrolling component for large lists
+const VirtualizedBookmarkList: React.FC<{
+    bookmarks: Bookmark[];
+    itemHeight: number;
+    containerHeight: number;
+}> = ({ bookmarks, itemHeight, containerHeight }) => {
+    const [scrollTop, setScrollTop] = useState(0);
+
+    const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+        setScrollTop(e.currentTarget.scrollTop);
+    }, []);
+
+    const visibleRange = useMemo(() => {
+        const start = Math.floor(scrollTop / itemHeight);
+        const end = Math.min(
+            start + Math.ceil(containerHeight / itemHeight) + 2, // +2 for buffer
+            bookmarks.length
+        );
+        return { start: Math.max(0, start - 1), end }; // -1 for buffer
+    }, [scrollTop, itemHeight, containerHeight, bookmarks.length]);
+
+    const visibleBookmarks = useMemo(() => {
+        return bookmarks.slice(visibleRange.start, visibleRange.end);
+    }, [bookmarks, visibleRange]);
+
+    const totalHeight = bookmarks.length * itemHeight;
+    const offsetY = visibleRange.start * itemHeight;
+
+    if (bookmarks.length === 0) {
+        return (
+            <div className="flex-1 flex items-center justify-center">
+                <div className="text-center text-gray-500 py-10">
+                    <p>No bookmarks to display</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div
+            className="flex-1 overflow-y-auto"
+            style={{ height: containerHeight }}
+            onScroll={handleScroll}
+        >
+            <div style={{ height: totalHeight, position: 'relative' }}>
+                <div
+                    style={{
+                        transform: `translateY(${offsetY}px)`,
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                    }}
+                >
+                    {visibleBookmarks.map((bookmark, index) => (
+                        <div
+                            key={bookmark.id}
+                            style={{
+                                height: itemHeight,
+                                position: 'absolute',
+                                top: (visibleRange.start + index) * itemHeight - offsetY,
+                                left: 0,
+                                right: 0,
+                            }}
+                        >
+                            <BookmarkItem bookmark={bookmark} />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const BookmarkList: React.FC<BookmarkListProps> = ({ bookmarks, folderName, noBookmarksMessage }) => {
+    const ITEM_HEIGHT = 80; // Approximate height of each bookmark item
+    const HEADER_HEIGHT = 80; // Height of the header
+    const CONTAINER_HEIGHT = 600; // Fixed height for virtual scrolling
+
+    // Use virtual scrolling for large lists (>50 items) to improve performance
+    const shouldUseVirtualScrolling = bookmarks.length > 50;
+
     return (
-        <div className="flex-1 bg-[#282C34] flex flex-col overflow-y-auto">
-             <div className="p-4 border-b border-gray-700/50 sticky top-0 bg-[#282C34] z-10">
+        <div className="flex-1 bg-[#282C34] flex flex-col">
+            <div className="p-4 border-b border-gray-700/50 sticky top-0 bg-[#282C34] z-10">
                 <h2 className="text-xl font-bold text-white flex items-center">
                     <OpenBookIcon className="w-6 h-6 mr-3 text-gray-400" />
                     {folderName}
                 </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                    {bookmarks.length} bookmarks
+                </p>
             </div>
-            <div className="p-4 space-y-2">
-                {bookmarks.length > 0 ? (
-                    bookmarks.map(bm => <BookmarkItem key={bm.id} bookmark={bm} />)
-                ) : (
-                    <div className="text-center text-gray-500 py-10">
-                        <p>{noBookmarksMessage}</p>
-                    </div>
-                )}
-            </div>
+
+            {shouldUseVirtualScrolling ? (
+                <VirtualizedBookmarkList
+                    bookmarks={bookmarks}
+                    itemHeight={ITEM_HEIGHT}
+                    containerHeight={CONTAINER_HEIGHT}
+                />
+            ) : (
+                <div className="p-4 space-y-2 overflow-y-auto flex-1">
+                    {bookmarks.length > 0 ? (
+                        bookmarks.map(bm => <BookmarkItem key={bm.id} bookmark={bm} />)
+                    ) : (
+                        <div className="text-center text-gray-500 py-10">
+                            <p>{noBookmarksMessage}</p>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

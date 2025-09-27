@@ -151,6 +151,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 {duplicateCount > 0 && (
                     <button 
                         onClick={onOpenDuplicateModal}
+                        title="Xem và dọn dẹp bookmark trùng lặp."
                         className="w-full flex items-center justify-center text-sm bg-yellow-600/20 text-yellow-300 font-bold py-2 px-3 rounded-lg hover:bg-yellow-600/30 transition-colors"
                     >
                         <DocumentDuplicateIcon className="w-5 h-5 mr-2" />
