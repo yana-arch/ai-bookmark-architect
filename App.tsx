@@ -9,6 +9,7 @@ import RestructurePanel from './components/RestructurePanel';
 import FileDropzone from './components/FileDropzone';
 import * as db from './db';
 import { searchCache, cacheKeys, generateHash, cacheStats } from './src/cache';
+import { formatNumber, parseCSVBookmarks, exportBookmarksToCSV } from './src/utils';
 
 // Lazy load modals for better performance
 const ImportModal = lazy(() => import('./components/ImportModal'));
@@ -799,54 +800,72 @@ const App: React.FC = () => {
         reader.onload = async (event) => {
             const content = event.target?.result as string;
             if (content) {
-                const parsedBookmarks = parseBookmarksHTML(content);
+                let parsedBookmarks: Bookmark[] = [];
 
-                let combinedBookmarks: Bookmark[] = [];
-                if (mode === 'merge') {
-                    const existingUrls = new Set(bookmarks.map(bm => bm.url));
-                    const newBookmarks = parsedBookmarks.filter(bm => !existingUrls.has(bm.url));
-                    combinedBookmarks = [...bookmarks, ...newBookmarks];
-                } else { // overwrite
-                    combinedBookmarks = parsedBookmarks;
+                try {
+                    const fileName = importFile.name.toLowerCase();
+                    if (fileName.endsWith('.html')) {
+                        parsedBookmarks = parseBookmarksHTML(content);
+                    } else if (fileName.endsWith('.csv')) {
+                        parsedBookmarks = parseCSVBookmarks(content);
+                    } else {
+                        throw new Error('Unsupported file format. Please use .html or .csv files.');
+                    }
+
+                    let combinedBookmarks: Bookmark[] = [];
+                    if (mode === 'merge') {
+                        const existingUrls = new Set(bookmarks.map(bm => bm.url));
+                        const newBookmarks = parsedBookmarks.filter(bm => !existingUrls.has(bm.url));
+                        combinedBookmarks = [...bookmarks, ...newBookmarks];
+                    } else { // overwrite
+                        combinedBookmarks = parsedBookmarks;
+                    }
+
+                    await db.saveBookmarks(combinedBookmarks);
+                    await db.saveFolders([]); // Clear structure on any import
+                    setBookmarks(combinedBookmarks);
+                    setFolders([]);
+                    setSelectedFolderId('root');
+                    setAppState(AppState.LOADED);
+                } catch (error: any) {
+                    alert(`Import failed: ${error.message}`);
                 }
-
-                await db.saveBookmarks(combinedBookmarks);
-                await db.saveFolders([]); // Clear structure on any import
-                setBookmarks(combinedBookmarks);
-                setFolders([]);
-                setSelectedFolderId('root');
-                setAppState(AppState.LOADED);
             }
         };
         reader.readAsText(importFile);
         setImportFile(null);
     }, [importFile, bookmarks]);
 
-    const handleExportBookmarks = useCallback(() => {
-        const buildHtml = (items: (Folder | Bookmark)[], level: number): string => {
-            let html = '';
-            const indent = ' '.repeat(level * 4);
-
-            items.forEach(item => {
-                if ('url' in item) { // It's a bookmark
-                    const tagsAttribute = item.tags && item.tags.length > 0 ? ` TAGS="${item.tags.join(',')}"` : '';
-                    html += `${indent}<DT><A HREF="${item.url}"${tagsAttribute}>${item.title}</A>\n`;
-                } else { // It's a folder
-                    html += `${indent}<DT><H3>${item.name}</H3>\n`;
-                    if (item.children && item.children.length > 0) {
-                        html += `${indent}<DL><p>\n`;
-                        html += buildHtml(item.children, level + 1);
-                        html += `${indent}</DL><p>\n`;
-                    }
-                }
-            });
-            return html;
-        };
-
+    const handleExportBookmarks = useCallback((format: 'html' | 'csv') => {
         const itemsToExport = folders.length > 0 ? folders : bookmarks;
-        const bookmarksHtml = buildHtml(itemsToExport, 1);
 
-        const fullHtml = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+        let content: string;
+        let mimeType: string;
+        let fileName: string;
+
+        if (format === 'html') {
+            const buildHtml = (items: (Folder | Bookmark)[], level: number): string => {
+                let html = '';
+                const indent = ' '.repeat(level * 4);
+
+                items.forEach(item => {
+                    if ('url' in item) { // It's a bookmark
+                        const tagsAttribute = item.tags && item.tags.length > 0 ? ` TAGS="${item.tags.join(',')}"` : '';
+                        html += `${indent}<DT><A HREF="${item.url}"${tagsAttribute}>${item.title}</A>\n`;
+                    } else { // It's a folder
+                        html += `${indent}<DT><H3>${item.name}</H3>\n`;
+                        if (item.children && item.children.length > 0) {
+                            html += `${indent}<DL><p>\n`;
+                            html += buildHtml(item.children, level + 1);
+                            html += `${indent}</DL><p>\n`;
+                        }
+                    }
+                });
+                return html;
+            };
+
+            const bookmarksHtml = buildHtml(itemsToExport, 1);
+            content = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
 <!-- This is an automatically generated file.
      It will be read and overwritten.
      DO NOT EDIT! -->
@@ -855,12 +874,19 @@ const App: React.FC = () => {
 <H1>Bookmarks</H1>
 <DL><p>
 ${bookmarksHtml}</DL><p>`;
+            mimeType = 'text/html';
+            fileName = 'bookmarks_export.html';
+        } else { // csv
+            content = exportBookmarksToCSV(bookmarks);
+            mimeType = 'text/csv';
+            fileName = 'bookmarks_export.csv';
+        }
 
-        const blob = new Blob([fullHtml], { type: 'text/html' });
+        const blob = new Blob([content], { type: mimeType });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'bookmarks_export.html';
+        a.download = fileName;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -974,11 +1000,11 @@ ${bookmarksHtml}</DL><p>`;
 
     return (
         <div className="flex h-screen w-full bg-[#1E2127] text-gray-300 font-sans">
-            <input 
-                type="file" 
+            <input
+                type="file"
                 ref={importInputRef}
-                className="hidden" 
-                accept=".html"
+                className="hidden"
+                accept=".html,.csv"
                 onChange={handleFileSelectedForImport}
             />
             <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="text-white">Đang tải...</div></div>}>
@@ -1036,7 +1062,7 @@ ${bookmarksHtml}</DL><p>`;
                         onSelectFolder={setSelectedFolderId}
                         onClearData={handleClearData}
                         onImport={handleImportClick}
-                        onExport={handleExportBookmarks}
+                        onExport={(format) => handleExportBookmarks(format)}
                         searchQuery={searchQuery}
                         onSearchChange={setSearchQuery}
                         totalBookmarks={bookmarks.length}

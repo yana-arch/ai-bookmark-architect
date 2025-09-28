@@ -14,7 +14,7 @@ interface SidebarProps {
     onSelectFolder: (id: string | null) => void;
     onClearData: () => void;
     onImport: () => void;
-    onExport: () => void;
+    onExport: (format: 'html' | 'csv') => void;
     onSearchChange: (query: string) => void;
     onOpenDuplicateModal: () => void;
     onStartBrokenLinkCheck: () => void;
@@ -74,34 +74,56 @@ const FolderItem: React.FC<{
 };
 
 
-const Sidebar: React.FC<SidebarProps> = ({ 
-    folders, selectedFolderId, onSelectFolder, onClearData, onImport, onExport, 
+const Sidebar: React.FC<SidebarProps> = ({
+    folders, selectedFolderId, onSelectFolder, onClearData, onImport, onExport,
     searchQuery, onSearchChange, totalBookmarks, duplicateCount, onOpenDuplicateModal,
     onStartBrokenLinkCheck, brokenLinkCheckState, brokenLinkCheckProgress
 }) => {
     const isCheckingLinks = brokenLinkCheckState === BrokenLinkCheckState.CHECKING;
+    const [showExportMenu, setShowExportMenu] = useState(false);
 
     return (
         <aside className="w-72 bg-[#21252C] p-3 flex-shrink-0 flex flex-col">
             <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Thư Mục</h2>
                 <div className="flex items-center space-x-3">
-                     <button 
-                        onClick={onImport} 
+                     <button
+                        onClick={onImport}
                         className="text-gray-400 hover:text-sky-400 transition-colors"
                         title="Nhập bookmarks"
                     >
                         <ImportIcon className="w-5 h-5" />
                     </button>
-                    <button 
-                        onClick={onExport} 
-                        className="text-gray-400 hover:text-emerald-400 transition-colors"
-                        title="Xuất bookmarks"
-                    >
-                        <ExportIcon className="w-5 h-5" />
-                    </button>
-                    <button 
-                        onClick={onClearData} 
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowExportMenu(!showExportMenu)}
+                            className="text-gray-400 hover:text-emerald-400 transition-colors"
+                            title="Xuất bookmarks"
+                        >
+                            <ExportIcon className="w-5 h-5" />
+                        </button>
+                        {showExportMenu && (
+                            <>
+                                <div className="fixed inset-0 z-5" onClick={() => setShowExportMenu(false)}></div>
+                                <div className="absolute right-0 top-8 bg-[#282C34] border border-gray-600 rounded-md shadow-lg z-10 min-w-32">
+                                    <button
+                                        onClick={() => { onExport('html'); setShowExportMenu(false); }}
+                                        className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700/50 rounded-t-md"
+                                    >
+                                        Xuất HTML
+                                    </button>
+                                    <button
+                                        onClick={() => { onExport('csv'); setShowExportMenu(false); }}
+                                        className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700/50 rounded-b-md"
+                                    >
+                                        Xuất CSV
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    <button
+                        onClick={onClearData}
                         className="text-gray-400 hover:text-red-500 transition-colors"
                         title="Xóa tất cả dữ liệu"
                     >
