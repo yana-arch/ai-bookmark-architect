@@ -73,3 +73,38 @@ export interface DuplicateStats {
   count: number;
   byHost: { [host: string]: number };
 }
+
+export interface FolderTemplate {
+  id: string;
+  name: string;
+  description: string;
+  structure: FolderStructureNode[];
+  createdAt: number;
+  updatedAt: number;
+  isDefault?: boolean;
+}
+
+export interface FolderStructureNode {
+  id: string;
+  name: string;
+  children: FolderStructureNode[];
+  parentId: string | null;
+}
+
+export interface EmptyFolderTree {
+  id: string;
+  name: string;
+  templateId: string;
+  structure: (Folder | Bookmark)[];
+  createdAt: number;
+  isActive: boolean;
+}
+
+export type FolderCreationMode = 'ai_generated' | 'template_based' | 'hybrid';
+
+export interface TemplateSettings {
+  folderCreationMode: FolderCreationMode;
+  selectedTemplateId: string | null;
+  allowAiFolderCreation: boolean;
+  strictMode: boolean; // If true, AI cannot create new folders, must use existing ones
+}

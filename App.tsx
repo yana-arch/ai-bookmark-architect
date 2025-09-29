@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspens
 import { GoogleGenAI, Type } from "@google/genai";
 import { AILogoIcon } from './components/Icons';
 // Fix: Consolidate type imports into a single statement.
-import { AppState, BrokenLinkCheckState, type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, ApiKeyStatus, type DuplicateStats, type InstructionPreset } from './types';
+import { AppState, BrokenLinkCheckState, type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, ApiKeyStatus, type DuplicateStats, type InstructionPreset, type FolderTemplate, type EmptyFolderTree, type TemplateSettings, type FolderCreationMode } from './types';
 import Sidebar from './components/Sidebar';
 import BookmarkList from './components/BookmarkList';
 import RestructurePanel from './components/RestructurePanel';
@@ -18,6 +18,7 @@ const LogModal = lazy(() => import('./components/LogModal'));
 const DuplicateModal = lazy(() => import('./components/DuplicateModal'));
 const BrokenLinkModal = lazy(() => import('./components/BrokenLinkModal'));
 const InstructionPresetModal = lazy(() => import('./components/InstructionPresetModal'));
+const FolderTemplateModal = lazy(() => import('./components/FolderTemplateModal'));
 
 const createMockData = (): Bookmark[] => {
   return [
@@ -51,8 +52,10 @@ const createMockData = (): Bookmark[] => {
 };
 
 const DEFAULT_SYSTEM_PROMPT = `You are an intelligent bookmark organizer. Your goal is to create a clean, hierarchical folder structure in VIETNAMESE. You will be given an *existing folder structure* and a *new list of bookmarks*. For each bookmark, you must:
-1.  Place it into the most logical folder path. **Crucially, if a suitable folder already exists, use it.** Do not create new folders that are synonyms or slight variations of existing ones. Consolidate them.
-2.  Generate 3-5 relevant, concise, VIETNAMESE tags for the bookmark.`;
+1. Place it into the most logical folder path. **CRITICALLY IMPORTANT: If a suitable folder already exists, use it.** Do not create new folders that are synonyms or slight variations of existing ones. Consolidate them.
+2. **FOLDER NAMING RULES:** Avoid creating folders with similar names that differ only by letters (e.g., don't create both "React" and "ReactJS", or "Web Dev" and "WebDev"). Use the most appropriate existing folder.
+3. **EXISTING STRUCTURE PRIORITY:** Always prefer using existing folders over creating new ones. The existing structure should be respected and utilized.
+4. Generate 3-5 relevant, concise, VIETNAMESE tags for the bookmark.`;
 
 
 const App: React.FC = () => {
@@ -78,8 +81,17 @@ const App: React.FC = () => {
     const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
     const [isBrokenLinkModalOpen, setIsBrokenLinkModalOpen] = useState(false);
     const [isInstructionPresetModalOpen, setIsInstructionPresetModalOpen] = useState(false);
+    const [isFolderTemplateModalOpen, setIsFolderTemplateModalOpen] = useState(false);
     const [instructionPresets, setInstructionPresets] = useState<InstructionPreset[]>([]);
     const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+    const [folderTemplates, setFolderTemplates] = useState<FolderTemplate[]>([]);
+    const [emptyFolderTrees, setEmptyFolderTrees] = useState<EmptyFolderTree[]>([]);
+    const [templateSettings, setTemplateSettings] = useState<TemplateSettings>({
+        folderCreationMode: 'hybrid',
+        selectedTemplateId: null,
+        allowAiFolderCreation: true,
+        strictMode: false,
+    });
     const [duplicateStats, setDuplicateStats] = useState<DuplicateStats>({ count: 0, byHost: {} });
     const [brokenLinks, setBrokenLinks] = useState<Bookmark[]>([]);
     const [brokenLinkCheckState, setBrokenLinkCheckState] = useState<BrokenLinkCheckState>(BrokenLinkCheckState.IDLE);
@@ -98,9 +110,18 @@ const App: React.FC = () => {
             const savedBookmarks = await db.getBookmarks();
             const savedApiConfigs = await db.getApiConfigs();
             const savedInstructionPresets = await db.getInstructionPresets();
+            const savedFolderTemplates = await db.getFolderTemplates();
+            const savedEmptyFolderTrees = await db.getEmptyFolderTrees();
 
             setApiConfigs(savedApiConfigs || []);
             setInstructionPresets(savedInstructionPresets || []);
+            setFolderTemplates(savedFolderTemplates || []);
+            setEmptyFolderTrees(savedEmptyFolderTrees || []);
+
+            // Initialize default templates if none exist
+            if (savedFolderTemplates.length === 0) {
+                await initializeDefaultTemplates();
+            }
 
             if (savedFolders && savedFolders.length > 0) {
                 setFolders(savedFolders);
@@ -927,6 +948,210 @@ ${bookmarksHtml}</DL><p>`;
         }
     }, [instructionPresets]);
 
+    // Folder Template handlers
+    const handleSaveFolderTemplate = useCallback(async (template: FolderTemplate) => {
+        await db.saveFolderTemplate(template);
+        setFolderTemplates(prev => {
+            const existingIndex = prev.findIndex(t => t.id === template.id);
+            if (existingIndex > -1) {
+                const newTemplates = [...prev];
+                newTemplates[existingIndex] = template;
+                return newTemplates;
+            }
+            return [...prev, template];
+        });
+    }, []);
+
+    const handleDeleteFolderTemplate = useCallback(async (id: string) => {
+        await db.deleteFolderTemplate(id);
+        setFolderTemplates(prev => prev.filter(t => t.id !== id));
+        // Also remove any empty trees that use this template
+        setEmptyFolderTrees(prev => prev.filter(tree => tree.templateId !== id));
+    }, []);
+
+    const handleCreateEmptyTree = useCallback(async (templateId: string, name: string) => {
+        const template = folderTemplates.find(t => t.id === templateId);
+        if (!template) return;
+
+        const treeStructure = db.convertStructureToTree(template.structure);
+        const newTree: EmptyFolderTree = {
+            id: `tree-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            name,
+            templateId,
+            structure: treeStructure,
+            createdAt: Date.now(),
+            isActive: false,
+        };
+
+        await db.saveEmptyFolderTree(newTree);
+        setEmptyFolderTrees(prev => [...prev, newTree]);
+    }, [folderTemplates]);
+
+    const handleDeleteEmptyTree = useCallback(async (id: string) => {
+        await db.deleteEmptyFolderTree(id);
+        setEmptyFolderTrees(prev => prev.filter(tree => tree.id !== id));
+    }, []);
+
+    const handleActivateEmptyTree = useCallback(async (id: string) => {
+        // Deactivate all other trees first
+        const updatedTrees = emptyFolderTrees.map(tree => ({
+            ...tree,
+            isActive: tree.id === id
+        }));
+
+        setEmptyFolderTrees(updatedTrees);
+
+        // Save to database
+        await Promise.all(updatedTrees.map(tree => db.saveEmptyFolderTree(tree)));
+
+        // Set the active tree structure as current folders
+        const activeTree = updatedTrees.find(tree => tree.id === id);
+        if (activeTree) {
+            setFolders(activeTree.structure);
+            setTemplateSettings(prev => ({
+                ...prev,
+                selectedTemplateId: activeTree.templateId,
+                folderCreationMode: 'template_based'
+            }));
+        }
+    }, [emptyFolderTrees]);
+
+    const handleTemplateSettingsChange = useCallback((newSettings: Partial<TemplateSettings>) => {
+        setTemplateSettings(prev => ({ ...prev, ...newSettings }));
+    }, []);
+
+    const initializeDefaultTemplates = useCallback(async () => {
+        const defaultTemplates: FolderTemplate[] = [
+            {
+                id: 'template-web-dev',
+                name: 'Phát triển Web',
+                description: 'Cấu trúc thư mục cho các bookmark liên quan đến phát triển web',
+                structure: [
+                    {
+                        id: 'web-frontend',
+                        name: 'Frontend',
+                        children: [
+                            { id: 'web-react', name: 'React', children: [], parentId: 'web-frontend' },
+                            { id: 'web-vue', name: 'Vue.js', children: [], parentId: 'web-frontend' },
+                            { id: 'web-angular', name: 'Angular', children: [], parentId: 'web-frontend' },
+                            { id: 'web-html-css', name: 'HTML/CSS', children: [], parentId: 'web-frontend' },
+                        ],
+                        parentId: null,
+                    },
+                    {
+                        id: 'web-backend',
+                        name: 'Backend',
+                        children: [
+                            { id: 'web-nodejs', name: 'Node.js', children: [], parentId: 'web-backend' },
+                            { id: 'web-python', name: 'Python', children: [], parentId: 'web-backend' },
+                            { id: 'web-php', name: 'PHP', children: [], parentId: 'web-backend' },
+                            { id: 'web-database', name: 'Database', children: [], parentId: 'web-backend' },
+                        ],
+                        parentId: null,
+                    },
+                    {
+                        id: 'web-tools',
+                        name: 'Công cụ & Tiện ích',
+                        children: [
+                            { id: 'web-build-tools', name: 'Build Tools', children: [], parentId: 'web-tools' },
+                            { id: 'web-editors', name: 'Editors', children: [], parentId: 'web-tools' },
+                            { id: 'web-version-control', name: 'Version Control', children: [], parentId: 'web-tools' },
+                        ],
+                        parentId: null,
+                    },
+                ],
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                isDefault: true,
+            },
+            {
+                id: 'template-ai-ml',
+                name: 'AI & Machine Learning',
+                description: 'Cấu trúc thư mục cho các bookmark liên quan đến AI và Machine Learning',
+                structure: [
+                    {
+                        id: 'ai-fundamentals',
+                        name: 'Kiến thức cơ bản',
+                        children: [
+                            { id: 'ai-math', name: 'Toán học', children: [], parentId: 'ai-fundamentals' },
+                            { id: 'ai-algorithms', name: 'Thuật toán', children: [], parentId: 'ai-fundamentals' },
+                            { id: 'ai-concepts', name: 'Khái niệm cơ bản', children: [], parentId: 'ai-fundamentals' },
+                        ],
+                        parentId: null,
+                    },
+                    {
+                        id: 'ai-frameworks',
+                        name: 'Frameworks & Libraries',
+                        children: [
+                            { id: 'ai-tensorflow', name: 'TensorFlow', children: [], parentId: 'ai-frameworks' },
+                            { id: 'ai-pytorch', name: 'PyTorch', children: [], parentId: 'ai-frameworks' },
+                            { id: 'ai-keras', name: 'Keras', children: [], parentId: 'ai-frameworks' },
+                            { id: 'ai-scikit-learn', name: 'Scikit-learn', children: [], parentId: 'ai-frameworks' },
+                        ],
+                        parentId: null,
+                    },
+                    {
+                        id: 'ai-applications',
+                        name: 'Ứng dụng',
+                        children: [
+                            { id: 'ai-nlp', name: 'Xử lý ngôn ngữ tự nhiên', children: [], parentId: 'ai-applications' },
+                            { id: 'ai-computer-vision', name: 'Computer Vision', children: [], parentId: 'ai-applications' },
+                            { id: 'ai-robotics', name: 'Robotics', children: [], parentId: 'ai-applications' },
+                        ],
+                        parentId: null,
+                    },
+                ],
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                isDefault: true,
+            },
+            {
+                id: 'template-general',
+                name: 'Tổng hợp',
+                description: 'Cấu trúc thư mục tổng hợp cho nhiều loại bookmark khác nhau',
+                structure: [
+                    {
+                        id: 'general-tech',
+                        name: 'Công nghệ',
+                        children: [
+                            { id: 'general-programming', name: 'Lập trình', children: [], parentId: 'general-tech' },
+                            { id: 'general-ai', name: 'Trí tuệ nhân tạo', children: [], parentId: 'general-tech' },
+                            { id: 'general-web', name: 'Web', children: [], parentId: 'general-tech' },
+                        ],
+                        parentId: null,
+                    },
+                    {
+                        id: 'general-learning',
+                        name: 'Học tập',
+                        children: [
+                            { id: 'general-tutorials', name: 'Hướng dẫn', children: [], parentId: 'general-learning' },
+                            { id: 'general-courses', name: 'Khóa học', children: [], parentId: 'general-learning' },
+                            { id: 'general-documentation', name: 'Tài liệu', children: [], parentId: 'general-learning' },
+                        ],
+                        parentId: null,
+                    },
+                    {
+                        id: 'general-tools',
+                        name: 'Công cụ',
+                        children: [
+                            { id: 'general-development', name: 'Phát triển', children: [], parentId: 'general-tools' },
+                            { id: 'general-design', name: 'Thiết kế', children: [], parentId: 'general-tools' },
+                            { id: 'general-productivity', name: 'Năng suất', children: [], parentId: 'general-tools' },
+                        ],
+                        parentId: null,
+                    },
+                ],
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                isDefault: true,
+            },
+        ];
+
+        // Save all default templates
+        await Promise.all(defaultTemplates.map(template => db.saveFolderTemplate(template)));
+        setFolderTemplates(defaultTemplates);
+    }, []);
+
     const foldersWithCounts = useMemo(() => {
         const addCounts = (items: (Folder | Bookmark)[]): (Folder | Bookmark)[] => {
             return items.map(item => {
@@ -1053,6 +1278,19 @@ ${bookmarksHtml}</DL><p>`;
                         presets={instructionPresets}
                     />
                 )}
+                {isFolderTemplateModalOpen && (
+                    <FolderTemplateModal
+                        isOpen={isFolderTemplateModalOpen}
+                        onClose={() => setIsFolderTemplateModalOpen(false)}
+                        templates={folderTemplates}
+                        emptyTrees={emptyFolderTrees}
+                        onSaveTemplate={handleSaveFolderTemplate}
+                        onDeleteTemplate={handleDeleteFolderTemplate}
+                        onCreateEmptyTree={handleCreateEmptyTree}
+                        onDeleteEmptyTree={handleDeleteEmptyTree}
+                        onActivateEmptyTree={handleActivateEmptyTree}
+                    />
+                )}
             </Suspense>
             <div className="w-full max-w-10xl mx-auto flex h-full p-4">
                 <main className="flex flex-1 bg-[#282C34] rounded-xl shadow-2xl overflow-hidden">
@@ -1080,6 +1318,13 @@ ${bookmarksHtml}</DL><p>`;
                                 AI Bookmark Architect
                             </h1>
                             <div className="flex items-center space-x-2">
+                                <button
+                                    onClick={() => setIsFolderTemplateModalOpen(true)}
+                                    className="px-3 py-1 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded"
+                                    title="Quản lý thư mục mẫu"
+                                >
+                                    Mẫu thư mục
+                                </button>
                                 <button className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600"></button>
                                 <button className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600"></button>
                                 <button className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-600"></button>
