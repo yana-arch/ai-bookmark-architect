@@ -1,6 +1,6 @@
 import React from 'react';
 import { AppState } from '../types';
-import type { ApiConfig } from '../types';
+import type { ApiConfig, FolderTemplate } from '../types';
 import { WarningIcon, CogIcon } from './Icons';
 import { formatNumber } from '../src/utils';
 
@@ -17,6 +17,8 @@ interface RestructurePanelProps {
     maxRetries: number;
     processingMode: 'single' | 'multi';
     hasPartialResults: boolean;
+    folderTemplates: FolderTemplate[];
+    selectedTemplateId: string | null;
     onStart: () => void;
     onStop: () => void;
     onApply: () => void;
@@ -25,22 +27,25 @@ interface RestructurePanelProps {
     onOpenApiModal: () => void;
     onOpenLogModal: () => void;
     onOpenInstructionPresetModal: () => void;
+    onOpenFolderTemplateModal: () => void;
     onSystemPromptChange: (prompt: string) => void;
     onCustomInstructionsChange: (instructions: string) => void;
     onBatchSizeChange: (size: number) => void;
     onMaxRetriesChange: (retries: number) => void;
     onProcessingModeChange: (mode: 'single' | 'multi') => void;
+    onApplyFolderTemplate: (template: FolderTemplate) => void;
+    onSelectedTemplateChange: (templateId: string | null) => void;
 }
 
 const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
     const {
         appState, progress, logs, errorDetails, onStart, onStop, onApply, onDiscard, onContinue,
-        apiConfigs, onOpenApiModal, onOpenLogModal, onOpenInstructionPresetModal,
+        apiConfigs, onOpenApiModal, onOpenLogModal, onOpenInstructionPresetModal, onOpenFolderTemplateModal,
         systemPrompt, onSystemPromptChange, sessionTokenUsage,
         customInstructions, onCustomInstructionsChange,
         batchSize, onBatchSizeChange, maxRetries, onMaxRetriesChange,
         processingMode, onProcessingModeChange,
-        hasPartialResults
+        hasPartialResults, folderTemplates, selectedTemplateId, onApplyFolderTemplate, onSelectedTemplateChange
     } = props;
     const progressPercentage = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
     
@@ -102,6 +107,50 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                                             rows={5}
                                             className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-y"
                                         />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label htmlFor="folder-template" className="block text-xs text-gray-400">
+                                                Mẫu thư mục:
+                                            </label>
+                                            <div className="flex items-center space-x-2">
+                                                <button
+                                                    onClick={onOpenFolderTemplateModal}
+                                                    className="text-xs text-blue-400 hover:text-blue-300 underline"
+                                                >
+                                                    Quản lý mẫu
+                                                </button>
+                                                {selectedTemplateId && (
+                                                    <button
+                                                        onClick={() => {
+                                                            const template = folderTemplates.find(t => t.id === selectedTemplateId);
+                                                            if (template) onApplyFolderTemplate(template);
+                                                        }}
+                                                        className="text-xs text-emerald-400 hover:text-emerald-300 underline"
+                                                    >
+                                                        Áp dụng
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <select
+                                            id="folder-template"
+                                            value={selectedTemplateId || ''}
+                                            onChange={(e) => onSelectedTemplateChange(e.target.value || null)}
+                                            className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                        >
+                                            <option value="">Không sử dụng mẫu</option>
+                                            {folderTemplates.map(template => (
+                                                <option key={template.id} value={template.id}>
+                                                    {template.name} - {template.description}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {selectedTemplateId && (
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                AI sẽ phân loại bookmark vào đúng cấu trúc thư mục có sẵn của mẫu được chọn.
+                                            </p>
+                                        )}
                                     </div>
                                     <div>
                                         <div className="flex items-center justify-between mb-1">

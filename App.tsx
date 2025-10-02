@@ -996,6 +996,43 @@ ${bookmarksHtml}</DL><p>`;
             selectedTemplateId: template.id,
             folderCreationMode: 'template_based'
         }));
+
+        // Update system prompt to use template structure as the FILLED categorization guide
+        const flattenTemplateFolders = (node: any, path: string[] = []): string[] => {
+            let folders: string[] = [];
+            const currentPath = [...path, node.name];
+            folders.push(currentPath.join(' -> '));
+
+            if (node.children && node.children.length > 0) {
+                node.children.forEach((child: any) => {
+                    folders = folders.concat(flattenTemplateFolders(child, currentPath));
+                });
+            }
+            return folders;
+        };
+
+        const availableFolders = template.structure.flatMap(node => flattenTemplateFolders(node));
+        const folderGuide = availableFolders.map((folder, index) => `${index + 1}. ${folder}`).join('\n');
+
+        const newSystemPrompt = `${DEFAULT_SYSTEM_PROMPT}\n\n**TEMPLATE MODE ACTIVATED - STRICT TEMPLATE FOLLOWING:** You MUST use the selected template "${template.name}" as your ONLY categorization framework. The template has created empty folders that you MUST fill with bookmarks.
+
+**AVAILABLE TEMPLATE FOLDERS (You may ONLY use these - NO NEW FOLDERS ALLOWED):**
+${folderGuide}
+
+**STRICT RULES - FOLLOW EXACTLY:**
+1. NEVER create new folders - ONLY use the folders listed above.
+2. For each bookmark, find the SINGLE BEST MATCHING folder from the template structure.
+3. Analyze the bookmark's content and map it directly to the most appropriate template category.
+4. If no perfect match exists, choose the closest related category from the template.
+5. Template purpose: ${template.description}
+
+**CATEGORIZATION EXAMPLES:**
+- React tutorials/docs → Frontend -> React
+- Node.js guides → Backend -> Node.js
+- Git repositories → Công cụ & Tiện ích -> Version Control
+- Python backend code → Backend -> Python`;
+
+        setSystemPrompt(newSystemPrompt);
         setAppState(AppState.STRUCTURED);
         setSelectedFolderId('root');
     }, []);
@@ -1298,13 +1335,6 @@ ${bookmarksHtml}</DL><p>`;
                             <h1 className="text-lg font-bold text-white flex items-center">
                                 <AILogoIcon className="w-6 h-6 mr-3 text-emerald-400" />
                                 AI Bookmark Architect
-                                <button
-                                    onClick={() => setIsFolderTemplateModalOpen(true)}
-                                    className="px-3 py-1 mx-4 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-full"
-                                    title="Quản lý thư mục mẫu"
-                                >
-                                    Mẫu
-                                </button>
                             </h1>
                             <div className="flex items-center space-x-2">
                                 <button className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600"></button>
@@ -1339,6 +1369,8 @@ ${bookmarksHtml}</DL><p>`;
                                     maxRetries={maxRetries}
                                     processingMode={processingMode}
                                     hasPartialResults={allCategorizedBookmarks.length > 0}
+                                    folderTemplates={folderTemplates}
+                                    selectedTemplateId={templateSettings.selectedTemplateId}
                                     onStart={() => startRestructuring(false)}
                                     onStop={handleStopRestructuring}
                                     onApply={applyChanges}
@@ -1347,10 +1379,19 @@ ${bookmarksHtml}</DL><p>`;
                                     onOpenApiModal={() => setIsApiModalOpen(true)}
                                     onOpenLogModal={() => setIsLogModalOpen(true)}
                                     onOpenInstructionPresetModal={() => setIsInstructionPresetModalOpen(true)}
+                                    onOpenFolderTemplateModal={() => setIsFolderTemplateModalOpen(true)}
                                     onCustomInstructionsChange={setCustomInstructions}
                                     onBatchSizeChange={setBatchSize}
                                     onMaxRetriesChange={setMaxRetries}
                                     onProcessingModeChange={setProcessingMode}
+                                    onApplyFolderTemplate={handleApplyFolderTemplate}
+                                    onSelectedTemplateChange={(templateId) => {
+                                        setTemplateSettings(prev => ({ ...prev, selectedTemplateId: templateId }));
+                                        // If no template selected, revert to default system prompt
+                                        if (!templateId) {
+                                            setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
+                                        }
+                                    }}
                                 />
                             </div>
                         )}
