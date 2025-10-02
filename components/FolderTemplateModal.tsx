@@ -1,17 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { FolderTemplate, FolderStructureNode, EmptyFolderTree } from '../types';
+import { FolderTemplate, FolderStructureNode } from '../types';
 import { XIcon, PlusIcon, TrashIcon, FolderIcon, ChevronRightIcon } from './Icons';
 
 interface FolderTemplateModalProps {
     isOpen: boolean;
     onClose: () => void;
     templates: FolderTemplate[];
-    emptyTrees: EmptyFolderTree[];
     onSaveTemplate: (template: FolderTemplate) => void;
     onDeleteTemplate: (id: string) => void;
-    onCreateEmptyTree: (templateId: string, name: string) => void;
-    onDeleteEmptyTree: (id: string) => void;
-    onActivateEmptyTree: (id: string) => void;
+    onApplyFolderTemplate: (template: FolderTemplate) => void;
 }
 
 interface TreeNodeProps {
@@ -103,19 +100,14 @@ const FolderTemplateModal: React.FC<FolderTemplateModalProps> = ({
     isOpen,
     onClose,
     templates,
-    emptyTrees,
     onSaveTemplate,
     onDeleteTemplate,
-    onCreateEmptyTree,
-    onDeleteEmptyTree,
-    onActivateEmptyTree,
+    onApplyFolderTemplate,
 }) => {
-    const [activeTab, setActiveTab] = useState<'templates' | 'trees'>('templates');
     const [editingTemplate, setEditingTemplate] = useState<FolderTemplate | null>(null);
     const [templateName, setTemplateName] = useState('');
     const [templateDescription, setTemplateDescription] = useState('');
     const [templateStructure, setTemplateStructure] = useState<FolderStructureNode[]>([]);
-    const [newTreeName, setNewTreeName] = useState('');
 
     useEffect(() => {
         if (isOpen) {
@@ -123,7 +115,6 @@ const FolderTemplateModal: React.FC<FolderTemplateModalProps> = ({
             setTemplateName('');
             setTemplateDescription('');
             setTemplateStructure([]);
-            setNewTreeName('');
             setEditingTemplate(null);
         }
     }, [isOpen]);
@@ -232,16 +223,6 @@ const FolderTemplateModal: React.FC<FolderTemplateModalProps> = ({
         setTemplateStructure(updateNodeInStructure(templateStructure));
     };
 
-    const handleCreateEmptyTree = () => {
-        if (!newTreeName.trim()) return;
-        // For now, create from the first template or ask user to select
-        const templateId = templates[0]?.id;
-        if (templateId) {
-            onCreateEmptyTree(templateId, newTreeName.trim());
-            setNewTreeName('');
-        }
-    };
-
     if (!isOpen) return null;
 
     return (
@@ -257,218 +238,124 @@ const FolderTemplateModal: React.FC<FolderTemplateModalProps> = ({
                     </button>
                 </div>
 
-                <div className="flex border-b border-gray-700">
-                    <button
-                        onClick={() => setActiveTab('templates')}
-                        className={`px-4 py-2 text-sm font-medium ${
-                            activeTab === 'templates'
-                                ? 'text-emerald-400 border-b-2 border-emerald-400'
-                                : 'text-gray-400 hover:text-white'
-                        }`}
-                    >
-                        Mẫu thư mục
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('trees')}
-                        className={`px-4 py-2 text-sm font-medium ${
-                            activeTab === 'trees'
-                                ? 'text-emerald-400 border-b-2 border-emerald-400'
-                                : 'text-gray-400 hover:text-white'
-                        }`}
-                    >
-                        Cây thư mục trống
-                    </button>
-                </div>
-
                 <div className="p-4 max-h-[calc(90vh-120px)] overflow-y-auto">
-                    {activeTab === 'templates' ? (
-                        <div className="space-y-4">
-                            {/* Template Form */}
-                            <div className="bg-[#21252C] p-4 rounded-lg">
-                                <h3 className="text-md font-semibold text-white mb-3">
-                                    {editingTemplate ? 'Chỉnh sửa mẫu' : 'Tạo mẫu mới'}
-                                </h3>
-                                <div className="space-y-3">
-                                    <div>
-                                        <label className="block text-sm text-gray-400 mb-1">Tên mẫu</label>
-                                        <input
-                                            type="text"
-                                            value={templateName}
-                                            onChange={(e) => setTemplateName(e.target.value)}
-                                            className="w-full bg-gray-700 text-white px-3 py-2 rounded text-sm"
-                                            placeholder="Nhập tên mẫu..."
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-gray-400 mb-1">Mô tả</label>
-                                        <textarea
-                                            value={templateDescription}
-                                            onChange={(e) => setTemplateDescription(e.target.value)}
-                                            className="w-full bg-gray-700 text-white px-3 py-2 rounded text-sm h-20 resize-none"
-                                            placeholder="Mô tả về mẫu thư mục này..."
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-gray-400 mb-2">Cấu trúc thư mục</label>
-                                        <div className="bg-gray-800 p-3 rounded min-h-[200px]">
-                                            {templateStructure.length > 0 ? (
-                                                templateStructure.map(node => (
-                                                    <TreeNode
-                                                        key={node.id}
-                                                        node={node}
-                                                        level={0}
-                                                        onAddChild={handleAddNode}
-                                                        onDeleteNode={handleDeleteNode}
-                                                        onUpdateNode={handleUpdateNode}
-                                                    />
-                                                ))
-                                            ) : (
-                                                <div className="text-gray-500 text-center py-8">
-                                                    Chưa có cấu trúc thư mục. Nhấn "Tạo mẫu mới" để bắt đầu.
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex space-x-2">
-                                        {editingTemplate ? (
-                                            <>
-                                                <button
-                                                    onClick={handleSaveEdit}
-                                                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm"
-                                                >
-                                                    Lưu chỉnh sửa
-                                                </button>
-                                                <button
-                                                    onClick={() => setEditingTemplate(null)}
-                                                    className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded text-sm"
-                                                >
-                                                    Hủy
-                                                </button>
-                                            </>
+                    <div className="space-y-4">
+                        {/* Template Form */}
+                        <div className="bg-[#21252C] p-4 rounded-lg">
+                            <h3 className="text-md font-semibold text-white mb-3">
+                                {editingTemplate ? 'Chỉnh sửa mẫu' : 'Tạo mẫu mới'}
+                            </h3>
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Tên mẫu</label>
+                                    <input
+                                        type="text"
+                                        value={templateName}
+                                        onChange={(e) => setTemplateName(e.target.value)}
+                                        className="w-full bg-gray-700 text-white px-3 py-2 rounded text-sm"
+                                        placeholder="Nhập tên mẫu..."
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Mô tả</label>
+                                    <textarea
+                                        value={templateDescription}
+                                        onChange={(e) => setTemplateDescription(e.target.value)}
+                                        className="w-full bg-gray-700 text-white px-3 py-2 rounded text-sm h-20 resize-none"
+                                        placeholder="Mô tả về mẫu thư mục này..."
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-2">Cấu trúc thư mục</label>
+                                    <div className="bg-gray-800 p-3 rounded min-h-[200px]">
+                                        {templateStructure.length > 0 ? (
+                                            templateStructure.map(node => (
+                                                <TreeNode
+                                                    key={node.id}
+                                                    node={node}
+                                                    level={0}
+                                                    onAddChild={handleAddNode}
+                                                    onDeleteNode={handleDeleteNode}
+                                                    onUpdateNode={handleUpdateNode}
+                                                />
+                                            ))
                                         ) : (
-                                            <button
-                                                onClick={handleCreateTemplate}
-                                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm"
-                                            >
-                                                Tạo mẫu mới
-                                            </button>
+                                            <div className="text-gray-500 text-center py-8">
+                                                Chưa có cấu trúc thư mục. Nhấn "Tạo mẫu mới" để bắt đầu.
+                                            </div>
                                         )}
                                     </div>
                                 </div>
-                            </div>
-
-                            {/* Existing Templates */}
-                            <div>
-                                <h3 className="text-md font-semibold text-white mb-3">Mẫu hiện có</h3>
-                                <div className="space-y-2">
-                                    {templates.map(template => (
-                                        <div key={template.id} className="bg-[#21252C] p-3 rounded-lg">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex-1">
-                                                    <h4 className="text-white font-medium">{template.name}</h4>
-                                                    <p className="text-gray-400 text-sm">{template.description}</p>
-                                                </div>
-                                                <div className="flex items-center space-x-2">
-                                                    <button
-                                                        onClick={() => handleEditTemplate(template)}
-                                                        className="text-gray-400 hover:text-emerald-400 px-2 py-1 text-sm"
-                                                    >
-                                                        Chỉnh sửa
-                                                    </button>
-                                                    <button
-                                                        onClick={() => onDeleteTemplate(template.id)}
-                                                        className="text-gray-400 hover:text-red-400 px-2 py-1 text-sm"
-                                                    >
-                                                        Xóa
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {templates.length === 0 && (
-                                        <div className="text-gray-500 text-center py-4">
-                                            Chưa có mẫu nào. Tạo mẫu đầu tiên của bạn.
-                                        </div>
+                                <div className="flex space-x-2">
+                                    {editingTemplate ? (
+                                        <>
+                                            <button
+                                                onClick={handleSaveEdit}
+                                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm"
+                                            >
+                                                Lưu chỉnh sửa
+                                            </button>
+                                            <button
+                                                onClick={() => setEditingTemplate(null)}
+                                                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded text-sm"
+                                            >
+                                                Hủy
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <button
+                                            onClick={handleCreateTemplate}
+                                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm"
+                                        >
+                                            Tạo mẫu mới
+                                        </button>
                                     )}
                                 </div>
                             </div>
                         </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {/* Create Empty Tree Form */}
-                            <div className="bg-[#21252C] p-4 rounded-lg">
-                                <h3 className="text-md font-semibold text-white mb-3">Tạo cây thư mục trống</h3>
-                                <div className="flex space-x-2">
-                                    <input
-                                        type="text"
-                                        value={newTreeName}
-                                        onChange={(e) => setNewTreeName(e.target.value)}
-                                        className="flex-1 bg-gray-700 text-white px-3 py-2 rounded text-sm"
-                                        placeholder="Tên cây thư mục..."
-                                    />
-                                    <button
-                                        onClick={handleCreateEmptyTree}
-                                        disabled={!newTreeName.trim() || templates.length === 0}
-                                        className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-600 text-white px-4 py-2 rounded text-sm"
-                                    >
-                                        Tạo
-                                    </button>
-                                </div>
+
+                        {/* Existing Templates */}
+                        <div>
+                            <h3 className="text-md font-semibold text-white mb-3">Mẫu hiện có</h3>
+                            <div className="space-y-2">
+                                {templates.map(template => (
+                                    <div key={template.id} className="bg-[#21252C] p-3 rounded-lg">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex-1">
+                                                <h4 className="text-white font-medium">{template.name}</h4>
+                                                <p className="text-gray-400 text-sm">{template.description}</p>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <button
+                                                    onClick={() => onApplyFolderTemplate(template)}
+                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+                                                >
+                                                    Áp dụng
+                                                </button>
+                                                <button
+                                                    onClick={() => handleEditTemplate(template)}
+                                                    className="text-gray-400 hover:text-emerald-400 px-2 py-1 text-sm"
+                                                >
+                                                    Chỉnh sửa
+                                                </button>
+                                                <button
+                                                    onClick={() => onDeleteTemplate(template.id)}
+                                                    className="text-gray-400 hover:text-red-400 px-2 py-1 text-sm"
+                                                >
+                                                    Xóa
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
                                 {templates.length === 0 && (
-                                    <p className="text-yellow-400 text-sm mt-2">
-                                        Cần tạo ít nhất một mẫu thư mục trước khi tạo cây trống.
-                                    </p>
+                                    <div className="text-gray-500 text-center py-4">
+                                        Chưa có mẫu nào. Tạo mẫu đầu tiên của bạn.
+                                    </div>
                                 )}
                             </div>
-
-                            {/* Existing Empty Trees */}
-                            <div>
-                                <h3 className="text-md font-semibold text-white mb-3">Cây thư mục trống hiện có</h3>
-                                <div className="space-y-2">
-                                    {emptyTrees.map(tree => (
-                                        <div key={tree.id} className="bg-[#21252C] p-3 rounded-lg">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center space-x-2">
-                                                        <h4 className="text-white font-medium">{tree.name}</h4>
-                                                        {tree.isActive && (
-                                                            <span className="bg-emerald-600 text-white px-2 py-1 rounded text-xs">
-                                                                Đang hoạt động
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <p className="text-gray-400 text-sm">
-                                                        Tạo từ mẫu: {templates.find(t => t.id === tree.templateId)?.name || 'Không tìm thấy'}
-                                                    </p>
-                                                </div>
-                                                <div className="flex items-center space-x-2">
-                                                    {!tree.isActive && (
-                                                        <button
-                                                            onClick={() => onActivateEmptyTree(tree.id)}
-                                                            className="text-gray-400 hover:text-emerald-400 px-2 py-1 text-sm"
-                                                        >
-                                                            Kích hoạt
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        onClick={() => onDeleteEmptyTree(tree.id)}
-                                                        className="text-gray-400 hover:text-red-400 px-2 py-1 text-sm"
-                                                    >
-                                                        Xóa
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {emptyTrees.length === 0 && (
-                                        <div className="text-gray-500 text-center py-4">
-                                            Chưa có cây thư mục trống nào. Tạo cây đầu tiên của bạn.
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
                         </div>
-                    )}
+                    </div>
                 </div>
             </div>
         </div>

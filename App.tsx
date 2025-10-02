@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspens
 import { GoogleGenAI, Type } from "@google/genai";
 import { AILogoIcon } from './components/Icons';
 // Fix: Consolidate type imports into a single statement.
-import { AppState, BrokenLinkCheckState, type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, ApiKeyStatus, type DuplicateStats, type InstructionPreset, type FolderTemplate, type EmptyFolderTree, type TemplateSettings, type FolderCreationMode } from './types';
+import { AppState, BrokenLinkCheckState, type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, ApiKeyStatus, type DuplicateStats, type InstructionPreset, type FolderTemplate, type TemplateSettings, type FolderCreationMode } from './types';
 import Sidebar from './components/Sidebar';
 import BookmarkList from './components/BookmarkList';
 import RestructurePanel from './components/RestructurePanel';
@@ -85,7 +85,6 @@ const App: React.FC = () => {
     const [instructionPresets, setInstructionPresets] = useState<InstructionPreset[]>([]);
     const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
     const [folderTemplates, setFolderTemplates] = useState<FolderTemplate[]>([]);
-    const [emptyFolderTrees, setEmptyFolderTrees] = useState<EmptyFolderTree[]>([]);
     const [templateSettings, setTemplateSettings] = useState<TemplateSettings>({
         folderCreationMode: 'hybrid',
         selectedTemplateId: null,
@@ -111,12 +110,10 @@ const App: React.FC = () => {
             const savedApiConfigs = await db.getApiConfigs();
             const savedInstructionPresets = await db.getInstructionPresets();
             const savedFolderTemplates = await db.getFolderTemplates();
-            const savedEmptyFolderTrees = await db.getEmptyFolderTrees();
 
             setApiConfigs(savedApiConfigs || []);
             setInstructionPresets(savedInstructionPresets || []);
             setFolderTemplates(savedFolderTemplates || []);
-            setEmptyFolderTrees(savedEmptyFolderTrees || []);
 
             // Initialize default templates if none exist
             if (savedFolderTemplates.length === 0) {
@@ -965,56 +962,20 @@ ${bookmarksHtml}</DL><p>`;
     const handleDeleteFolderTemplate = useCallback(async (id: string) => {
         await db.deleteFolderTemplate(id);
         setFolderTemplates(prev => prev.filter(t => t.id !== id));
-        // Also remove any empty trees that use this template
-        setEmptyFolderTrees(prev => prev.filter(tree => tree.templateId !== id));
     }, []);
 
-    const handleCreateEmptyTree = useCallback(async (templateId: string, name: string) => {
-        const template = folderTemplates.find(t => t.id === templateId);
-        if (!template) return;
-
+    const handleApplyFolderTemplate = useCallback(async (template: FolderTemplate) => {
+        // Set the template structure as current folders
         const treeStructure = db.convertStructureToTree(template.structure);
-        const newTree: EmptyFolderTree = {
-            id: `tree-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            name,
-            templateId,
-            structure: treeStructure,
-            createdAt: Date.now(),
-            isActive: false,
-        };
-
-        await db.saveEmptyFolderTree(newTree);
-        setEmptyFolderTrees(prev => [...prev, newTree]);
-    }, [folderTemplates]);
-
-    const handleDeleteEmptyTree = useCallback(async (id: string) => {
-        await db.deleteEmptyFolderTree(id);
-        setEmptyFolderTrees(prev => prev.filter(tree => tree.id !== id));
-    }, []);
-
-    const handleActivateEmptyTree = useCallback(async (id: string) => {
-        // Deactivate all other trees first
-        const updatedTrees = emptyFolderTrees.map(tree => ({
-            ...tree,
-            isActive: tree.id === id
+        setFolders(treeStructure);
+        setTemplateSettings(prev => ({
+            ...prev,
+            selectedTemplateId: template.id,
+            folderCreationMode: 'template_based'
         }));
-
-        setEmptyFolderTrees(updatedTrees);
-
-        // Save to database
-        await Promise.all(updatedTrees.map(tree => db.saveEmptyFolderTree(tree)));
-
-        // Set the active tree structure as current folders
-        const activeTree = updatedTrees.find(tree => tree.id === id);
-        if (activeTree) {
-            setFolders(activeTree.structure);
-            setTemplateSettings(prev => ({
-                ...prev,
-                selectedTemplateId: activeTree.templateId,
-                folderCreationMode: 'template_based'
-            }));
-        }
-    }, [emptyFolderTrees]);
+        setAppState(AppState.STRUCTURED);
+        setSelectedFolderId('root');
+    }, []);
 
     const handleTemplateSettingsChange = useCallback((newSettings: Partial<TemplateSettings>) => {
         setTemplateSettings(prev => ({ ...prev, ...newSettings }));
@@ -1283,12 +1244,9 @@ ${bookmarksHtml}</DL><p>`;
                         isOpen={isFolderTemplateModalOpen}
                         onClose={() => setIsFolderTemplateModalOpen(false)}
                         templates={folderTemplates}
-                        emptyTrees={emptyFolderTrees}
                         onSaveTemplate={handleSaveFolderTemplate}
                         onDeleteTemplate={handleDeleteFolderTemplate}
-                        onCreateEmptyTree={handleCreateEmptyTree}
-                        onDeleteEmptyTree={handleDeleteEmptyTree}
-                        onActivateEmptyTree={handleActivateEmptyTree}
+                        onApplyFolderTemplate={handleApplyFolderTemplate}
                     />
                 )}
             </Suspense>
@@ -1316,15 +1274,15 @@ ${bookmarksHtml}</DL><p>`;
                             <h1 className="text-lg font-bold text-white flex items-center">
                                 <AILogoIcon className="w-6 h-6 mr-3 text-emerald-400" />
                                 AI Bookmark Architect
-                            </h1>
-                            <div className="flex items-center space-x-2">
                                 <button
                                     onClick={() => setIsFolderTemplateModalOpen(true)}
-                                    className="px-3 py-1 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded"
+                                    className="px-3 py-1 mx-4 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-full"
                                     title="Quản lý thư mục mẫu"
                                 >
-                                    Mẫu thư mục
+                                    Mẫu
                                 </button>
+                            </h1>
+                            <div className="flex items-center space-x-2">
                                 <button className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600"></button>
                                 <button className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600"></button>
                                 <button className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-600"></button>

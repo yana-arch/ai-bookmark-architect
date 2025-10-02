@@ -91,15 +91,6 @@ export interface FolderStructureNode {
   parentId: string | null;
 }
 
-export interface EmptyFolderTree {
-  id: string;
-  name: string;
-  templateId: string;
-  structure: (Folder | Bookmark)[];
-  createdAt: number;
-  isActive: boolean;
-}
-
 export type FolderCreationMode = 'ai_generated' | 'template_based' | 'hybrid';
 
 export interface TemplateSettings {
