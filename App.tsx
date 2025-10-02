@@ -419,6 +419,12 @@ const App: React.FC = () => {
                         setLogs(prev => [...prev, `[Worker ${batchIndex}] ${data}`]);
                         addDetailedLog('info', `Worker ${batchIndex}`, data);
                     } else if (type === 'batch_result') {
+                        // Check if processing was stopped; if so, ignore this result
+                        if (stopProcessingRef.current) {
+                            activeWorkersRef.current.delete(batchIndex);
+                            return; // Discard the result
+                        }
+
                         activeWorkersRef.current.delete(batchIndex);
                         completedBatches++;
                         batchResults[batchIndex] = data.categorizedBatch;
@@ -452,6 +458,12 @@ const App: React.FC = () => {
                             startNextBatch();
                         }
                     } else if (type === 'batch_error') {
+                        // Check if processing was stopped; if so, ignore this error
+                        if (stopProcessingRef.current) {
+                            activeWorkersRef.current.delete(batchIndex);
+                            return; // Discard the error
+                        }
+
                         activeWorkersRef.current.delete(batchIndex);
                         failedBatches++;
                         setLogs(prev => [...prev, `[Worker ${batchIndex}] Lỗi: ${error}`]);
