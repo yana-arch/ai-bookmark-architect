@@ -1270,6 +1270,7 @@ ${bookmarksHtml}</DL><p>`;
                         onSaveTemplate={handleSaveFolderTemplate}
                         onDeleteTemplate={handleDeleteFolderTemplate}
                         onApplyFolderTemplate={handleApplyFolderTemplate}
+                        apiConfigs={apiConfigs}
                     />
                 )}
             </Suspense>
