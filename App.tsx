@@ -244,8 +244,13 @@ const App: React.FC = () => {
         await db.saveBookmarks(cleanedBookmarks);
         setBookmarks(cleanedBookmarks);
 
-        // If the current structure is based on the old bookmarks, clear it
-        if (appState === AppState.STRUCTURED || appState === AppState.REVIEW || appState === AppState.ERROR) {
+        // If the current structure exists, rebuild it with remaining bookmarks
+        if (appState === AppState.STRUCTURED) {
+            const updatedFolders = arrayToTree(cleanedBookmarks);
+            await db.saveFolders(updatedFolders);
+            setFolders(updatedFolders);
+        } else if (appState === AppState.REVIEW || appState === AppState.ERROR) {
+            // Clear temporary structure for non-applied changes
             await db.saveFolders([]);
             setFolders([]);
             setAppState(AppState.LOADED);
@@ -305,7 +310,13 @@ const App: React.FC = () => {
         await db.saveBookmarks(cleanedBookmarks);
         setBookmarks(cleanedBookmarks);
 
-        if (appState === AppState.STRUCTURED || appState === AppState.REVIEW || appState === AppState.ERROR) {
+        // If the current structure exists, rebuild it with remaining bookmarks
+        if (appState === AppState.STRUCTURED) {
+            const updatedFolders = arrayToTree(cleanedBookmarks);
+            await db.saveFolders(updatedFolders);
+            setFolders(updatedFolders);
+        } else if (appState === AppState.REVIEW || appState === AppState.ERROR) {
+            // Clear temporary structure for non-applied changes
             await db.saveFolders([]);
             setFolders([]);
             setAppState(AppState.LOADED);
