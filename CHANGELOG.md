@@ -5,6 +5,71 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-10-02
+
+### Added
+
+- **Folder Template System**: Comprehensive template-based organization framework
+  - Pre-defined templates for Web Development, AI/ML, and General use cases
+  - Strict template mode with AI enforcement using specialized system prompts
+  - Template-based categorization that restricts AI to only use predefined folder structures
+
+- **AI Template Generation**: Natural language template creation
+  - Generate custom folder hierarchies using descriptive text input
+  - AI interprets user requirements and creates structured templates
+  - Template creation through conversational interface with Gemini AI
+
+- **Template Management Interface**: Full CRUD operations for templates
+  - Create, read, update, and delete folder templates
+  - Template library with searchable collection
+  - Default templates automatically included with installation
+
+- **Template Import/Export**: Data portability for templates
+  - Export individual or multiple templates to JSON format
+  - Import templates from JSON files with validation
+  - Template sharing and backup capabilities
+
+- **Enhanced UI Integration**: Improved restructure workflow
+  - Template selection integrated into main restructure panel
+  - Apply templates directly from dropdown with confirmation
+  - Template status indicators and management shortcuts
+
+- **Conditional System Prompts**: Context-aware AI instructions
+  - Default prompts for general bookmark organization
+  - Template-specific prompts when templates are active
+  - Automatic prompt switching based on template selection
+
+### Changed
+
+- **Restructure Panel Redesign**: Streamlined user experience
+  - Moved template selection from header to options panel
+  - Unified AI configuration interface
+  - Improved visual hierarchy with collapsible sections
+
+- **System Prompt Logic**: Smarter AI context handling
+  - Dynamic prompt generation based on user selections
+  - Conditional template enforcement instructions
+  - Context-aware prompt concatenation strategies
+
+### Technical Improvements
+
+- **Template State Management**: Robust template handling
+  - Template persistence with IndexedDB integration
+  - State synchronization across components
+  - Template validation and error handling
+
+- **UI Component Architecture**: Enhanced modularity
+  - Enhanced FolderTemplateModal with multi-purpose functionality
+  - Improved RestructurePanel with integrated options
+  - Template-aware component interactions
+
+### Features
+
+- **Template-Enforced AI Categorization**: Strict adherence to defined structures
+- **Natural Language Template Creation**: Conversational template generation
+- **Template Ecosystem**: Shareable, importable template collections
+- **Contextual AI Behavior**: Mode-specific AI processing logic
+
 ## [1.1.0] - 2025-09-28
 
 ### Added

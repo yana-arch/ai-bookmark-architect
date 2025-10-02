@@ -1,6 +1,6 @@
 # AI Bookmark Architect
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/yana-arch/ai-bookmark-architect/releases)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/yana-arch/ai-bookmark-architect/releases)
 [![React](https://img.shields.io/badge/React-19.1.1-blue.svg)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8.2-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.2.0-646CFF.svg)](https://vitejs.dev/)
@@ -11,6 +11,9 @@ A sophisticated React-based application that leverages artificial intelligence t
 ## ✨ Features
 
 - 🤖 **AI-Powered Restructuring**: Automatically categorize and organize bookmarks using advanced AI algorithms
+- 🎯 **Folder Template System**: Pre-defined organizational templates for different use cases with strict category enforcement
+- 🛠️ **AI Template Generation**: Create custom folder structures using natural language descriptions
+- 📥 **Template Import/Export**: Share and backup your custom folder templates
 - 💾 **Local Storage**: Secure, offline-first storage using IndexedDB
 - 🎨 **Modern UI**: Clean, responsive interface built with React and TypeScript
 - ⚡ **Fast Performance**: Optimized with Vite for lightning-fast development and builds
@@ -40,6 +43,11 @@ A sophisticated React-based application that leverages artificial intelligence t
   - [🎯 Usage](#-usage)
     - [Development Server](#development-server)
     - [Production Build](#production-build)
+  - [📂 Folder Template System](#-folder-template-system)
+    - [Default Templates](#default-templates)
+    - [Using Templates](#using-templates)
+    - [Template Management](#template-management)
+    - [Custom Templates](#custom-templates)
   - [🛠️ Development](#️-development)
     - [Project Structure](#project-structure)
     - [Available Scripts](#available-scripts)
@@ -98,21 +106,67 @@ npm run build
 npm run preview
 ```
 
+## 📂 Folder Template System
+
+AI Bookmark Architect includes a powerful folder template system that allows you to create predefined organizational structures for your bookmarks. This ensures consistent categorization and provides AI guidance for specific use cases.
+
+### Default Templates
+
+The application comes with three built-in templates:
+
+1. **Phát triển Web (Web Development)**
+   - Frontend (React, Vue.js, Angular, HTML/CSS)
+   - Backend (Node.js, Python, PHP, Database)
+   - Công cụ & Tiện ích (Build Tools, Editors, Version Control)
+
+2. **AI & Machine Learning**
+   - Kiến thức cơ bản (Math, Algorithms, Concepts)
+   - Frameworks & Libraries (TensorFlow, PyTorch, Keras, Scikit-learn)
+   - Ứng dụng (NLP, Computer Vision, Robotics)
+
+3. **Tổng hợp (General)**
+   - Công nghệ (Programming, AI, Web)
+   - Học tập (Tutorials, Courses, Documentation)
+   - Công cụ (Development, Design, Productivity)
+
+### Using Templates
+
+1. **Select a Template**: In the restructure panel, expand the "Tùy chọn & Chỉ dẫn cho AI" section
+2. **Choose from Dropdown**: Select a template from the dropdown menu
+3. **Apply Template**: Click the "Áp dụng" (Apply) button to activate the template structure
+4. **Run Restructuring**: Start the AI process - bookmarks will be organized strictly according to the template
+
+### Template Management
+
+- **Quản lý mẫu (Manage Templates)**: Access the full template management interface
+- **AI Generation**: Create custom templates using natural language descriptions
+- **Import/Export**: Share templates via JSON files
+- **Template Mode**: When active, AI receives strict instructions to only use template-defined folders
+
+### Custom Templates
+
+Create your own templates using the AI-powered template generator or manually define folder structures. Templates are stored locally and can be exported for backup or sharing.
+
 ## 🛠️ Development
 
 ### Project Structure
 
 ```
 ai-bookmark-architect/
-├── components/          # React components
-├── src/                 # Core application logic
-│   ├── aiWorker.ts     # AI processing worker
-│   ├── cache.ts        # Caching utilities
-│   ├── performance.ts  # Performance monitoring
-│   └── utils.ts        # Utility functions
-├── types.ts            # TypeScript type definitions
-├── db.ts               # Database operations
-└── App.tsx             # Main application component
+├── components/                  # React components
+│   ├── RestructurePanel.tsx    # Main panel with AI options & template selection
+│   ├── FolderTemplateModal.tsx # Template management interface
+│   ├── ApiConfigModal.tsx      # API configuration
+│   ├── LogModal.tsx            # Processing logs viewer
+│   └── ...                     # Other UI components
+├── src/                         # Core application logic
+│   ├── aiWorker.ts             # AI processing worker
+│   ├── cache.ts                # Caching utilities
+│   ├── performance.ts          # Performance monitoring
+│   └── utils.ts                # Utility functions
+├── types.ts                    # TypeScript type definitions
+├── db.ts                       # Database operations
+└── App.tsx                     # Main application component
 ```
 
 ### Available Scripts
