@@ -5,7 +5,7 @@ import {
   getDbConnections,
   deleteDbConnection,
   testDbConnection,
-  parsePostgresConnectionString,
+  parseDbConnectionString,
   exportToCloud,
   importFromCloud,
 } from "../db";
@@ -59,7 +59,7 @@ const DbConnectionModal: React.FC<DbConnectionModalProps> = ({
     try {
       let parsedConnection;
       try {
-        parsedConnection = parsePostgresConnectionString(
+        parsedConnection = parseDbConnectionString(
           newConnection.connectionString
         );
       } catch (error) {
@@ -295,12 +295,25 @@ const DbConnectionModal: React.FC<DbConnectionModalProps> = ({
                       placeholder="postgres://username:password@host:port/database"
                       className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm font-mono"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Ví dụ: <code className="bg-gray-800 px-1 rounded">postgresql://user:pass@ep-xxx-pooler.region.aws.neon.tech/dbname?sslmode=require</code>
-                    </p>
-                    <p className="text-xs text-blue-400 mt-1">
-                      Lấy connection string từ <a href="https://console.neon.tech" target="_blank" rel="noopener noreferrer" className="underline">https://console.neon.tech</a>
-                    </p>
+                    <div className="space-y-1">
+                      <p className="text-xs text-amber-400 bg-amber-900/20 p-2 rounded">
+                        <strong>⚠️ Note:</strong> Neon HTTP API không hỗ trợ CORS trong browser. Khuyên dùng Supabase thay thế.
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        <strong>Option 1 (Khuyên):</strong> <code className="bg-gray-800 px-1 rounded">supabase://[url]/[apikey]</code>
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        <strong>Option 2 (Neon):</strong> <code className="bg-gray-800 px-1 rounded">postgresql://user:pass@ep-xxx-pooler.region.aws.neon.tech/dbname</code>
+                      </p>
+                      <div className="flex gap-2 mt-2">
+                        <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 underline">
+                          → Tạo Supabase project
+                        </a>
+                        <a href="https://console.neon.tech" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 underline">
+                          → Neon (cần server proxy)
+                        </a>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex gap-2">
