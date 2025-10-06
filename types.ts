@@ -103,12 +103,13 @@ export interface TemplateSettings {
 export interface DbConnection {
   id: string;
   name: string; // Nickname for user-friendly display
-  connectionString: string; // postgres://user:pass@host:port/db
+  connectionString: string; // postgres://user:pass@host:port/db OR supabase://url/apikey
   host: string;
   port: number;
   database: string;
   username: string;
-  password: string; // Will be encrypted in storage
+  password: string; // API key for Supabase, password for Postgres
+  provider: 'neon' | 'supabase' | 'postgresql'; // Database provider
   isActive: boolean;
   createdAt: number;
 }

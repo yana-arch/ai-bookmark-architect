@@ -1,4 +1,5 @@
 import { openDB, IDBPDatabase } from 'idb';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 // Fix: Import ApiConfig type.
 import type { Bookmark, Folder, ApiConfig, InstructionPreset, FolderTemplate, EmptyFolderTree, DbConnection, SyncProfile, EncryptedData } from './types';
 
@@ -434,23 +435,39 @@ export const importFromCloud = async (connection: DbConnection, mode: 'merge' | 
     }
 };
 
-// Parse PostgreSQL connection string
-export const parsePostgresConnectionString = (connectionString: string): Omit<DbConnection, 'id' | 'name' | 'isActive' | 'createdAt'> => {
-    // postgres://username:password@hostname:port/database
+// Parse database connection string (PostgreSQL or Supabase)
+export const parseDbConnectionString = (connectionString: string): Omit<DbConnection, 'id' | 'name' | 'isActive' | 'createdAt'> => {
     const url = new URL(connectionString);
 
-    if (url.protocol !== 'postgresql:' && url.protocol !== 'postgres:') {
-        throw new Error('Invalid PostgreSQL connection string. Expected postgres:// or postgresql://');
-    }
+    if (url.protocol === 'supabase:') {
+        // Supabase format: supabase://project-url/project-api-key
+        // e.g. supabase://abcdefghijklmnopqrst.supabase.co/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        const pathParts = url.pathname.split('/');
+        const apiKey = pathParts[1] || url.pathname.slice(1);
 
-    return {
-        connectionString,
-        host: url.hostname,
-        port: parseInt(url.port) || 5432,
-        database: url.pathname.slice(1), // Remove leading slash
-        username: decodeURIComponent(url.username),
-        password: decodeURIComponent(url.password)
-    };
+        return {
+            connectionString,
+            host: url.hostname,
+            port: 5432, // Default Postgres port
+            database: 'postgres', // Supabase uses 'postgres' as db name
+            username: 'postgres', // Supabase uses 'postgres' user
+            password: apiKey,
+            provider: 'supabase'
+        };
+    } else if (url.protocol === 'postgresql:' || url.protocol === 'postgres:') {
+        // Standard PostgreSQL format
+        return {
+            connectionString,
+            host: url.hostname,
+            port: parseInt(url.port) || 5432,
+            database: url.pathname.slice(1), // Remove leading slash
+            username: decodeURIComponent(url.username),
+            password: decodeURIComponent(url.password),
+            provider: url.hostname.includes('neon.tech') ? 'neon' : 'postgresql'
+        };
+    } else {
+        throw new Error('Invalid connection string. Expected supabase:// or postgres[t]:// format');
+    }
 };
 
 // Test database connection (using HTTP client)
