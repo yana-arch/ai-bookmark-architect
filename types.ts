@@ -99,3 +99,35 @@ export interface TemplateSettings {
   allowAiFolderCreation: boolean;
   strictMode: boolean; // If true, AI cannot create new folders, must use existing ones
 }
+
+export interface DbConnection {
+  id: string;
+  name: string; // Nickname for user-friendly display
+  connectionString: string; // postgres://user:pass@host:port/db
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string; // Will be encrypted in storage
+  isActive: boolean;
+  createdAt: number;
+}
+
+export interface SyncProfile {
+  local: boolean; // Use local IndexedDB
+  cloud: DbConnection | null; // PostgreSQL connection
+  browser: boolean; // Use browser bookmarks API (extension only)
+}
+
+// Encryption utility for passwords
+export interface EncryptedData {
+  iv: string; // Initialization vector
+  data: string; // Encrypted value
+}
+
+export interface EmptyFolderTree {
+  id: string;
+  name: string;
+  structure: FolderStructureNode[];
+  createdAt: number;
+}

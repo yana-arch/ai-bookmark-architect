@@ -19,6 +19,7 @@ const DuplicateModal = lazy(() => import('./components/DuplicateModal'));
 const BrokenLinkModal = lazy(() => import('./components/BrokenLinkModal'));
 const InstructionPresetModal = lazy(() => import('./components/InstructionPresetModal'));
 const FolderTemplateModal = lazy(() => import('./components/FolderTemplateModal'));
+const DbConnectionModal = lazy(() => import('./components/DbConnectionModal'));
 
 const createMockData = (): Bookmark[] => {
   return [
@@ -82,6 +83,7 @@ const App: React.FC = () => {
     const [isBrokenLinkModalOpen, setIsBrokenLinkModalOpen] = useState(false);
     const [isInstructionPresetModalOpen, setIsInstructionPresetModalOpen] = useState(false);
     const [isFolderTemplateModalOpen, setIsFolderTemplateModalOpen] = useState(false);
+    const [isDbConnectionModalOpen, setIsDbConnectionModalOpen] = useState(false);
     const [instructionPresets, setInstructionPresets] = useState<InstructionPreset[]>([]);
     const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
     const [folderTemplates, setFolderTemplates] = useState<FolderTemplate[]>([]);
@@ -1310,6 +1312,18 @@ ${folderGuide}
                         apiConfigs={apiConfigs}
                     />
                 )}
+                {isDbConnectionModalOpen && (
+                    <DbConnectionModal
+                        isOpen={isDbConnectionModalOpen}
+                        onClose={() => setIsDbConnectionModalOpen(false)}
+                        onRefreshBookmarks={async () => {
+                            const updatedBookmarks = await db.getBookmarks();
+                            const updatedFolders = await db.getFolders();
+                            setBookmarks(updatedBookmarks);
+                            setFolders(updatedFolders || []);
+                        }}
+                    />
+                )}
             </Suspense>
             <div className="w-full max-w-10xl mx-auto flex h-full p-4">
                 <main className="flex flex-1 bg-[#282C34] rounded-xl shadow-2xl overflow-hidden">
@@ -1336,10 +1350,19 @@ ${folderGuide}
                                 <AILogoIcon className="w-6 h-6 mr-3 text-emerald-400" />
                                 AI Bookmark Architect
                             </h1>
-                            <div className="flex items-center space-x-2">
-                                <button className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600"></button>
-                                <button className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600"></button>
-                                <button className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-600"></button>
+                            <div className="flex items-center space-x-4">
+                                <button
+                                    onClick={() => setIsDbConnectionModalOpen(true)}
+                                    className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                                    title="Quản lý kết nối database cloud"
+                                >
+                                    ☁️ Cloud DB
+                                </button>
+                                <div className="flex items-center space-x-2">
+                                    <button className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600"></button>
+                                    <button className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600"></button>
+                                    <button className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-600"></button>
+                                </div>
                             </div>
                         </header>
                        
