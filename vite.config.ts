@@ -10,6 +10,10 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        // HTTPS should be enabled via reverse proxy in production
+        // For development testing:
+        // npm run dev  # HTTP on port 3000
+        // npm run dev:http-proxy  # If needed
       },
       plugins: [react()],
       define: {

@@ -14,6 +14,8 @@ A sophisticated React-based application that leverages artificial intelligence t
 - 🎯 **Folder Template System**: Pre-defined organizational templates for different use cases with strict category enforcement
 - 🛠️ **AI Template Generation**: Create custom folder structures using natural language descriptions
 - 📥 **Template Import/Export**: Share and backup your custom folder templates
+- ☁️ **Cloud Database Sync**: Sync bookmarks across browsers/devices using PostgreSQL (Supabase/Neon)
+- 🔐 **HTTPS Support**: Secure connections with HTTPS protocol enforcement
 - 💾 **Local Storage**: Secure, offline-first storage using IndexedDB
 - 🎨 **Modern UI**: Clean, responsive interface built with React and TypeScript
 - ⚡ **Fast Performance**: Optimized with Vite for lightning-fast development and builds
@@ -94,10 +96,16 @@ GEMINI_API_KEY=your_gemini_api_key_here
 Start the development server with hot reload:
 
 ```bash
+# Regular development (HTTP)
 npm run dev
+
+# HTTPS development (Recommended for cloud sync testing)
+npm run dev-https
 ```
 
-The application will be available at `http://localhost:5173`.
+The application will be available at:
+- HTTP: `http://localhost:3000`
+- HTTPS: `https://localhost:3000`
 
 ### Production Build
 

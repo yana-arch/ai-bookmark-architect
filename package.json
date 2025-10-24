@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:secure": "echo 'Use: npm run dev (localhost:3000 with CORS support for HTTPS testing)' && npm run dev",
     "build": "vite build",
     "preview": "vite preview"
   },
