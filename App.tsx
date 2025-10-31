@@ -2,23 +2,26 @@ import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspens
 import { GoogleGenAI, Type } from "@google/genai";
 import { AILogoIcon } from './components/Icons';
 // Fix: Consolidate type imports into a single statement.
-import { AppState, BrokenLinkCheckState, type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, ApiKeyStatus, type DuplicateStats, type InstructionPreset, type FolderTemplate, type TemplateSettings, type FolderCreationMode } from './types';
+import { AppState, BrokenLinkCheckState, type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, ApiKeyStatus, type DuplicateStats, type InstructionPreset, type FolderTemplate, type TemplateSettings, type FolderCreationMode, type UserCorrection } from './types';
 import Sidebar from './components/Sidebar';
 import BookmarkList from './components/BookmarkList';
 import RestructurePanel from './components/RestructurePanel';
 import FileDropzone from './components/FileDropzone';
 import * as db from './db';
+import { saveLog, getUserCorrections } from './db';
 import { searchCache, cacheKeys, generateHash, cacheStats } from './src/cache';
 import { formatNumber, parseCSVBookmarks, exportBookmarksToCSV } from './src/utils';
 
 // Lazy load modals for better performance
 const ImportModal = lazy(() => import('./components/ImportModal'));
+const ExportModal = lazy(() => import('./components/ExportModal'));
 const ApiConfigModal = lazy(() => import('./components/ApiConfigModal'));
 const LogModal = lazy(() => import('./components/LogModal'));
 const DuplicateModal = lazy(() => import('./components/DuplicateModal'));
 const BrokenLinkModal = lazy(() => import('./components/BrokenLinkModal'));
 const InstructionPresetModal = lazy(() => import('./components/InstructionPresetModal'));
 const FolderTemplateModal = lazy(() => import('./components/FolderTemplateModal'));
+const NotificationToast = lazy(() => import('./components/NotificationToast'));
 
 const createMockData = (): Bookmark[] => {
   return [
@@ -69,7 +72,11 @@ const App: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [apiConfigs, setApiConfigs] = useState<ApiConfig[]>([]);
     const [errorDetails, setErrorDetails] = useState<string | null>(null);
-    const [importFile, setImportFile] = useState<File | null>(null);
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importFileName, setImportFileName] = useState<string>('');
+    const [previewBookmarks, setPreviewBookmarks] = useState<Bookmark[]>([]);
+    const [notifications, setNotifications] = useState<{ id: string, message: string, type: 'info' | 'error' | 'success' | 'warning', duration?: number, action?: { label: string, onClick: () => void } }[]>([]);
+    const [userCorrections, setUserCorrections] = useState<UserCorrection[]>([]);
     const [customInstructions, setCustomInstructions] = useState<string>('');
     const [systemPrompt, setSystemPrompt] = useState<string>(DEFAULT_SYSTEM_PROMPT);
     const [sessionTokenUsage, setSessionTokenUsage] = useState({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
@@ -82,6 +89,7 @@ const App: React.FC = () => {
     const [isBrokenLinkModalOpen, setIsBrokenLinkModalOpen] = useState(false);
     const [isInstructionPresetModalOpen, setIsInstructionPresetModalOpen] = useState(false);
     const [isFolderTemplateModalOpen, setIsFolderTemplateModalOpen] = useState(false);
+    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [instructionPresets, setInstructionPresets] = useState<InstructionPreset[]>([]);
     const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
     const [folderTemplates, setFolderTemplates] = useState<FolderTemplate[]>([]);
@@ -110,10 +118,12 @@ const App: React.FC = () => {
             const savedApiConfigs = await db.getApiConfigs();
             const savedInstructionPresets = await db.getInstructionPresets();
             const savedFolderTemplates = await db.getFolderTemplates();
+            const savedUserCorrections = await db.getUserCorrections();
 
             setApiConfigs(savedApiConfigs || []);
             setInstructionPresets(savedInstructionPresets || []);
             setFolderTemplates(savedFolderTemplates || []);
+            setUserCorrections(savedUserCorrections || []);
 
             // Initialize default templates if none exist
             if (savedFolderTemplates.length === 0) {
@@ -194,13 +204,10 @@ const App: React.FC = () => {
         }));
     };
 
-    const handleFileLoaded = useCallback(async (loadedBookmarks: Bookmark[]) => {
-        await db.saveBookmarks(loadedBookmarks);
-        await db.saveFolders([]); // Clear any old folder structure
-        setBookmarks(loadedBookmarks);
-        setFolders([]);
-        setSelectedFolderId('root');
-        setAppState(AppState.LOADED);
+    const handleFileLoaded = useCallback(async (fileName: string, loadedBookmarks: Bookmark[]) => {
+        setImportFileName(fileName);
+        setPreviewBookmarks(loadedBookmarks);
+        setShowImportModal(true);
     }, []);
     
     const handleSaveApiConfig = useCallback(async (config: ApiConfig) => {
@@ -366,16 +373,27 @@ const App: React.FC = () => {
         stopProcessingRef.current = true;
     };
 
+    const handleDismissNotification = useCallback((id: string) => {
+        setNotifications(prev => prev.filter(n => n.id !== id));
+    }, []);
+
     const startRestructuring = async (isContinuation = false) => {
-        const addDetailedLog = (type: DetailedLog['type'], title: string, content: string | object, usage?: DetailedLog['usage']) => {
-            setDetailedLogs(prev => [...prev, {
+        const addDetailedLog = async (type: DetailedLog['type'], title: string, content: string | object, usage?: DetailedLog['usage']) => {
+            const newLog: DetailedLog = {
                 id: `log-${Date.now()}-${Math.random()}`,
                 timestamp: new Date().toLocaleTimeString('en-GB'),
                 type,
                 title,
                 content,
                 usage
-            }]);
+            };
+            setDetailedLogs(prev => [...prev, newLog]);
+            await saveLog(newLog); // Save to IndexedDB
+
+            // Trigger real-time notification for certain types of logs
+            if (type === 'error' || (type === 'info' && title.includes('Hoàn tất'))) {
+                setNotifications(prev => [...prev, { id: newLog.id, message: `${newLog.title}: ${typeof newLog.content === 'string' ? newLog.content.substring(0, 100) : ''}...`, type: newLog.type === 'error' ? 'error' : 'success' }]);
+            }
         };
 
         if (!isContinuation) {
@@ -587,7 +605,9 @@ const App: React.FC = () => {
                         userInstructionBlock,
                         currentTree,
                         batchIndex,
-                        maxRetries
+                        maxRetries,
+                        userHistory: userCorrections,
+                        domainKnowledge: ""
                     }
                 });
             }
@@ -824,67 +844,104 @@ const App: React.FC = () => {
     }, []);
 
     const handleImportClick = useCallback(() => {
-        importInputRef.current?.click();
-    }, []);
-
-    const handleFileSelectedForImport = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-        if (event.target.files && event.target.files.length > 0) {
-            setImportFile(event.target.files[0]);
-            event.target.value = '';
-        }
+        // Create a hidden file input to trigger file selection
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.html,.csv';
+        input.multiple = false;
+        input.onchange = (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const content = event.target?.result as string;
+                    if (content) {
+                        let parsedBookmarks: Bookmark[] = [];
+                        if (file.name.endsWith('.html')) {
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(content, 'text/html');
+                            const links = Array.from(doc.querySelectorAll('a'));
+                            parsedBookmarks = links.map((link, index) => ({
+                                id: `bm-${Date.now()}-${index}`,
+                                title: link.textContent || 'No Title',
+                                url: link.href,
+                                parentId: null
+                            }));
+                        } else if (file.name.endsWith('.csv')) {
+                            const lines = content.split('\n');
+                            lines.forEach((line, index) => {
+                                const [title, url] = line.split(',').map(s => s.trim());
+                                if (title && url) {
+                                    parsedBookmarks.push({
+                                        id: `bm-${Date.now()}-${index}`,
+                                        title,
+                                        url,
+                                        parentId: null
+                                    });
+                                }
+                            });
+                        }
+                        handleFileLoaded(file.name, parsedBookmarks);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        };
+        input.click();
     }, []);
 
     const processImport = useCallback(async (mode: 'merge' | 'overwrite') => {
-        if (!importFile) return;
+        if (previewBookmarks.length === 0) return;
 
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-            const content = event.target?.result as string;
-            if (content) {
-                let parsedBookmarks: Bookmark[] = [];
+        let combinedBookmarks: Bookmark[] = [];
+        if (mode === 'merge') {
+            const existingUrls = new Set(bookmarks.map(bm => bm.url));
+            const newBookmarks = previewBookmarks.filter(bm => !existingUrls.has(bm.url));
+            combinedBookmarks = [...bookmarks, ...newBookmarks];
+        } else { // overwrite
+            combinedBookmarks = previewBookmarks;
+        }
 
-                try {
-                    const fileName = importFile.name.toLowerCase();
-                    if (fileName.endsWith('.html')) {
-                        parsedBookmarks = parseBookmarksHTML(content);
-                    } else if (fileName.endsWith('.csv')) {
-                        parsedBookmarks = parseCSVBookmarks(content);
-                    } else {
-                        throw new Error('Unsupported file format. Please use .html or .csv files.');
-                    }
+        await db.saveBookmarks(combinedBookmarks);
+        await db.saveFolders([]); // Clear structure on any import
+        setBookmarks(combinedBookmarks);
+        setFolders([]);
+        setSelectedFolderId('root');
+        setAppState(AppState.LOADED);
+        setShowImportModal(false);
+        setImportFileName('');
+        setPreviewBookmarks([]);
+    }, [previewBookmarks, bookmarks]);
 
-                    let combinedBookmarks: Bookmark[] = [];
-                    if (mode === 'merge') {
-                        const existingUrls = new Set(bookmarks.map(bm => bm.url));
-                        const newBookmarks = parsedBookmarks.filter(bm => !existingUrls.has(bm.url));
-                        combinedBookmarks = [...bookmarks, ...newBookmarks];
-                    } else { // overwrite
-                        combinedBookmarks = parsedBookmarks;
-                    }
+    const handleExportBookmarks = useCallback(async (options: any) => {
+        // Filter bookmarks based on options
+        let filteredBookmarks = bookmarks;
 
-                    await db.saveBookmarks(combinedBookmarks);
-                    await db.saveFolders([]); // Clear structure on any import
-                    setBookmarks(combinedBookmarks);
-                    setFolders([]);
-                    setSelectedFolderId('root');
-                    setAppState(AppState.LOADED);
-                } catch (error: any) {
-                    alert(`Import failed: ${error.message}`);
-                }
-            }
-        };
-        reader.readAsText(importFile);
-        setImportFile(null);
-    }, [importFile, bookmarks]);
+        // Filter by folders
+        if (options.selectedFolders && options.selectedFolders.length > 0) {
+            const folderIds = new Set(options.selectedFolders);
+            filteredBookmarks = filteredBookmarks.filter(bm => folderIds.has(bm.parentId || ''));
+        }
 
-    const handleExportBookmarks = useCallback((format: 'html' | 'csv') => {
-        const itemsToExport = folders.length > 0 ? folders : bookmarks;
+        // Filter by tags
+        if (options.selectedTags && options.selectedTags.length > 0) {
+            filteredBookmarks = filteredBookmarks.filter(bm =>
+                options.selectedTags.some((tag: string) => bm.tags?.includes(tag))
+            );
+        }
 
+        // Filter by date range (not implemented yet)
+        if (options.dateRange && (options.dateRange.from || options.dateRange.to)) {
+            // TODO: Implement date filtering when date fields are added to bookmarks
+            filteredBookmarks = filteredBookmarks;
+        }
+
+        // Build export content based on format
         let content: string;
         let mimeType: string;
         let fileName: string;
 
-        if (format === 'html') {
+        if (options.format === 'html') {
             const buildHtml = (items: (Folder | Bookmark)[], level: number): string => {
                 let html = '';
                 const indent = ' '.repeat(level * 4);
@@ -905,7 +962,9 @@ const App: React.FC = () => {
                 return html;
             };
 
-            const bookmarksHtml = buildHtml(itemsToExport, 1);
+            // Create folder structure from filtered bookmarks
+            const filteredFolders = folders.length > 0 ? folders : [];
+            const bookmarksHtml = buildHtml(filteredFolders, 1);
             content = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
 <!-- This is an automatically generated file.
      It will be read and overwritten.
@@ -917,10 +976,40 @@ const App: React.FC = () => {
 ${bookmarksHtml}</DL><p>`;
             mimeType = 'text/html';
             fileName = 'bookmarks_export.html';
-        } else { // csv
-            content = exportBookmarksToCSV(bookmarks);
+        } else if (options.format === 'csv') {
+            content = exportBookmarksToCSV(filteredBookmarks);
             mimeType = 'text/csv';
             fileName = 'bookmarks_export.csv';
+        } else if (options.format === 'json') {
+            content = JSON.stringify(filteredBookmarks, null, 2);
+            mimeType = 'application/json';
+            fileName = 'bookmarks_export.json';
+        } else if (options.format === 'md') {
+            const buildMarkdown = (items: (Folder | Bookmark)[], level: number): string => {
+                let md = '';
+                items.forEach(item => {
+                    if ('url' in item) { // It's a bookmark
+                        md += `${'  '.repeat(level)}- [${item.title}](${item.url})`;
+                        if (item.tags && item.tags.length > 0) {
+                            md += ` (Tags: ${item.tags.join(', ')})`;
+                        }
+                        md += '\n';
+                    } else { // It's a folder
+                        md += `${'#'.repeat(level + 1)} ${item.name}\n\n`;
+                        if (item.children && item.children.length > 0) {
+                            md += buildMarkdown(item.children, level + 1);
+                        }
+                    }
+                });
+                return md;
+            };
+
+            const filteredFolders = folders.length > 0 ? folders : [];
+            content = buildMarkdown(filteredFolders, 0);
+            mimeType = 'text/markdown';
+            fileName = 'bookmarks_export.md';
+        } else {
+            throw new Error(`Unsupported export format: ${options.format}`);
         }
 
         const blob = new Blob([content], { type: mimeType });
@@ -933,6 +1022,10 @@ ${bookmarksHtml}</DL><p>`;
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }, [folders, bookmarks]);
+
+    const handleOpenExportModal = useCallback(() => {
+        setIsExportModalOpen(true);
+    }, []);
 
     // Instruction Preset handlers
     const handleSaveInstructionPreset = useCallback(async (preset: InstructionPreset) => {
@@ -1246,19 +1339,18 @@ ${folderGuide}
 
     return (
         <div className="flex h-screen w-full bg-[#1E2127] text-gray-300 font-sans">
-            <input
-                type="file"
-                ref={importInputRef}
-                className="hidden"
-                accept=".html,.csv"
-                onChange={handleFileSelectedForImport}
-            />
             <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="text-white">Đang tải...</div></div>}>
-                {importFile && (
+                {showImportModal && (
                     <ImportModal
-                        fileName={importFile.name}
+                        fileName={importFileName}
+                        previewBookmarks={previewBookmarks}
+                        existingBookmarks={bookmarks}
                         onImport={processImport}
-                        onCancel={() => setImportFile(null)}
+                        onCancel={() => {
+                            setShowImportModal(false);
+                            setImportFileName('');
+                            setPreviewBookmarks([]);
+                        }}
                     />
                 )}
                 {isApiModalOpen && (
@@ -1310,7 +1402,29 @@ ${folderGuide}
                         apiConfigs={apiConfigs}
                     />
                 )}
+                {isExportModalOpen && (
+                    <ExportModal
+                        folders={folders}
+                        bookmarks={bookmarks}
+                        onExport={handleExportBookmarks}
+                        onCancel={() => setIsExportModalOpen(false)}
+                    />
+                )}
             </Suspense>
+            <div className="fixed bottom-4 right-4 z-50 space-y-2">
+                {notifications.map((notification, index) => (
+                    <NotificationToast
+                        key={notification.id}
+                        id={notification.id}
+                        message={notification.message}
+                        type={notification.type}
+                        duration={notification.duration}
+                        action={notification.action}
+                        index={index}
+                        onDismiss={handleDismissNotification}
+                    />
+                ))}
+            </div>
             <div className="w-full max-w-10xl mx-auto flex h-full p-4">
                 <main className="flex flex-1 bg-[#282C34] rounded-xl shadow-2xl overflow-hidden">
                     <Sidebar
@@ -1319,7 +1433,7 @@ ${folderGuide}
                         onSelectFolder={setSelectedFolderId}
                         onClearData={handleClearData}
                         onImport={handleImportClick}
-                        onExport={(format) => handleExportBookmarks(format)}
+                        onExport={handleOpenExportModal}
                         searchQuery={searchQuery}
                         onSearchChange={setSearchQuery}
                         totalBookmarks={bookmarks.length}

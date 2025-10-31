@@ -9,7 +9,7 @@ interface DuplicateModalProps {
 }
 
 const DuplicateModal: React.FC<DuplicateModalProps> = ({ stats, onClose, onClean }) => {
-    const sortedHosts = Object.entries(stats.byHost).sort(([, a], [, b]) => b - a);
+    const sortedHosts = Object.entries(stats.byHost).sort(([, a]: [string, number], [, b]: [string, number]) => b - a);
 
     return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 transition-opacity duration-300">

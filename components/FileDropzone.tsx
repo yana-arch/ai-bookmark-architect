@@ -3,7 +3,7 @@ import React, { useCallback } from 'react';
 import type { Bookmark } from '../types';
 
 interface FileDropzoneProps {
-    onFileLoaded: (bookmarks: Bookmark[]) => void;
+    onFileLoaded: (fileName: string, bookmarks: Bookmark[]) => void;
 }
 
 const FileDropzone: React.FC<FileDropzoneProps> = ({ onFileLoaded }) => {
@@ -21,13 +21,36 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({ onFileLoaded }) => {
         }));
     };
 
+    const parseBookmarksCSV = (csvString: string): Bookmark[] => {
+        const lines = csvString.split('\n');
+        const bookmarks: Bookmark[] = [];
+        // Assuming CSV format: Title,URL
+        lines.forEach((line, index) => {
+            const [title, url] = line.split(',').map(s => s.trim());
+            if (title && url) {
+                bookmarks.push({
+                    id: `bm-${Date.now()}-${index}`,
+                    title,
+                    url,
+                    parentId: null
+                });
+            }
+        });
+        return bookmarks;
+    };
+
     const handleFile = useCallback((file: File) => {
         const reader = new FileReader();
         reader.onload = (event) => {
             const content = event.target?.result as string;
             if (content) {
-                const parsedBookmarks = parseBookmarksHTML(content);
-                onFileLoaded(parsedBookmarks);
+                let parsedBookmarks: Bookmark[] = [];
+                if (file.name.endsWith('.html')) {
+                    parsedBookmarks = parseBookmarksHTML(content);
+                } else if (file.name.endsWith('.csv')) {
+                    parsedBookmarks = parseBookmarksCSV(content);
+                }
+                onFileLoaded(file.name, parsedBookmarks);
             }
         };
         reader.readAsText(file);
@@ -58,12 +81,12 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({ onFileLoaded }) => {
             className="flex-1 flex flex-col items-center justify-center m-4 border-2 border-dashed border-gray-600 rounded-lg text-center p-8"
         >
             <h2 className="text-2xl font-bold text-white mb-2">Bắt đầu tổ chức</h2>
-            <p className="text-gray-400 mb-6">Kéo và thả file `bookmarks.html` của bạn vào đây hoặc nhấp để chọn.</p>
+            <p className="text-gray-400 mb-6">Kéo và thả file `bookmarks.html` hoặc `bookmarks.csv` của bạn vào đây hoặc nhấp để chọn.</p>
             <input 
                 type="file" 
                 id="file-upload" 
                 className="hidden" 
-                accept=".html"
+                accept=".html,.csv"
                 onChange={onFileChange} 
             />
             <label 

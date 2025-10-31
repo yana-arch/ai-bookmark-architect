@@ -11,6 +11,8 @@ interface WorkerMessage {
     currentTree: any;
     batchIndex: number;
     maxRetries: number;
+    userHistory?: any[]; // New: for context enrichment
+    domainKnowledge?: string; // New: for context enrichment
   };
 }
 
@@ -34,10 +36,19 @@ async function callAIProvider(
   batch: any[],
   userInstructionBlock: string,
   currentTree: any,
-  batchIndex: number
+  batchIndex: number,
+  userHistory?: any[],
+  domainKnowledge?: string
 ): Promise<{ categorizedBatch: any[]; usage?: any }> {
   if (provider === 'openrouter') {
-    const finalSystemPrompt = systemPrompt + "\n\nOutput a JSON object with a single key 'bookmarks' which is an array where each object represents a bookmark with its original 'title', 'url', its final 'path' as an array of Vietnamese folder names (e.g., ['Phát triển Web', 'React']), and 'tags' as an array of Vietnamese strings (e.g., ['hướng dẫn', 'frontend', 'javascript']).";
+    let finalSystemPrompt = systemPrompt;
+    if (domainKnowledge) {
+      finalSystemPrompt += `\n\nCONTEXT ENRICHMENT:\nDomain Knowledge: ${domainKnowledge}`; 
+    }
+    if (userHistory && userHistory.length > 0) {
+      finalSystemPrompt += `\n\nUSER PREFERENCES (Based on corrections):\n${JSON.stringify(userHistory, null, 2)}`;
+    }
+    finalSystemPrompt += "\n\nOutput a JSON object with a single key 'bookmarks' which is an array where each object represents a bookmark with its original 'title', 'url', its final 'path' as an array of Vietnamese folder names (e.g., ['Phát triển Web', 'React']), and 'tags' as an array of Vietnamese strings (e.g., ['hướng dẫn', 'frontend', 'javascript']).";
     const userPrompt = `${userContent}\n\nBOOKMARKS TO CATEGORIZE:\n${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}`;
     const requestPayload = {
       model,
@@ -78,12 +89,20 @@ async function callAIProvider(
   } else { // Gemini
     // For Gemini, since workers can't import the library directly,
     // we'll post a message back to main thread to handle the call
+    let geminiSystemPrompt = systemPrompt + userInstructionBlock;
+    if (domainKnowledge) {
+      geminiSystemPrompt += `\n\nCONTEXT ENRICHMENT:\nDomain Knowledge: ${domainKnowledge}`; 
+    }
+    if (userHistory && userHistory.length > 0) {
+      geminiSystemPrompt += `\n\nUSER PREFERENCES (Based on corrections):\n${JSON.stringify(userHistory, null, 2)}`;
+    }
+
     self.postMessage({
       type: 'gemini_request',
       data: {
         apiKey,
         model,
-        systemPrompt: systemPrompt + userInstructionBlock,
+        systemPrompt: geminiSystemPrompt,
         userContent: `EXISTING STRUCTURE:\n${JSON.stringify(currentTree, null, 2)}\n\nBOOKMARKS TO CATEGORIZE:\n${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}`,
         batchIndex
       }
@@ -123,7 +142,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   }
 
   if (type === 'process_batch' && data) {
-    const { batch, apiConfigs, systemPrompt, userInstructionBlock, currentTree, batchIndex, maxRetries } = data;
+    const { batch, apiConfigs, systemPrompt, userInstructionBlock, currentTree, batchIndex, maxRetries, userHistory, domainKnowledge } = data;
 
     try {
       self.postMessage({ type: 'log', data: `Worker starting batch ${batchIndex}`, batchIndex });
@@ -137,9 +156,12 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       let keyIndex = 0;
       let batchSuccess = false;
 
+      const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
       while (!batchSuccess && keyIndex < availableKeys.length) {
         const currentKeyConfig = availableKeys[keyIndex];
         let retries = 0;
+        let retryDelay = 1000; // Start with 1 second
 
         while (retries <= maxRetries) {
           try {
@@ -175,7 +197,9 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
               batch,
               userInstructionBlock,
               currentTree,
-              batchIndex
+              batchIndex,
+              userHistory,
+              domainKnowledge
             );
 
             // Log response details
@@ -209,18 +233,44 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
               batchIndex
             });
 
-            const isFatalError = errorMessage.includes('429') || errorMessage.toLowerCase().includes('quota') || errorMessage.includes('API key');
+            const isFatalError = (
+                errorMessage.includes('401') || // Unauthorized - likely bad API key
+                errorMessage.includes('403') || // Forbidden - likely permission issue
+                errorMessage.includes('API key') // Generic API key error
+            );
+
             if (isFatalError) {
               self.postMessage({
                 type: 'log',
-                data: `Key "${currentKeyConfig.name}" has fatal error, switching keys`,
+                data: `Key "${currentKeyConfig.name}" has a fatal configuration error, switching keys`,
                 batchIndex
               });
-              break;
+              break; // Stop retrying with this key, switch to next
             }
 
-            retries++;
-            if (retries > maxRetries) {
+            const isRateLimitError = (
+                errorMessage.includes('429') || // Too Many Requests
+                errorMessage.toLowerCase().includes('quota') || // Exceeded quota
+                errorMessage.includes('rate limit') // Generic rate limit message
+            );
+
+            if (isRateLimitError && retries < maxRetries) {
+                self.postMessage({
+                    type: 'log',
+                    data: `Rate limit hit for key "${currentKeyConfig.name}". Retrying in ${retryDelay / 1000}s...`,
+                    batchIndex
+                });
+                await sleep(retryDelay);
+                retryDelay *= 2; // Exponential backoff
+            } else if (retries < maxRetries) {
+                self.postMessage({
+                    type: 'log',
+                    data: `Transient error with key "${currentKeyConfig.name}". Retrying in ${retryDelay / 1000}s...`,
+                    batchIndex
+                });
+                await sleep(retryDelay);
+                retryDelay *= 2; // Exponential backoff
+            } else {
               self.postMessage({
                 type: 'log',
                 data: `Max retries reached for key "${currentKeyConfig.name}", switching keys`,
@@ -228,6 +278,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
               });
               break;
             }
+
+            retries++;
           }
         }
 

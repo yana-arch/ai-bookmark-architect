@@ -14,12 +14,13 @@ interface SidebarProps {
     onSelectFolder: (id: string | null) => void;
     onClearData: () => void;
     onImport: () => void;
-    onExport: (format: 'html' | 'csv') => void;
+    onExport: () => void;
     onSearchChange: (query: string) => void;
     onOpenDuplicateModal: () => void;
     onStartBrokenLinkCheck: () => void;
     brokenLinkCheckState: BrokenLinkCheckState;
     brokenLinkCheckProgress: { current: number; total: number };
+    onBookmarkMoved: (bookmark: Bookmark, oldPath: string[], newPath: string[]) => void;
 }
 
 const FolderItem: React.FC<{
@@ -27,7 +28,8 @@ const FolderItem: React.FC<{
     level: number;
     selectedFolderId: string | null;
     onSelectFolder: (id: string | null) => void;
-}> = ({ folder, level, selectedFolderId, onSelectFolder }) => {
+    onBookmarkMoved: (bookmark: Bookmark, oldPath: string[], newPath: string[]) => void;
+}> = ({ folder, level, selectedFolderId, onSelectFolder, onBookmarkMoved }) => {
     const [isOpen, setIsOpen] = useState(true);
     const isSelected = selectedFolderId === folder.id;
 
@@ -37,6 +39,15 @@ const FolderItem: React.FC<{
         <div>
             <div
                 onClick={() => onSelectFolder(folder.id)}
+                onDragOver={(e) => e.preventDefault()} // Allow drop
+                onDrop={(e) => {
+                    e.preventDefault();
+                    const bookmarkData = e.dataTransfer.getData('bookmark');
+                    if (bookmarkData) {
+                        const { bookmark, originalPath } = JSON.parse(bookmarkData);
+                        onBookmarkMoved(bookmark, originalPath, [...(folder.path || []), folder.name]);
+                    }
+                }}
                 className={`flex items-center p-2 rounded-md cursor-pointer transition-colors duration-150 ${
                     isSelected ? 'bg-emerald-500/20 text-emerald-400' : 'hover:bg-gray-700/50'
                 }`}
@@ -94,34 +105,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                     >
                         <ImportIcon className="w-5 h-5" />
                     </button>
-                    <div className="relative">
-                        <button
-                            onClick={() => setShowExportMenu(!showExportMenu)}
-                            className="text-gray-400 hover:text-emerald-400 transition-colors"
-                            title="Xuất bookmarks"
-                        >
-                            <ExportIcon className="w-5 h-5" />
-                        </button>
-                        {showExportMenu && (
-                            <>
-                                <div className="fixed inset-0 z-5" onClick={() => setShowExportMenu(false)}></div>
-                                <div className="absolute right-0 top-8 bg-[#282C34] border border-gray-600 rounded-md shadow-lg z-10 min-w-32">
-                                    <button
-                                        onClick={() => { onExport('html'); setShowExportMenu(false); }}
-                                        className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700/50 rounded-t-md"
-                                    >
-                                        Xuất HTML
-                                    </button>
-                                    <button
-                                        onClick={() => { onExport('csv'); setShowExportMenu(false); }}
-                                        className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700/50 rounded-b-md"
-                                    >
-                                        Xuất CSV
-                                    </button>
-                                </div>
-                            </>
-                        )}
-                    </div>
+                    <button
+                        onClick={onExport}
+                        className="text-gray-400 hover:text-emerald-400 transition-colors"
+                        title="Xuất bookmarks"
+                    >
+                        <ExportIcon className="w-5 h-5" />
+                    </button>
                     <button
                         onClick={onClearData}
                         className="text-gray-400 hover:text-red-500 transition-colors"

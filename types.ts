@@ -99,3 +99,20 @@ export interface TemplateSettings {
   allowAiFolderCreation: boolean;
   strictMode: boolean; // If true, AI cannot create new folders, must use existing ones
 }
+
+export interface UserCorrection {
+  id: string;
+  originalBookmarkUrl: string;
+  originalPath: string[];
+  correctedPath: string[];
+  timestamp: number;
+  reason?: string; // Optional: why the user corrected it
+}
+
+export interface EmptyFolderTree {
+  id: string;
+  name: string;
+  structure: FolderStructureNode[];
+  createdAt: number;
+  updatedAt: number;
+}
