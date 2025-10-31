@@ -116,3 +116,60 @@ export interface EmptyFolderTree {
   createdAt: number;
   updatedAt: number;
 }
+
+// Phase 2: Enhanced Features Types
+export interface BackupMetadata {
+  id: string;
+  name: string;
+  description?: string;
+  timestamp: number;
+  size: number;
+  bookmarkCount: number;
+  folderCount: number;
+  driveFileId?: string;
+  type: 'manual' | 'auto';
+  status: 'pending' | 'completed' | 'failed';
+}
+
+export interface SyncStatus {
+  lastSync: number;
+  status: 'idle' | 'syncing' | 'error';
+  errorMessage?: string;
+  pendingChanges: number;
+}
+
+export interface AnalyticsData {
+  totalBookmarks: number;
+  totalFolders: number;
+  avgBookmarksPerFolder: number;
+  topDomains: Array<{ domain: string; count: number }>;
+  folderDistribution: Array<{ folder: string; count: number }>;
+  tagUsage: Array<{ tag: string; count: number }>;
+  aiPerformance: {
+    totalRequests: number;
+    successRate: number;
+    avgTokensPerRequest: number;
+    accuracyScore: number;
+  };
+  usageStats: {
+    totalSessions: number;
+    avgSessionDuration: number;
+    mostUsedFeatures: string[];
+    importCount: number;
+    exportCount: number;
+  };
+  growthTrends: Array<{ date: string; bookmarks: number; folders: number }>;
+}
+
+export interface ExtensionMessage {
+  type: 'AUTH_REQUEST' | 'BOOKMARK_DATA' | 'SYNC_REQUEST' | 'STATUS_UPDATE';
+  payload?: any;
+  requestId?: string;
+}
+
+export interface OAuthToken {
+  access_token: string;
+  refresh_token?: string;
+  expires_at: number;
+  token_type: string;
+}

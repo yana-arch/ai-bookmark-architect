@@ -21,6 +21,7 @@ const DuplicateModal = lazy(() => import('./components/DuplicateModal'));
 const BrokenLinkModal = lazy(() => import('./components/BrokenLinkModal'));
 const InstructionPresetModal = lazy(() => import('./components/InstructionPresetModal'));
 const FolderTemplateModal = lazy(() => import('./components/FolderTemplateModal'));
+const AnalyticsDashboard = lazy(() => import('./components/AnalyticsDashboard'));
 const NotificationToast = lazy(() => import('./components/NotificationToast'));
 
 const createMockData = (): Bookmark[] => {
@@ -90,6 +91,7 @@ const App: React.FC = () => {
     const [isInstructionPresetModalOpen, setIsInstructionPresetModalOpen] = useState(false);
     const [isFolderTemplateModalOpen, setIsFolderTemplateModalOpen] = useState(false);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+    const [isAnalyticsDashboardOpen, setIsAnalyticsDashboardOpen] = useState(false);
     const [instructionPresets, setInstructionPresets] = useState<InstructionPreset[]>([]);
     const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
     const [folderTemplates, setFolderTemplates] = useState<FolderTemplate[]>([]);
@@ -1410,6 +1412,13 @@ ${folderGuide}
                         onCancel={() => setIsExportModalOpen(false)}
                     />
                 )}
+                {isAnalyticsDashboardOpen && (
+                    <AnalyticsDashboard
+                        bookmarks={bookmarks}
+                        folders={folders}
+                        onClose={() => setIsAnalyticsDashboardOpen(false)}
+                    />
+                )}
             </Suspense>
             <div className="fixed bottom-4 right-4 z-50 space-y-2">
                 {notifications.map((notification, index) => (
@@ -1451,6 +1460,13 @@ ${folderGuide}
                                 AI Bookmark Architect
                             </h1>
                             <div className="flex items-center space-x-2">
+                                <button
+                                    onClick={() => setIsAnalyticsDashboardOpen(true)}
+                                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-md transition-colors"
+                                    title="Xem phân tích dữ liệu"
+                                >
+                                    📊
+                                </button>
                                 <button className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600"></button>
                                 <button className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600"></button>
                                 <button className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-600"></button>
