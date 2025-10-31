@@ -1,7 +1,7 @@
 {
   "name": "ai-bookmark-architect",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,10 +9,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
     "@google/genai": "^1.21.0",
-    "idb": "^7.1.1"
+    "@supabase/supabase-js": "^2.78.0",
+    "axios": "^1.6.0",
+    "chart.js": "^4.4.0",
+    "idb": "^7.1.1",
+    "react": "^19.1.1",
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^19.1.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

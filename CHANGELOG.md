@@ -5,6 +5,153 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2025-10-31
+
+### Added
+
+- **Phase 2: Enhanced Features - Analytics Dashboard**: Comprehensive data visualization and insights
+  - Interactive charts showing domain distribution, folder usage, and growth trends
+  - AI performance metrics including success rates, token usage, and accuracy scoring
+  - Real-time analytics calculation from bookmarks, logs, and user corrections
+  - Tag usage analysis and bookmark categorization insights
+  - Usage statistics tracking import/export activities
+
+- **Advanced Data Visualization**: Chart.js integration for rich analytics
+  - Bar charts for domain and folder distribution analysis
+  - Line charts for bookmark growth trends over time
+  - Doughnut charts for tag usage visualization
+  - Responsive design with customizable chart options
+  - Real-time data updates and performance metrics
+
+- **Database Schema Enhancement**: Extended IndexedDB for Phase 2 features
+  - New stores for backups, sync status, analytics data, and OAuth tokens
+  - Database version upgrade to v8 with migration support
+  - CRUD operations for all new data types
+  - Enhanced data persistence and retrieval functions
+
+- **TypeScript Type System Expansion**: Comprehensive type definitions
+  - New interfaces for backup metadata, sync status, and analytics data
+  - OAuth token management types
+  - Extension message types for future browser integration
+  - Enhanced type safety across all new features
+
+### Technical Improvements
+
+- **Chart.js Integration**: Modern charting library for data visualization
+  - React-Chartjs-2 wrapper for seamless React integration
+  - Customizable chart themes and responsive design
+  - Performance-optimized rendering and updates
+
+- **Database Architecture**: Scalable IndexedDB implementation
+  - Version-controlled schema migrations
+  - Efficient batch operations and data retrieval
+  - Enhanced error handling and data validation
+
+- **Component Architecture**: Modular analytics system
+  - Lazy-loaded AnalyticsDashboard component
+  - Real-time data calculation and caching
+  - Responsive modal interface with smooth animations
+
+### Features
+
+- **📊 Analytics Dashboard**: Comprehensive bookmark insights and visualization
+- **📈 Interactive Charts**: Domain analysis, folder distribution, and growth trends
+- **🤖 AI Performance Tracking**: Success rates, token usage, and accuracy metrics
+- **🏷️ Tag Analytics**: Usage patterns and categorization insights
+- **💾 Enhanced Data Storage**: Extended database schema for future features
+
+## [1.3.0] - 2025-10-31
+
+### Added
+
+- **Import Preview System**: Comprehensive import workflow with detailed preview
+  - ImportPreview component with statistics and domain analysis
+  - Real-time duplicate detection during import process
+  - Domain-based statistics and bookmark validation
+  - Enhanced ImportModal with preview functionality
+
+- **Advanced Duplicate Management**: Intelligent duplicate detection and cleanup
+  - Real-time duplicate detection across all bookmarks
+  - Duplicate statistics by hostname/domain
+  - Automated duplicate cleanup with user confirmation
+  - DuplicateModal with detailed statistics and cleanup options
+
+- **Selective Export Functionality**: Advanced export capabilities with filtering
+  - ExportModal with comprehensive filtering options
+  - Filter by folders, tags, and date ranges (framework ready)
+  - Multiple export formats: HTML, CSV, JSON, Markdown
+  - Domain-based filtering and export statistics
+
+- **Enhanced Toast Notification System**: Improved user feedback
+  - Stacked notification system with progress bars
+  - Different notification types (info, success, warning, error)
+  - Configurable duration and auto-dismiss
+  - Action buttons for interactive notifications
+
+- **Advanced Log Management**: Comprehensive logging and analysis tools
+  - Enhanced LogModal with search and filtering capabilities
+  - Log statistics dashboard (total, by type, token usage)
+  - Export logs to JSON format
+  - Auto-scroll for real-time log monitoring
+  - Type-based filtering (Info, Request, Response, Error)
+
+- **Import Button Functionality**: Fixed import workflow across all app states
+  - Hidden file input system for consistent import experience
+  - Works in all application states (EMPTY, LOADED, STRUCTURED)
+  - Support for both HTML and CSV bookmark files
+  - Integrated with existing import preview system
+
+### Fixed
+
+- **TypeScript Compilation Errors**: Complete type safety resolution
+  - Fixed all TypeScript errors across 3 files (DuplicateModal, ImportPreview, db.ts)
+  - Resolved arithmetic operation type issues in sorting functions
+  - Added missing type imports for DetailedLog and UserCorrection
+  - Enhanced type annotations for better code reliability
+
+- **Import Button Responsiveness**: Resolved non-functional import button
+  - Implemented proper file selection mechanism
+  - Fixed handleImportClick function to trigger file dialog
+  - Ensured import functionality works regardless of app state
+
+### Changed
+
+- **Import Workflow Enhancement**: Streamlined import process
+  - Preview system integrated into import modal
+  - Statistics display with duplicate and validity counts
+  - Improved user experience with step-by-step import process
+
+- **Notification System Upgrade**: Better user feedback mechanisms
+  - Stacked notifications with visual progress indicators
+  - Enhanced notification types and durations
+  - Improved accessibility and user interaction
+
+### Technical Improvements
+
+- **Component Architecture**: Enhanced modularity and reusability
+  - ImportPreview component with comprehensive statistics
+  - Enhanced LogModal with advanced filtering and search
+  - Improved NotificationToast with stacking and actions
+
+- **Type Safety**: Complete TypeScript compliance
+  - Resolved all compilation errors
+  - Enhanced type definitions and imports
+  - Improved code reliability and maintainability
+
+- **User Experience**: Better interaction patterns
+  - Consistent import functionality across app states
+  - Enhanced feedback systems with notifications
+  - Improved modal interfaces with better information display
+
+### Features
+
+- **Smart Import System**: Preview and validate before importing
+- **Duplicate Intelligence**: Automatic detection and cleanup
+- **Advanced Export Options**: Filter and format exports
+- **Real-time Notifications**: Enhanced user feedback
+- **Log Analysis Tools**: Search, filter, and export logs
+- **Type-Safe Development**: Zero TypeScript errors
+
 ## [1.2.0] - 2025-10-02
 
 ### Added

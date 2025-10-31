@@ -122,7 +122,7 @@ export const runAllTests = async () => {
 };
 
 // Auto-run tests in development
-if (import.meta.env?.DEV) {
+if (typeof import.meta !== 'undefined' && (import.meta as any).env?.DEV) {
     // Run tests after a short delay to ensure everything is loaded
     setTimeout(runAllTests, 1000);
 }

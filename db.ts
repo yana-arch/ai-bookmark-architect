@@ -1,6 +1,6 @@
 import { openDB, IDBPDatabase } from 'idb';
 // Fix: Import ApiConfig type.
-import type { Bookmark, Folder, ApiConfig, InstructionPreset, FolderTemplate, EmptyFolderTree } from './types';
+import type { Bookmark, Folder, ApiConfig, InstructionPreset, FolderTemplate, EmptyFolderTree, DetailedLog, UserCorrection, BackupMetadata, SyncStatus, AnalyticsData, OAuthToken } from './types';
 
 const DB_NAME = 'AIBookmarkArchitectDB';
 const BOOKMARKS_STORE = 'bookmarks';
@@ -10,13 +10,20 @@ const API_CONFIGS_STORE = 'apiConfigs';
 const INSTRUCTION_PRESETS_STORE = 'instructionPresets';
 const FOLDER_TEMPLATES_STORE = 'folderTemplates';
 const EMPTY_FOLDER_TREES_STORE = 'emptyFolderTrees';
+const LOGS_STORE = 'logs'; // New store for persistent logs
+const USER_CORRECTIONS_STORE = 'userCorrections'; // New store for user corrections
+// Phase 2: Enhanced Features stores
+const BACKUPS_STORE = 'backups';
+const SYNC_STATUS_STORE = 'syncStatus';
+const ANALYTICS_STORE = 'analytics';
+const OAUTH_TOKENS_STORE = 'oauthTokens';
 
 let dbPromise: Promise<IDBPDatabase>;
 
 const initDB = () => {
     if (!dbPromise) {
-        // Fix: Bump DB version to 5 and add folder templates and empty folder trees stores.
-        dbPromise = openDB(DB_NAME, 5, {
+        // Phase 2: Bump DB version to 8 and add new stores for enhanced features
+        dbPromise = openDB(DB_NAME, 8, {
             upgrade(db, oldVersion) {
                 if (oldVersion < 1) {
                     if (!db.objectStoreNames.contains(BOOKMARKS_STORE)) {
@@ -62,6 +69,31 @@ const initDB = () => {
                         db.createObjectStore(EMPTY_FOLDER_TREES_STORE, { keyPath: 'id' });
                     }
                 }
+                if (oldVersion < 6) {
+                    if (!db.objectStoreNames.contains(LOGS_STORE)) {
+                        db.createObjectStore(LOGS_STORE, { keyPath: 'id' });
+                    }
+                }
+                if (oldVersion < 7) {
+                    if (!db.objectStoreNames.contains(USER_CORRECTIONS_STORE)) {
+                        db.createObjectStore(USER_CORRECTIONS_STORE, { keyPath: 'id' });
+                    }
+                }
+                if (oldVersion < 8) {
+                    // Phase 2: Enhanced Features stores
+                    if (!db.objectStoreNames.contains(BACKUPS_STORE)) {
+                        db.createObjectStore(BACKUPS_STORE, { keyPath: 'id' });
+                    }
+                    if (!db.objectStoreNames.contains(SYNC_STATUS_STORE)) {
+                        db.createObjectStore(SYNC_STATUS_STORE);
+                    }
+                    if (!db.objectStoreNames.contains(ANALYTICS_STORE)) {
+                        db.createObjectStore(ANALYTICS_STORE);
+                    }
+                    if (!db.objectStoreNames.contains(OAUTH_TOKENS_STORE)) {
+                        db.createObjectStore(OAUTH_TOKENS_STORE, { keyPath: 'id' });
+                    }
+                }
             },
         });
     }
@@ -103,13 +135,20 @@ export const getFolders = async (): Promise<(Folder | Bookmark)[] | undefined> =
 
 export const clearAllData = async (): Promise<void> => {
     const db = await initDB();
-    const tx = db.transaction([BOOKMARKS_STORE, FOLDERS_STORE, API_CONFIGS_STORE, INSTRUCTION_PRESETS_STORE, FOLDER_TEMPLATES_STORE, EMPTY_FOLDER_TREES_STORE], 'readwrite');
+    const tx = db.transaction([BOOKMARKS_STORE, FOLDERS_STORE, API_CONFIGS_STORE, INSTRUCTION_PRESETS_STORE, FOLDER_TEMPLATES_STORE, EMPTY_FOLDER_TREES_STORE, LOGS_STORE, USER_CORRECTIONS_STORE, BACKUPS_STORE, SYNC_STATUS_STORE, ANALYTICS_STORE, OAUTH_TOKENS_STORE], 'readwrite');
     await tx.objectStore(BOOKMARKS_STORE).clear();
     await tx.objectStore(FOLDERS_STORE).clear();
     await tx.objectStore(API_CONFIGS_STORE).clear();
     await tx.objectStore(INSTRUCTION_PRESETS_STORE).clear();
     await tx.objectStore(FOLDER_TEMPLATES_STORE).clear();
     await tx.objectStore(EMPTY_FOLDER_TREES_STORE).clear();
+    await tx.objectStore(LOGS_STORE).clear(); // Clear logs as well
+    await tx.objectStore(USER_CORRECTIONS_STORE).clear(); // Clear user corrections
+    // Phase 2: Clear new stores
+    await tx.objectStore(BACKUPS_STORE).clear();
+    await tx.objectStore(SYNC_STATUS_STORE).clear();
+    await tx.objectStore(ANALYTICS_STORE).clear();
+    await tx.objectStore(OAUTH_TOKENS_STORE).clear();
     await tx.done;
 };
 
@@ -190,6 +229,104 @@ export const getEmptyFolderTree = async (id: string): Promise<EmptyFolderTree | 
 export const deleteEmptyFolderTree = async (id: string): Promise<void> => {
     const db = await initDB();
     await db.delete(EMPTY_FOLDER_TREES_STORE, id);
+};
+
+// Log CRUD operations
+export const saveLog = async (log: DetailedLog): Promise<void> => {
+    const db = await initDB();
+    await db.add(LOGS_STORE, log);
+};
+
+export const getLogs = async (): Promise<DetailedLog[]> => {
+    const db = await initDB();
+    return db.getAll(LOGS_STORE);
+};
+
+export const clearLogs = async (): Promise<void> => {
+    const db = await initDB();
+    await db.clear(LOGS_STORE);
+};
+
+// User Correction CRUD operations
+export const saveUserCorrection = async (correction: UserCorrection): Promise<void> => {
+    const db = await initDB();
+    await db.add(USER_CORRECTIONS_STORE, correction);
+};
+
+export const getUserCorrections = async (): Promise<UserCorrection[]> => {
+    const db = await initDB();
+    return db.getAll(USER_CORRECTIONS_STORE);
+};
+
+export const clearUserCorrections = async (): Promise<void> => {
+    const db = await initDB();
+    await db.clear(USER_CORRECTIONS_STORE);
+};
+
+// Phase 2: Enhanced Features CRUD operations
+
+// Backup Metadata CRUD operations
+export const saveBackupMetadata = async (backup: BackupMetadata): Promise<void> => {
+    const db = await initDB();
+    await db.put(BACKUPS_STORE, backup);
+};
+
+export const getBackupMetadata = async (id: string): Promise<BackupMetadata | undefined> => {
+    const db = await initDB();
+    return db.get(BACKUPS_STORE, id);
+};
+
+export const getAllBackupMetadata = async (): Promise<BackupMetadata[]> => {
+    const db = await initDB();
+    return db.getAll(BACKUPS_STORE);
+};
+
+export const deleteBackupMetadata = async (id: string): Promise<void> => {
+    const db = await initDB();
+    await db.delete(BACKUPS_STORE, id);
+};
+
+// Sync Status operations
+export const saveSyncStatus = async (status: SyncStatus): Promise<void> => {
+    const db = await initDB();
+    await db.put(SYNC_STATUS_STORE, status, 'syncStatus');
+};
+
+export const getSyncStatus = async (): Promise<SyncStatus | undefined> => {
+    const db = await initDB();
+    return db.get(SYNC_STATUS_STORE, 'syncStatus');
+};
+
+// Analytics Data operations
+export const saveAnalyticsData = async (analytics: AnalyticsData): Promise<void> => {
+    const db = await initDB();
+    await db.put(ANALYTICS_STORE, analytics, 'analyticsData');
+};
+
+export const getAnalyticsData = async (): Promise<AnalyticsData | undefined> => {
+    const db = await initDB();
+    return db.get(ANALYTICS_STORE, 'analyticsData');
+};
+
+// OAuth Token CRUD operations
+export const saveOAuthToken = async (token: OAuthToken): Promise<void> => {
+    const db = await initDB();
+    await db.put(OAUTH_TOKENS_STORE, token);
+};
+
+export const getOAuthToken = async (id: string): Promise<OAuthToken | undefined> => {
+    const db = await initDB();
+    return db.get(OAUTH_TOKENS_STORE, id);
+};
+
+export const getAllOAuthTokens = async (): Promise<OAuthToken[]> => {
+    const db = await initDB();
+    return db.getAll(OAUTH_TOKENS_STORE);
+};
+
+export const deleteOAuthToken = async (id: string): Promise<void> => {
+    const db = await initDB();
+    await db.delete(OAUTH_TOKENS_STORE, id);
 };
 
 // Utility function to convert folder structure to folder tree
