@@ -15,7 +15,10 @@
     "idb": "^7.1.1",
     "chart.js": "^4.4.0",
     "react-chartjs-2": "^5.2.0",
-    "gapi-script": "^1.2.0"
+    "@supabase/supabase-js": "^2.39.0",
+    "axios": "^1.6.0",
+    "@supabase/auth-ui-react": "^0.4.7",
+    "@supabase/auth-ui-shared": "^0.1.8"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

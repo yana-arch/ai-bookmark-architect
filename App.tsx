@@ -11,6 +11,7 @@ import * as db from './db';
 import { saveLog, getUserCorrections } from './db';
 import { searchCache, cacheKeys, generateHash, cacheStats } from './src/cache';
 import { formatNumber, parseCSVBookmarks, exportBookmarksToCSV } from './src/utils';
+import { backupScheduler } from './src/services/backupScheduler';
 
 // Lazy load modals for better performance
 const ImportModal = lazy(() => import('./components/ImportModal'));
@@ -22,6 +23,8 @@ const BrokenLinkModal = lazy(() => import('./components/BrokenLinkModal'));
 const InstructionPresetModal = lazy(() => import('./components/InstructionPresetModal'));
 const FolderTemplateModal = lazy(() => import('./components/FolderTemplateModal'));
 const AnalyticsDashboard = lazy(() => import('./components/AnalyticsDashboard'));
+const AuthModal = lazy(() => import('./components/AuthModal'));
+const BackupModal = lazy(() => import('./components/BackupModal'));
 const NotificationToast = lazy(() => import('./components/NotificationToast'));
 
 const createMockData = (): Bookmark[] => {
@@ -92,6 +95,8 @@ const App: React.FC = () => {
     const [isFolderTemplateModalOpen, setIsFolderTemplateModalOpen] = useState(false);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [isAnalyticsDashboardOpen, setIsAnalyticsDashboardOpen] = useState(false);
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+    const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
     const [instructionPresets, setInstructionPresets] = useState<InstructionPreset[]>([]);
     const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
     const [folderTemplates, setFolderTemplates] = useState<FolderTemplate[]>([]);
@@ -131,6 +136,9 @@ const App: React.FC = () => {
             if (savedFolderTemplates.length === 0) {
                 await initializeDefaultTemplates();
             }
+
+            // Initialize backup scheduler
+            await backupScheduler.initialize();
 
             if (savedFolders && savedFolders.length > 0) {
                 setFolders(savedFolders);
@@ -1419,6 +1427,38 @@ ${folderGuide}
                         onClose={() => setIsAnalyticsDashboardOpen(false)}
                     />
                 )}
+                {isAuthModalOpen && (
+                    <AuthModal
+                        isOpen={isAuthModalOpen}
+                        onClose={() => setIsAuthModalOpen(false)}
+                        onAuthSuccess={() => {
+                            setNotifications(prev => [...prev, {
+                                id: `auth-success-${Date.now()}`,
+                                message: 'Successfully connected to PostgreSQL!',
+                                type: 'success'
+                            }]);
+                        }}
+                        onAuthError={(error) => {
+                            setNotifications(prev => [...prev, {
+                                id: `auth-error-${Date.now()}`,
+                                message: `PostgreSQL authentication failed: ${error}`,
+                                type: 'error'
+                            }]);
+                        }}
+                    />
+                )}
+                {isBackupModalOpen && (
+                    <BackupModal
+                        isOpen={isBackupModalOpen}
+                        onClose={() => setIsBackupModalOpen(false)}
+                        bookmarks={bookmarks}
+                        folders={folders}
+                        onRestoreSuccess={() => {
+                            // Refresh data after restore
+                            window.location.reload();
+                        }}
+                    />
+                )}
             </Suspense>
             <div className="fixed bottom-4 right-4 z-50 space-y-2">
                 {notifications.map((notification, index) => (
@@ -1460,6 +1500,20 @@ ${folderGuide}
                                 AI Bookmark Architect
                             </h1>
                             <div className="flex items-center space-x-2">
+                                <button
+                                    onClick={() => setIsAuthModalOpen(true)}
+                                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
+                                    title="Connect to PostgreSQL"
+                                >
+                                    ☁️
+                                </button>
+                                <button
+                                    onClick={() => setIsBackupModalOpen(true)}
+                                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-md transition-colors"
+                                    title="Backup & Restore"
+                                >
+                                    💾
+                                </button>
                                 <button
                                     onClick={() => setIsAnalyticsDashboardOpen(true)}
                                     className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-md transition-colors"
