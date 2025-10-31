@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { Folder, Bookmark } from '../types';
+import type { Folder, Bookmark } from '@/types';
 import { ExportIcon, FolderIcon } from './Icons';
 
 interface ExportModalProps {

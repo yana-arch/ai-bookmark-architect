@@ -1,4 +1,4 @@
-import type { Bookmark } from '../types';
+import type { Bookmark } from '@/types';
 
 /**
  * Formats a number using Vietnamese locale (dots as thousand separators)

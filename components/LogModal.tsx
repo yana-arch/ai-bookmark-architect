@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import type { DetailedLog } from '../types';
+import type { DetailedLog } from '@/types';
 import { ClipboardIcon, SearchIcon, ExportIcon, TrashIcon } from './Icons';
-import { formatNumber } from '../src/utils';
+import { formatNumber } from '@/src/utils';
 
 interface LogModalProps {
     logs: DetailedLog[];

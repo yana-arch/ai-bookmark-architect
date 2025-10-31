@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { InstructionPreset } from '../types';
+import { InstructionPreset } from '@/types';
 
 interface InstructionPresetModalProps {
   isOpen: boolean;

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, useReducer } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
-import { AILogoIcon } from './components/Icons';
+import { AILogoIcon, ChartIcon, CloudIcon, DownloadIcon } from './components/Icons';
 // Fix: Consolidate type imports into a single statement.
 import { AppState, BrokenLinkCheckState, type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, ApiKeyStatus, type DuplicateStats, type InstructionPreset, type FolderTemplate, type TemplateSettings, type FolderCreationMode, type UserCorrection } from './types';
 import Sidebar from './components/Sidebar';
@@ -1566,7 +1566,7 @@ ${folderGuide}
                                     className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
                                     title="Upload dữ liệu"
                                 >
-                                    ☁️
+                                    <CloudIcon className="w-4 h-4" />
                                 </button>
                                 <button
                                     onClick={() => {
@@ -1576,7 +1576,7 @@ ${folderGuide}
                                     className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-md transition-colors"
                                     title="Import dữ liệu"
                                 >
-                                    📥
+                                    <DownloadIcon className="w-4 h-4" />
                                 </button>
 
                                 <button
@@ -1584,7 +1584,7 @@ ${folderGuide}
                                     className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-md transition-colors"
                                     title="Xem phân tích dữ liệu"
                                 >
-                                    📊
+                                    <ChartIcon className="w-4 h-4" />
                                 </button>
                                 <button className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600"></button>
                                 <button className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600"></button>
