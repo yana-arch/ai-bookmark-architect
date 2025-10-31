@@ -14,6 +14,7 @@ A sophisticated React-based application that leverages artificial intelligence t
 - 🎯 **Folder Template System**: Pre-defined organizational templates for different use cases with strict category enforcement
 - 🛠️ **AI Template Generation**: Create custom folder structures using natural language descriptions
 - 📥 **Template Import/Export**: Share and backup your custom folder templates
+- ☁️ **Cloud Backup**: Key-based backup and restore using Supabase (optional)
 - 💾 **Local Storage**: Secure, offline-first storage using IndexedDB
 - 🎨 **Modern UI**: Clean, responsive interface built with React and TypeScript
 - ⚡ **Fast Performance**: Optimized with Vite for lightning-fast development and builds
@@ -40,9 +41,11 @@ A sophisticated React-based application that leverages artificial intelligence t
   - [📋 Prerequisites](#-prerequisites)
   - [🚀 Installation](#-installation)
   - [⚙️ Configuration](#️-configuration)
+    - [Supabase Setup (Optional)](#supabase-setup-optional)
   - [🎯 Usage](#-usage)
     - [Development Server](#development-server)
     - [Production Build](#production-build)
+    - [Cloud Backup (Optional)](#cloud-backup-optional)
   - [📂 Folder Template System](#-folder-template-system)
     - [Default Templates](#default-templates)
     - [Using Templates](#using-templates)
@@ -83,9 +86,22 @@ Create a `.env.local` file in the root directory:
 
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-> **Security Note**: Never commit your API key to version control. The `.env.local` file is already included in `.gitignore`.
+> **Security Note**: Never commit your API keys to version control. The `.env.local` file is already included in `.gitignore`.
+
+### Supabase Setup (Optional)
+
+For cloud backup functionality, you can set up Supabase:
+
+1. **Create a Supabase project** at [supabase.com](https://supabase.com)
+2. **Get your project URL and anon key** from the project settings
+3. **Run the table setup script** from `SUPABASE_SETUP.md`
+4. **Add the environment variables** as shown above
+
+The application will work without Supabase, but cloud backups require it.
 
 ## 🎯 Usage
 
@@ -105,6 +121,17 @@ The application will be available at `http://localhost:5173`.
 npm run build
 npm run preview
 ```
+
+### Cloud Backup (Optional)
+
+If you've set up Supabase, you can use cloud backup features:
+
+1. **Upload Data**: Click the ☁️ button in the header to upload your current bookmarks with a unique key
+2. **Download Data**: Click the 📥 button to restore bookmarks using a previously saved key
+3. **Key Management**: Each backup is identified by a unique key you provide
+4. **Cross-Device Access**: Access your backups from any device with the same key
+
+**Note**: Cloud backup is completely optional. The app works perfectly with local storage only.
 
 ## 📂 Folder Template System
 
@@ -196,6 +223,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Build Tool**: Vite 6.2.0
 - **AI Integration**: Google Gemini AI API
 - **Database**: IndexedDB (via idb library)
+- **Cloud Database**: Supabase (PostgreSQL)
 - **Styling**: CSS Modules
 
 ---

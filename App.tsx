@@ -23,8 +23,7 @@ const BrokenLinkModal = lazy(() => import('./components/BrokenLinkModal'));
 const InstructionPresetModal = lazy(() => import('./components/InstructionPresetModal'));
 const FolderTemplateModal = lazy(() => import('./components/FolderTemplateModal'));
 const AnalyticsDashboard = lazy(() => import('./components/AnalyticsDashboard'));
-const AuthModal = lazy(() => import('./components/AuthModal'));
-const BackupModal = lazy(() => import('./components/BackupModal'));
+const KeyInputModal = lazy(() => import('./components/KeyInputModal'));
 const NotificationToast = lazy(() => import('./components/NotificationToast'));
 
 const createMockData = (): Bookmark[] => {
@@ -95,7 +94,8 @@ const App: React.FC = () => {
     const [isFolderTemplateModalOpen, setIsFolderTemplateModalOpen] = useState(false);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [isAnalyticsDashboardOpen, setIsAnalyticsDashboardOpen] = useState(false);
-    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+    const [isKeyInputModalOpen, setIsKeyInputModalOpen] = useState(false);
+    const [keyInputMode, setKeyInputMode] = useState<'upload' | 'import'>('upload');
     const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
     const [instructionPresets, setInstructionPresets] = useState<InstructionPreset[]>([]);
     const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
@@ -1037,6 +1037,79 @@ ${bookmarksHtml}</DL><p>`;
         setIsExportModalOpen(true);
     }, []);
 
+    const handleUploadData = useCallback(async (key: string) => {
+        try {
+            const { keyBasedService } = await import('./src/services/postgresqlService');
+            const metadata = {
+                name: `Backup ${new Date().toLocaleString('vi-VN')}`,
+                description: `Manual backup with ${bookmarks.length} bookmarks`,
+                bookmarkCount: bookmarks.length,
+                folderCount: folders.length,
+                type: 'manual' as const,
+                size: 0, // Will be calculated by service
+                timestamp: Date.now(),
+                status: 'completed' as const,
+            };
+
+            await keyBasedService.uploadBackup(key, { bookmarks, folders }, metadata, (progress) => {
+                setNotifications(prev => [...prev, {
+                    id: `upload-progress-${Date.now()}-${Math.random()}`,
+                    message: `Upload progress: ${progress}%`,
+                    type: 'info'
+                }]);
+            });
+
+            setNotifications(prev => [...prev, {
+                id: `upload-success-${Date.now()}`,
+                message: 'Upload thành công! Dữ liệu đã được lưu với key của bạn.',
+                type: 'success'
+            }]);
+        } catch (error: any) {
+            setNotifications(prev => [...prev, {
+                id: `upload-error-${Date.now()}`,
+                message: `Upload thất bại: ${error.message}`,
+                type: 'error'
+            }]);
+            throw error;
+        }
+    }, [bookmarks, folders]);
+
+    const handleImportData = useCallback(async (key: string) => {
+        try {
+            const { keyBasedService } = await import('./src/services/postgresqlService');
+            const result = await keyBasedService.downloadBackup(key, (progress) => {
+                setNotifications(prev => [...prev, {
+                    id: `import-progress-${Date.now()}-${Math.random()}`,
+                    message: `Import progress: ${progress}%`,
+                    type: 'info'
+                }]);
+            });
+
+            // Save imported data
+            await db.saveBookmarks(result.data.bookmarks);
+            await db.saveFolders(result.data.folders);
+
+            // Update state
+            setBookmarks(result.data.bookmarks);
+            setFolders(result.data.folders);
+            setAppState(AppState.STRUCTURED);
+            setSelectedFolderId('root');
+
+            setNotifications(prev => [...prev, {
+                id: `import-success-${Date.now()}`,
+                message: `Import thành công! Đã tải ${result.data.bookmarks.length} bookmarks.`,
+                type: 'success'
+            }]);
+        } catch (error: any) {
+            setNotifications(prev => [...prev, {
+                id: `import-error-${Date.now()}`,
+                message: `Import thất bại: ${error.message}`,
+                type: 'error'
+            }]);
+            throw error;
+        }
+    }, []);
+
     // Instruction Preset handlers
     const handleSaveInstructionPreset = useCallback(async (preset: InstructionPreset) => {
         await db.saveInstructionPreset(preset);
@@ -1427,38 +1500,23 @@ ${folderGuide}
                         onClose={() => setIsAnalyticsDashboardOpen(false)}
                     />
                 )}
-                {isAuthModalOpen && (
-                    <AuthModal
-                        isOpen={isAuthModalOpen}
-                        onClose={() => setIsAuthModalOpen(false)}
-                        onAuthSuccess={() => {
-                            setNotifications(prev => [...prev, {
-                                id: `auth-success-${Date.now()}`,
-                                message: 'Successfully connected to PostgreSQL!',
-                                type: 'success'
-                            }]);
-                        }}
-                        onAuthError={(error) => {
-                            setNotifications(prev => [...prev, {
-                                id: `auth-error-${Date.now()}`,
-                                message: `PostgreSQL authentication failed: ${error}`,
-                                type: 'error'
-                            }]);
+                {isKeyInputModalOpen && (
+                    <KeyInputModal
+                        isOpen={isKeyInputModalOpen}
+                        onClose={() => setIsKeyInputModalOpen(false)}
+                        mode={keyInputMode}
+                        onSubmit={async (key) => {
+                            if (keyInputMode === 'upload') {
+                                // Handle upload
+                                await handleUploadData(key);
+                            } else {
+                                // Handle import
+                                await handleImportData(key);
+                            }
                         }}
                     />
                 )}
-                {isBackupModalOpen && (
-                    <BackupModal
-                        isOpen={isBackupModalOpen}
-                        onClose={() => setIsBackupModalOpen(false)}
-                        bookmarks={bookmarks}
-                        folders={folders}
-                        onRestoreSuccess={() => {
-                            // Refresh data after restore
-                            window.location.reload();
-                        }}
-                    />
-                )}
+
             </Suspense>
             <div className="fixed bottom-4 right-4 z-50 space-y-2">
                 {notifications.map((notification, index) => (
@@ -1501,19 +1559,26 @@ ${folderGuide}
                             </h1>
                             <div className="flex items-center space-x-2">
                                 <button
-                                    onClick={() => setIsAuthModalOpen(true)}
+                                    onClick={() => {
+                                        setKeyInputMode('upload');
+                                        setIsKeyInputModalOpen(true);
+                                    }}
                                     className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
-                                    title="Connect to PostgreSQL"
+                                    title="Upload dữ liệu"
                                 >
                                     ☁️
                                 </button>
                                 <button
-                                    onClick={() => setIsBackupModalOpen(true)}
-                                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-md transition-colors"
-                                    title="Backup & Restore"
+                                    onClick={() => {
+                                        setKeyInputMode('import');
+                                        setIsKeyInputModalOpen(true);
+                                    }}
+                                    className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-md transition-colors"
+                                    title="Import dữ liệu"
                                 >
-                                    💾
+                                    📥
                                 </button>
+
                                 <button
                                     onClick={() => setIsAnalyticsDashboardOpen(true)}
                                     className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-md transition-colors"
