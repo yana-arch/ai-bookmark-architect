@@ -1,5 +1,5 @@
 import React from 'react';
-import type { DuplicateStats } from '../types';
+import type { DuplicateStats } from '@/types';
 import { DocumentDuplicateIcon } from './Icons';
 
 interface DuplicateModalProps {

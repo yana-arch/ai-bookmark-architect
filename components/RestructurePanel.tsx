@@ -1,8 +1,8 @@
 import React from 'react';
-import { AppState } from '../types';
-import type { ApiConfig, FolderTemplate } from '../types';
+import { AppState } from '@/types';
+import type { ApiConfig, FolderTemplate } from '@/types';
 import { WarningIcon, CogIcon } from './Icons';
-import { formatNumber } from '../src/utils';
+import { formatNumber } from '@/src/utils';
 
 interface RestructurePanelProps {
     appState: AppState;

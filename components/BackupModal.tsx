@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { postgresqlService } from '../src/services/postgresqlService';
-import type { BackupMetadata, Bookmark, Folder } from '../types';
-import * as db from '../db';
+import { postgresqlService } from '@/src/services/postgresqlService';
+import type { BackupMetadata, Bookmark, Folder } from '@/types';
+import * as db from '@/db';
+import { ChartIcon, CalendarIcon, FolderIcon2, SaveIcon, UploadIcon, FolderOpenIcon } from './Icons';
 
 interface BackupModalProps {
   isOpen: boolean;
@@ -37,7 +38,7 @@ const BackupModal: React.FC<BackupModalProps> = ({
   const checkAuthAndLoadBackups = async () => {
     try {
       await postgresqlService.initialize();
-      const authenticated = postgresqlService.isSignedIn();
+      const authenticated = await postgresqlService.isSignedIn();
       setIsAuthenticated(authenticated);
 
       if (authenticated) {
@@ -263,7 +264,7 @@ const BackupModal: React.FC<BackupModalProps> = ({
                       </>
                     ) : (
                       <>
-                        <span>📤 Create Backup</span>
+                        <span><UploadIcon className="w-4 h-4 mr-1" />Create Backup</span>
                       </>
                     )}
                   </button>
@@ -285,7 +286,7 @@ const BackupModal: React.FC<BackupModalProps> = ({
 
                 {backups.length === 0 ? (
                   <div className="text-center py-8 text-gray-400">
-                    <div className="text-4xl mb-2">📁</div>
+                    <div className="text-4xl mb-2"><FolderOpenIcon className="w-16 h-16 mx-auto" /></div>
                     <p>No backups found. Create your first backup above.</p>
                   </div>
                 ) : (
@@ -299,10 +300,10 @@ const BackupModal: React.FC<BackupModalProps> = ({
                               <p className="text-sm text-gray-300 mt-1">{backup.description}</p>
                             )}
                             <div className="flex items-center space-x-4 mt-2 text-xs text-gray-400">
-                              <span>📅 {formatDate(backup.timestamp)}</span>
-                              <span>📊 {backup.bookmarkCount} bookmarks</span>
-                              <span>📂 {backup.folderCount} folders</span>
-                              <span>💾 {formatSize(backup.size)}</span>
+                              <span><CalendarIcon className="w-3 h-3 inline mr-1" />{formatDate(backup.timestamp)}</span>
+                              <span><ChartIcon className="w-3 h-3 inline mr-1" />{backup.bookmarkCount} bookmarks</span>
+                              <span><FolderIcon2 className="w-3 h-3 inline mr-1" />{backup.folderCount} folders</span>
+                              <span><SaveIcon className="w-3 h-3 inline mr-1" />{formatSize(backup.size)}</span>
                               <span className={`px-2 py-1 rounded text-xs ${
                                 backup.type === 'auto' ? 'bg-blue-900/20 text-blue-400' : 'bg-green-900/20 text-green-400'
                               }`}>

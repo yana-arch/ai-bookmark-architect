@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Bookmark } from '../types';
+import type { Bookmark } from '@/types';
 import { BrokenLinkIcon, FileIcon } from './Icons';
 
 interface BrokenLinkModalProps {

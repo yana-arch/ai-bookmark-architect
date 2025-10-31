@@ -1,17 +1,28 @@
 import { supabase } from './supabaseClient';
 
 class SupabaseApiClient {
-  // Create backup with key (no user authentication required)
+  private async getCurrentUserId(): Promise<string> {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) {
+      throw new Error('User not authenticated');
+    }
+    return user.id;
+  }
+
+  // Create backup with key (user authentication required)
   async createBackup(key: string, data: { bookmarks: any[]; folders: any[] }, metadata: any): Promise<any> {
-    // Check if key already exists
+    // const userId = await this.getCurrentUserId();
+
+    // Check if key already exists for this user
     const { data: existing, error: checkError } = await supabase
       .from('backups')
       .select('id')
+      // .eq('user_id', userId)
       .eq('name', key) // Using name field to store the key
       .single();
 
     if (existing) {
-      throw new Error('Key already exists. Please choose a different key.');
+      throw new Error('A backup with this name already exists. Please choose a different name.');
     }
 
     if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found" error
@@ -22,7 +33,7 @@ class SupabaseApiClient {
     const { data: backup, error } = await supabase
       .from('backups')
       .insert({
-        user_id: 'anonymous', // Use a fixed value since we don't have authentication
+        // user_id: userId,
         name: key, // Store the key in the name field
         description: metadata.description || null,
         data: data,
@@ -43,9 +54,12 @@ class SupabaseApiClient {
   }
 
   async getBackup(key: string): Promise<any> {
+    // const userId = await this.getCurrentUserId();
+
     const { data: backup, error } = await supabase
       .from('backups')
       .select('*')
+      // .eq('user_id', userId)
       .eq('name', key) // Key is stored in name field
       .single();
 
@@ -74,9 +88,12 @@ class SupabaseApiClient {
   }
 
   async listBackups(): Promise<any[]> {
+    // const userId = await this.getCurrentUserId();
+
     const { data: backups, error } = await supabase
       .from('backups')
       .select('*')
+      // .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -99,9 +116,12 @@ class SupabaseApiClient {
   }
 
   async deleteBackup(key: string): Promise<void> {
+    // const userId = await this.getCurrentUserId();
+
     const { error } = await supabase
       .from('backups')
       .delete()
+      // .eq('user_id', userId)
       .eq('name', key);
 
     if (error) {
@@ -110,9 +130,12 @@ class SupabaseApiClient {
   }
 
   async checkKeyExists(key: string): Promise<boolean> {
+    // const userId = await this.getCurrentUserId();
+
     const { data, error } = await supabase
       .from('backups')
       .select('id')
+      // .eq('user_id', userId)
       .eq('name', key)
       .single();
 

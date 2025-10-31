@@ -1,9 +1,9 @@
 
 
 import React, { useState } from 'react';
-import { AppState, BrokenLinkCheckState, type Folder, type Bookmark } from '../types';
+import { AppState, BrokenLinkCheckState, type Folder, type Bookmark } from '@/types';
 import { FolderIcon, ChevronRightIcon, TrashIcon, ImportIcon, ExportIcon, SearchIcon, XIcon, DocumentDuplicateIcon, BrokenLinkIcon } from './Icons';
-import { formatNumber } from '../src/utils';
+import { formatNumber } from '@/src/utils';
 
 interface SidebarProps {
     folders: Folder[];

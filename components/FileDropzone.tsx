@@ -1,6 +1,6 @@
 
 import React, { useCallback } from 'react';
-import type { Bookmark } from '../types';
+import type { Bookmark } from '@/types';
 
 interface FileDropzoneProps {
     onFileLoaded: (fileName: string, bookmarks: Bookmark[]) => void;

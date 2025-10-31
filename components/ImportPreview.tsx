@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Bookmark } from '../types';
+import type { Bookmark } from '@/types';
 import { FileIcon, WarningIcon } from './Icons';
 
 interface ImportPreviewProps {

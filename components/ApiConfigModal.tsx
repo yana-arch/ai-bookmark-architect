@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { ApiConfig, ApiKeyStatus } from '../types';
+import type { ApiConfig, ApiKeyStatus } from '@/types';
 import { CogIcon, TrashIcon, PowerIcon, ExclamationTriangleIcon } from './Icons';
 
 interface ApiConfigModalProps {

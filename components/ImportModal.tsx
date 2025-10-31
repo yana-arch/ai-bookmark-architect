@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import type { Bookmark } from '../types';
+import type { Bookmark } from '@/types';
 import ImportPreview from './ImportPreview';
 
 interface ImportModalProps {
