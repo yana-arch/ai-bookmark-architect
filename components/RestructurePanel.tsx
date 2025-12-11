@@ -21,6 +21,7 @@ interface RestructurePanelProps {
     selectedTemplateId: string | null;
     onStart: () => void;
     onStop: () => void;
+    onForceStop?: () => void;
     onApply: () => void;
     onDiscard: () => void;
     onContinue: () => void;
@@ -39,7 +40,7 @@ interface RestructurePanelProps {
 
 const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
     const {
-        appState, progress, logs, errorDetails, onStart, onStop, onApply, onDiscard, onContinue,
+        appState, progress, logs, errorDetails, onStart, onStop, onForceStop, onApply, onDiscard, onContinue,
         apiConfigs, onOpenApiModal, onOpenLogModal, onOpenInstructionPresetModal, onOpenFolderTemplateModal,
         systemPrompt, onSystemPromptChange, sessionTokenUsage,
         customInstructions, onCustomInstructionsChange,
@@ -288,12 +289,22 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                                })}
                             </div>
                         </div>
-                        <button
-                            onClick={onStop}
-                            className="w-full mt-4 bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
-                        >
-                            Dừng Xử Lý
-                        </button>
+                        <div className="space-y-2 mt-4">
+                            <button
+                                onClick={onStop}
+                                className="w-full bg-orange-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-700 transition-colors"
+                            >
+                                Dừng Xử Lý (Graceful)
+                            </button>
+                            {onForceStop && (
+                                <button
+                                    onClick={onForceStop}
+                                    className="w-full bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
+                                >
+                                    Dừng Bắt Buộc (Force)
+                                </button>
+                            )}
+                        </div>
                         <LogViewerButton />
                     </>
                 );

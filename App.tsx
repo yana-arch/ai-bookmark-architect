@@ -383,6 +383,44 @@ const App: React.FC = () => {
         stopProcessingRef.current = true;
     };
 
+    // Helper function to add detailed logs - defined here so it can be used by force stop
+    const addDetailedLog = async (type: DetailedLog['type'], title: string, content: string | object, usage?: DetailedLog['usage']) => {
+        const newLog: DetailedLog = {
+            id: `log-${Date.now()}-${Math.random()}`,
+            timestamp: new Date().toLocaleTimeString('en-GB'),
+            type,
+            title,
+            content,
+            usage
+        };
+        setDetailedLogs(prev => [...prev, newLog]);
+        await saveLog(newLog); // Save to IndexedDB
+
+        // Trigger real-time notification for certain types of logs
+        if (type === 'error' || (type === 'info' && title.includes('Hoàn tất'))) {
+            setNotifications(prev => [...prev, { id: newLog.id, message: `${newLog.title}: ${typeof newLog.content === 'string' ? newLog.content.substring(0, 100) : ''}...`, type: newLog.type === 'error' ? 'error' : 'success' }]);
+        }
+    };
+
+    const handleForceStopRestructuring = useCallback(() => {
+        // Immediately terminate all workers
+        workersRef.current.forEach(worker => {
+            worker.terminate();
+        });
+        workersRef.current = [];
+        activeWorkersRef.current.clear();
+
+        // Set stop flag and transition to error state
+        stopProcessingRef.current = true;
+
+        // Add force stop log
+        addDetailedLog('info', 'Force stop initiated', 'All workers terminated immediately');
+
+        setLogs(prev => [...prev, 'Đã dừng xử lý bắt buộc - tất cả worker đã bị terminate']);
+        setErrorDetails('Xử lý đã được dừng bắt buộc. Bạn có thể áp dụng kết quả đã xử lý hoặc bắt đầu lại.');
+        setAppState(AppState.ERROR);
+    }, []);
+
     const handleDismissNotification = useCallback((id: string) => {
         setNotifications(prev => prev.filter(n => n.id !== id));
     }, []);
@@ -1622,6 +1660,7 @@ ${folderGuide}
                                     selectedTemplateId={templateSettings.selectedTemplateId}
                                     onStart={() => startRestructuring(false)}
                                     onStop={handleStopRestructuring}
+                                    onForceStop={handleForceStopRestructuring}
                                     onApply={applyChanges}
                                     onDiscard={discardChanges}
                                     onContinue={continueRestructuring}
