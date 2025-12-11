@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { ApiConfig, ApiKeyStatus } from '@/types';
-import { CogIcon, TrashIcon, PowerIcon, ExclamationTriangleIcon } from './Icons';
+import { CogIcon, TrashIcon, PowerIcon, ExclamationTriangleIcon, XIcon } from './Icons';
 
 interface ApiConfigModalProps {
     onClose: () => void;
@@ -15,6 +15,23 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
     const [apiKey, setApiKey] = useState('');
     const [provider, setProvider] = useState<'gemini' | 'openrouter'>('gemini');
     const [model, setModel] = useState('');
+    const [editingId, setEditingId] = useState<string | null>(null);
+
+    const handleEditConfig = (config: ApiConfig) => {
+        setEditingId(config.id);
+        setName(config.name);
+        setApiKey(config.apiKey);
+        setProvider(config.provider);
+        setModel(config.model);
+    };
+
+    const handleCancelEdit = () => {
+        setEditingId(null);
+        setName('');
+        setApiKey('');
+        setModel('');
+        setProvider('gemini');
+    };
 
     const handleAddKey = (e: React.FormEvent) => {
         e.preventDefault();
@@ -26,20 +43,36 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
             alert("Vui lòng nhập tên model cho OpenRouter.");
             return;
         }
-        
-        onSaveApiConfig({
-            id: `key-${Date.now()}`,
-            name,
-            provider,
-            apiKey,
-            model: provider === 'gemini' ? 'gemini-2.5-flash' : model,
-            status: 'active'
-        });
+
+        if (editingId) {
+            // Editing existing config
+            const existingConfig = apiConfigs.find(config => config.id === editingId);
+            if (existingConfig) {
+                onSaveApiConfig({
+                    ...existingConfig,
+                    name,
+                    provider,
+                    apiKey,
+                    model: provider === 'gemini' ? 'gemini-2.5-flash' : model,
+                });
+            }
+        } else {
+            // Adding new config
+            onSaveApiConfig({
+                id: `key-${Date.now()}`,
+                name,
+                provider,
+                apiKey,
+                model: provider === 'gemini' ? 'gemini-2.5-flash' : model,
+                status: 'active'
+            });
+        }
 
         setName('');
         setApiKey('');
         setModel('');
         setProvider('gemini');
+        setEditingId(null);
     };
     
     const providerClasses = {
@@ -81,6 +114,9 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
                                {config.status === 'error' && (
                                    <button onClick={() => onToggleApiConfigStatus(config.id, 'active')} className="p-1.5 rounded-full hover:bg-sky-500/20" title="Kích hoạt lại key"><ExclamationTriangleIcon className="w-4 h-4 text-sky-400" /></button>
                                )}
+                               <button onClick={() => handleEditConfig(config)} className="p-1.5 rounded-full hover:bg-blue-500/20" title={`Sửa key ${config.name}`}>
+                                   <CogIcon className="w-4 h-4 text-gray-500 hover:text-blue-500 cursor-pointer transition-colors" />
+                               </button>
                                <button onClick={() => onDeleteApiConfig(config.id)} className="p-1.5 rounded-full hover:bg-red-500/20" title={`Xóa key ${config.name}`}>
                                    <TrashIcon className="w-4 h-4 text-gray-500 hover:text-red-500 cursor-pointer transition-colors" />
                                </button>
@@ -90,7 +126,22 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
                 </div>
                 
                 <form onSubmit={handleAddKey} className="space-y-4 pt-4 border-t border-gray-700/50">
-                    <h3 className="text-sm font-semibold text-gray-300">Thêm Key Mới</h3>
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-gray-300">
+                            {editingId ? 'Sửa Key' : 'Thêm Key Mới'}
+                        </h3>
+                        {editingId && (
+                            <button
+                                type="button"
+                                onClick={handleCancelEdit}
+                                className="text-xs text-gray-400 hover:text-white transition-colors"
+                                title="Hủy sửa"
+                            >
+                                <XIcon className="w-4 h-4 inline mr-1" />
+                                Hủy
+                            </button>
+                        )}
+                    </div>
                     <div>
                         <label className="block text-xs text-gray-400 mb-2">Nhà cung cấp AI</label>
                         <div className="flex space-x-2">
@@ -122,7 +173,7 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
                         />
                     )}
                     <button type="submit" className="w-full text-sm bg-emerald-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-600 transition-colors">
-                        Thêm & Lưu API Key
+                        {editingId ? 'Cập Nhật API Key' : 'Thêm & Lưu API Key'}
                     </button>
                 </form>
 
