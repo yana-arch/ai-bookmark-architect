@@ -26,6 +26,102 @@ interface WorkerResponse {
 // Import necessary libraries for the worker
 // Note: Workers have limited access, so we need to be careful with imports
 
+// Helper function to parse and validate AI response content
+function parseAIResponse(content: string): any[] {
+  try {
+    // First attempt: direct JSON parsing
+    const parsed = JSON.parse(content);
+    if (parsed && parsed.bookmarks && Array.isArray(parsed.bookmarks)) {
+      return parsed.bookmarks;
+    }
+    throw new Error('Invalid response structure');
+  } catch (error) {
+    // Second attempt: try to extract and repair JSON
+    try {
+      // Remove any leading/trailing whitespace and potential markdown formatting
+      let cleanedContent = content.trim();
+
+      // Remove markdown code blocks if present
+      if (cleanedContent.startsWith('```json')) {
+        cleanedContent = cleanedContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (cleanedContent.startsWith('```')) {
+        cleanedContent = cleanedContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+
+      // Try to find JSON object boundaries
+      const jsonStart = cleanedContent.indexOf('{');
+      const jsonEnd = cleanedContent.lastIndexOf('}');
+
+      if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+        cleanedContent = cleanedContent.substring(jsonStart, jsonEnd + 1);
+      }
+
+      // Attempt basic JSON repair for common issues
+      let repairedContent = cleanedContent
+        // Fix trailing commas before closing brackets
+        .replace(/,(\s*[}\]])/g, '$1')
+        // Fix missing commas between array elements
+        .replace(/}(\s*){/g, '},{')
+        // Fix unescaped quotes in strings (basic)
+        .replace(/([^\\])"([^"]*)"([^,}\]]*[^\\])"([^"]*)"([^,}\]]*)/g, '$1"$2\\"$3\\"$4"$5');
+
+      const parsed = JSON.parse(repairedContent);
+      if (parsed && parsed.bookmarks && Array.isArray(parsed.bookmarks)) {
+        // Validate each bookmark has required fields
+        const validBookmarks = parsed.bookmarks.filter((bookmark: any) => {
+          return bookmark &&
+                 typeof bookmark.title === 'string' &&
+                 typeof bookmark.url === 'string' &&
+                 Array.isArray(bookmark.path) &&
+                 Array.isArray(bookmark.tags);
+        });
+
+        if (validBookmarks.length > 0) {
+          return validBookmarks;
+        }
+      }
+
+      throw new Error('No valid bookmarks found after repair');
+    } catch (repairError) {
+      // Final fallback: try to extract individual bookmark objects using the cleaned content
+      try {
+        const bookmarks: any[] = [];
+        // Use the cleaned content from the outer scope
+        let searchContent = content.trim();
+
+        // Remove markdown if present
+        if (searchContent.startsWith('```json')) {
+          searchContent = searchContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+        } else if (searchContent.startsWith('```')) {
+          searchContent = searchContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
+        }
+
+        const bookmarkRegex = /{\s*"id"\s*:\s*"[^"]*"\s*,\s*"title"\s*:\s*"[^"]*"\s*,\s*"url"\s*:\s*"[^"]*"\s*,\s*"parentId"\s*:\s*"(?:[^"]*)"\s*,\s*"path"\s*:\s*\[[^\]]*\]\s*,\s*"tags"\s*:\s*\[[^\]]*\]\s*}/g;
+
+        let match;
+        while ((match = bookmarkRegex.exec(searchContent)) !== null) {
+          try {
+            const bookmark = JSON.parse(match[0]);
+            if (bookmark.title && bookmark.url && Array.isArray(bookmark.path) && Array.isArray(bookmark.tags)) {
+              bookmarks.push(bookmark);
+            }
+          } catch (e) {
+            // Skip malformed individual bookmarks
+          }
+        }
+
+        if (bookmarks.length > 0) {
+          return bookmarks;
+        }
+
+        throw new Error('Could not extract any valid bookmarks');
+      } catch (finalError) {
+        throw new Error(`Failed to parse AI response: ${finalError.message}. Raw content: ${content.substring(0, 200)}...`);
+      }
+    }
+  }
+}
+
 // Helper function to make API calls
 async function callAIProvider(
   provider: string,
@@ -82,7 +178,8 @@ async function callAIProvider(
 
     const responseData = await response.json();
     const usage = responseData.usage;
-    const categorizedBatch = JSON.parse(responseData.choices[0].message.content).bookmarks;
+    const rawContent = responseData.choices[0].message.content;
+    const categorizedBatch = parseAIResponse(rawContent);
 
     return { categorizedBatch, usage };
 
