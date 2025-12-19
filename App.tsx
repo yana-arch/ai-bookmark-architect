@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, useReducer } from 'react';
 
-import { AILogoIcon, ChartIcon, CloudIcon, DownloadIcon } from './components/Icons';
+import { AILogoIcon, ChartIcon, UploadIcon, ImportIcon } from './components/Icons';
 // Fix: Consolidate type imports into a single statement.
 import { AppState, BrokenLinkCheckState, type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, ApiKeyStatus, type DuplicateStats, type InstructionPreset, type FolderTemplate, type TemplateSettings, type FolderCreationMode, type UserCorrection } from './types';
 import Sidebar from './components/Sidebar';
@@ -1435,7 +1435,7 @@ ${folderGuide}
                                     className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
                                     title="Upload dữ liệu"
                                 >
-                                    <CloudIcon className="w-4 h-4" />
+                                    <UploadIcon className="w-4 h-4" />
                                 </button>
                                 <button
                                     onClick={() => {
@@ -1445,7 +1445,7 @@ ${folderGuide}
                                     className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-md transition-colors"
                                     title="Import dữ liệu"
                                 >
-                                    <DownloadIcon className="w-4 h-4" />
+                                    <ImportIcon className="w-4 h-4" />
                                 </button>
 
                                 <button
