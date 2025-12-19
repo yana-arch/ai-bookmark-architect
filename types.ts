@@ -173,3 +173,17 @@ export interface OAuthToken {
   expires_at: number;
   token_type: string;
 }
+
+export interface DbConnection {
+  id: string;
+  name: string;
+  isActive: boolean;
+  createdAt: number;
+  connectionString: string;
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string;
+  provider: 'supabase' | 'postgresql' | 'neon';
+}

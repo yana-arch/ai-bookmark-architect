@@ -1,7 +1,7 @@
 import { openDB, IDBPDatabase } from 'idb';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 // Fix: Import ApiConfig type.
-import type { Bookmark, Folder, ApiConfig, InstructionPreset, FolderTemplate, EmptyFolderTree, DetailedLog, UserCorrection, BackupMetadata, SyncStatus, AnalyticsData, OAuthToken } from './types';
+import type { Bookmark, Folder, ApiConfig, InstructionPreset, FolderTemplate, EmptyFolderTree, DetailedLog, UserCorrection, BackupMetadata, SyncStatus, AnalyticsData, OAuthToken, DbConnection } from './types';
 
 const DB_NAME = 'AIBookmarkArchitectDB';
 const BOOKMARKS_STORE = 'bookmarks';

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, useReducer } from 'react';
-import { GoogleGenAI, Type } from "@google/genai";
+
 import { AILogoIcon, ChartIcon, CloudIcon, DownloadIcon } from './components/Icons';
 // Fix: Consolidate type imports into a single statement.
 import { AppState, BrokenLinkCheckState, type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, ApiKeyStatus, type DuplicateStats, type InstructionPreset, type FolderTemplate, type TemplateSettings, type FolderCreationMode, type UserCorrection } from './types';
@@ -383,101 +383,7 @@ const App: React.FC = () => {
         stopProcessingRef.current = true;
     };
 
-    // Helper function to parse and validate AI response content
-    const parseAIResponse = (content: string): any[] => {
-        try {
-            // First attempt: direct JSON parsing
-            const parsed = JSON.parse(content);
-            if (parsed && parsed.bookmarks && Array.isArray(parsed.bookmarks)) {
-                return parsed.bookmarks;
-            }
-            throw new Error('Invalid response structure');
-        } catch (error) {
-            // Second attempt: try to extract and repair JSON
-            try {
-                // Remove any leading/trailing whitespace and potential markdown formatting
-                let cleanedContent = content.trim();
 
-                // Remove markdown code blocks if present
-                if (cleanedContent.startsWith('```json')) {
-                    cleanedContent = cleanedContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-                } else if (cleanedContent.startsWith('```')) {
-                    cleanedContent = cleanedContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
-                }
-
-                // Try to find JSON object boundaries
-                const jsonStart = cleanedContent.indexOf('{');
-                const jsonEnd = cleanedContent.lastIndexOf('}');
-
-                if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
-                    cleanedContent = cleanedContent.substring(jsonStart, jsonEnd + 1);
-                }
-
-                // Attempt basic JSON repair for common issues
-                let repairedContent = cleanedContent
-                    // Fix trailing commas before closing brackets
-                    .replace(/,(\s*[}\]])/g, '$1')
-                    // Fix missing commas between array elements
-                    .replace(/}(\s*){/g, '},{')
-                    // Fix unescaped quotes in strings (basic)
-                    .replace(/([^\\])"([^"]*)"([^,}\]]*[^\\])"([^"]*)"([^,}\]]*)/g, '$1"$2\\"$3\\"$4"$5');
-
-                const parsed = JSON.parse(repairedContent);
-                if (parsed && parsed.bookmarks && Array.isArray(parsed.bookmarks)) {
-                    // Validate each bookmark has required fields
-                    const validBookmarks = parsed.bookmarks.filter((bookmark: any) => {
-                        return bookmark &&
-                               typeof bookmark.title === 'string' &&
-                               typeof bookmark.url === 'string' &&
-                               Array.isArray(bookmark.path) &&
-                               Array.isArray(bookmark.tags);
-                    });
-
-                    if (validBookmarks.length > 0) {
-                        return validBookmarks;
-                    }
-                }
-
-                throw new Error('No valid bookmarks found after repair');
-            } catch (repairError) {
-                // Final fallback: try to extract individual bookmark objects
-                try {
-                    const bookmarks: any[] = [];
-                    // Use the cleaned content from the outer scope
-                    let searchContent = content.trim();
-
-                    // Remove markdown if present
-                    if (searchContent.startsWith('```json')) {
-                        searchContent = searchContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-                    } else if (searchContent.startsWith('```')) {
-                        searchContent = searchContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
-                    }
-
-                    const bookmarkRegex = /{\s*"id"\s*:\s*"[^"]*"\s*,\s*"title"\s*:\s*"[^"]*"\s*,\s*"url"\s*:\s*"[^"]*"\s*,\s*"parentId"\s*:\s*"(?:[^"]*)"\s*,\s*"path"\s*:\s*\[[^\]]*\]\s*,\s*"tags"\s*:\s*\[[^\]]*\]\s*}/g;
-
-                    let match;
-                    while ((match = bookmarkRegex.exec(searchContent)) !== null) {
-                        try {
-                            const bookmark = JSON.parse(match[0]);
-                            if (bookmark.title && bookmark.url && Array.isArray(bookmark.path) && Array.isArray(bookmark.tags)) {
-                                bookmarks.push(bookmark);
-                            }
-                        } catch (e) {
-                            // Skip malformed individual bookmarks
-                        }
-                    }
-
-                    if (bookmarks.length > 0) {
-                        return bookmarks;
-                    }
-
-                    throw new Error('Could not extract any valid bookmarks');
-                } catch (finalError) {
-                    throw new Error(`Failed to parse AI response: ${finalError.message}. Raw content: ${content.substring(0, 200)}...`);
-                }
-            }
-        }
-    };
 
     // Helper function to add detailed logs - defined here so it can be used by force stop
     const addDetailedLog = async (type: DetailedLog['type'], title: string, content: string | object, usage?: DetailedLog['usage']) => {
@@ -652,9 +558,6 @@ const App: React.FC = () => {
                     } else if (type === 'detailed_log') {
                         // Handle detailed logs from worker
                         addDetailedLog(data.type, data.title, data.content, data.usage);
-                    } else if (type === 'gemini_request') {
-                        // Handle Gemini request from worker
-                        handleGeminiRequest(data, batchIndex, worker);
                     }
                 };
 
@@ -665,54 +568,7 @@ const App: React.FC = () => {
             }
         };
 
-        const handleGeminiRequest = async (geminiData: any, batchIndex: number, worker: Worker) => {
-            try {
-                const ai = new GoogleGenAI({ apiKey: geminiData.apiKey });
-                const genAiResponse = await ai.models.generateContent({
-                    model: geminiData.model,
-                    contents: geminiData.userContent,
-                    config: {
-                        systemInstruction: geminiData.systemPrompt,
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: Type.ARRAY,
-                            items: {
-                                type: Type.OBJECT,
-                                properties: {
-                                    title: { type: Type.STRING },
-                                    url: { type: Type.STRING },
-                                    path: { type: Type.ARRAY, items: { type: Type.STRING } },
-                                    tags: { type: Type.ARRAY, items: { type: Type.STRING } }
-                                },
-                                required: ['title', 'url', 'path', 'tags']
-                            }
-                        }
-                    }
-                });
 
-                const usage = genAiResponse.usageMetadata;
-                const tokenInfo = usage ? {
-                    promptTokens: usage.promptTokenCount,
-                    completionTokens: usage.candidatesTokenCount,
-                    totalTokens: usage.totalTokenCount
-                } : undefined;
-
-                const categorizedBatch = parseAIResponse(genAiResponse.text.trim());
-
-                worker.postMessage({
-                    type: 'gemini_response',
-                    batchIndex,
-                    categorizedBatch,
-                    usage: tokenInfo
-                });
-            } catch (error: any) {
-                worker.postMessage({
-                    type: 'gemini_response',
-                    batchIndex,
-                    error: error.toString()
-                });
-            }
-        };
 
         const startNextBatch = () => {
             if (stopProcessingRef.current) {
@@ -787,165 +643,13 @@ const App: React.FC = () => {
             activeWorkersRef.current.clear();
         };
 
-        // Start processing based on mode
-        if (processingMode === 'multi') {
-            initializeWorkers();
-            for (let i = 0; i < Math.min(MAX_CONCURRENT_WORKERS, totalBatches); i++) {
-                startNextBatch();
-            }
-        } else {
-            // Single-threaded processing (original sequential approach)
-            await processSequentially();
+        // Always use multi-threaded processing
+        initializeWorkers();
+        for (let i = 0; i < Math.min(MAX_CONCURRENT_WORKERS, totalBatches); i++) {
+            startNextBatch();
         }
 
-        // Sequential processing function (original logic)
-        async function processSequentially() {
-            for (let i = 0; i < totalBatches; i++) {
-                if (stopProcessingRef.current) {
-                    const stopMsg = "Quá trình đã được người dùng dừng lại.";
-                    setLogs(prev => [...prev, stopMsg]);
-                    addDetailedLog('info', 'Xử lý đã dừng', stopMsg);
-                    setErrorDetails(stopMsg);
-                    setAppState(AppState.ERROR);
-                    return;
-                }
 
-                const batch = bookmarksToProcess.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
-                const progressCurrent = allCategorizedBookmarks.length + (i * BATCH_SIZE) + batch.length;
-                const logMsg = `Đang xử lý batch ${i + 1}/${totalBatches} (bookmarks ${progressCurrent}/${bookmarks.length})...`;
-
-                setProgress({ current: progressCurrent, total: bookmarks.length });
-                setLogs(prev => [...prev, logMsg]);
-                addDetailedLog('info', `Xử lý Batch ${i + 1}/${totalBatches}`, `Số lượng bookmarks: ${batch.length}`);
-
-                let batchSuccess = false;
-
-                while (!batchSuccess && availableKeys.length > 0) {
-                    const currentKeyConfig = availableKeys[0]; // Use first available key for sequential
-                    let retries = 0;
-
-                    while (retries <= maxRetries) {
-                        try {
-                            if (retries > 0) {
-                                const retryMsg = `Thử lại lần ${retries}/${maxRetries} với key "${currentKeyConfig.name}"...`;
-                                setLogs(prev => [...prev, retryMsg]);
-                                addDetailedLog('info', 'Thử lại yêu cầu', retryMsg);
-                            } else {
-                                const attemptMsg = `Sử dụng key: ${currentKeyConfig.name} (${currentKeyConfig.provider})`;
-                                setLogs(prev => [...prev, attemptMsg]);
-                                addDetailedLog('info', 'Thử nghiệm API Key', `Key: ${currentKeyConfig.name}, Provider: ${currentKeyConfig.provider}`);
-                            }
-
-                            let categorizedBatch: CategorizedBookmark[] = [];
-                            const currentTree = arrayToTree(bookmarks.map(bm => {
-                                const categorized = runningCategorizedBookmarks.find(cb => cb.url === bm.url);
-                                return { ...bm, path: categorized?.path || [], tags: categorized?.tags || [] };
-                            }));
-
-                            // API Call Logic
-                            if (currentKeyConfig.provider === 'openrouter') {
-                                addDetailedLog('info', 'Sử dụng OpenRouter', `Model: ${currentKeyConfig.model}`);
-                                const finalSystemPrompt = systemPrompt + "\n\nOutput a JSON object with a single key 'bookmarks' which is an array where each object represents a bookmark with its original 'title', 'url', its final 'path' as an array of Vietnamese folder names (e.g., ['Phát triển Web', 'React']), and 'tags' as an array of Vietnamese strings (e.g., ['hướng dẫn', 'frontend', 'javascript']).";
-                                const userPrompt = `${userInstructionBlock}\n\nEXISTING STRUCTURE:\n${JSON.stringify(currentTree, null, 2)}\n\nBOOKMARKS TO CATEGORIZE:\n${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}`;
-                                const requestPayload = { model: currentKeyConfig.model, response_format: { type: "json_object" }, messages: [{ role: "system", content: finalSystemPrompt }, { role: "user", content: userPrompt }] };
-                                addDetailedLog('request', `Request đến OpenRouter (${currentKeyConfig.model})`, requestPayload);
-
-                                const response = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', headers: { 'Authorization': `Bearer ${currentKeyConfig.apiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': `${location.protocol}//${location.host}`, 'X-Title': 'AI Bookmark Architect' }, body: JSON.stringify(requestPayload) });
-
-                                if (!response.ok) {
-                                    const errorText = await response.text();
-                                    try {
-                                        const errorData = JSON.parse(errorText);
-                                        throw new Error(`OpenRouter API Error: ${response.status} ${response.statusText} - ${errorData.error?.message || 'Unknown error'}`);
-                                    } catch (e) {
-                                        throw new Error(`OpenRouter API Error: ${response.status} ${response.statusText} - ${errorText}`);
-                                    }
-                                }
-                                const responseData = await response.json();
-                                const usage = responseData.usage;
-                                const tokenInfo = usage ? { promptTokens: usage.prompt_tokens, completionTokens: usage.completion_tokens, totalTokens: usage.total_tokens } : undefined;
-                                if (tokenInfo) {
-                                    setSessionTokenUsage(prev => ({ promptTokens: prev.promptTokens + tokenInfo.promptTokens, completionTokens: prev.completionTokens + tokenInfo.completionTokens, totalTokens: prev.totalTokens + tokenInfo.totalTokens }));
-                                }
-                                addDetailedLog('response', `Response từ OpenRouter (${currentKeyConfig.model})`, responseData, tokenInfo);
-                                const jsonContent = JSON.parse(responseData.choices[0].message.content);
-                                categorizedBatch = jsonContent.bookmarks;
-                            } else { // Gemini Provider
-                                const ai = new GoogleGenAI({apiKey: currentKeyConfig.apiKey});
-                                const systemInstruction = systemPrompt + userInstructionBlock;
-                                const userContent = `EXISTING STRUCTURE:\n${JSON.stringify(currentTree, null, 2)}\n\nBOOKMARKS TO CATEGORIZE:\n${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}`;
-
-                                addDetailedLog('request', `Request đến Gemini (${currentKeyConfig.model})`, { systemInstruction, userContent });
-
-                                const genAiResponse = await ai.models.generateContent({ model: currentKeyConfig.model, contents: userContent, config: { systemInstruction: systemInstruction, responseMimeType: "application/json", responseSchema: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, url: { type: Type.STRING }, path: { type: Type.ARRAY, items: { type: Type.STRING } }, tags: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ['title', 'url', 'path', 'tags'] } } } });
-
-                                const usage = genAiResponse.usageMetadata;
-                                const tokenInfo = usage ? { promptTokens: usage.promptTokenCount, completionTokens: usage.candidatesTokenCount, totalTokens: usage.totalTokenCount } : undefined;
-                                if (tokenInfo) {
-                                    setSessionTokenUsage(prev => ({ promptTokens: prev.promptTokens + tokenInfo.promptTokens, completionTokens: prev.completionTokens + tokenInfo.completionTokens, totalTokens: prev.totalTokens + tokenInfo.totalTokens }));
-                                }
-                                addDetailedLog('response', `Response từ Gemini (${currentKeyConfig.model})`, genAiResponse, tokenInfo);
-                                categorizedBatch = parseAIResponse(genAiResponse.text.trim());
-                            }
-
-                            runningCategorizedBookmarks.push(...categorizedBatch);
-                            const currentFolders = arrayToTree(bookmarks.map(bm => {
-                                const categorized = runningCategorizedBookmarks.find(cb => cb.url === bm.url);
-                                return { ...bm, path: categorized?.path || [], tags: categorized?.tags || [] };
-                            }));
-                            setFolders(currentFolders);
-
-                            batchSuccess = true;
-                            break;
-                        } catch (error: any) {
-                            const errorMessage = error.toString();
-                            setLogs(prev => [...prev, `Lỗi với key "${currentKeyConfig.name}": ${errorMessage.substring(0, 100)}...`]);
-                            addDetailedLog('error', `Lỗi với key "${currentKeyConfig.name}" (Lần thử ${retries + 1})`, { message: errorMessage, details: error });
-
-                            const isFatalError = errorMessage.includes('429') || errorMessage.toLowerCase().includes('quota') || errorMessage.includes('API key');
-                            if (isFatalError) {
-                                 const quotaErrorMsg = `Key "${currentKeyConfig.name}" đã gặp lỗi nghiêm trọng (hết hạn mức hoặc không hợp lệ). Đang chuyển key...`;
-                                 setLogs(prev => [...prev, quotaErrorMsg]);
-                                 addDetailedLog('error', 'Lỗi nghiêm trọng của Key', quotaErrorMsg);
-                                 await handleToggleApiConfigStatus(currentKeyConfig.id, 'error');
-                                 availableKeys.shift(); // Remove this key
-                                 break;
-                            }
-
-                            retries++;
-                            if (retries > maxRetries) {
-                                const maxRetriesMsg = `Đã đạt số lần thử lại tối đa cho key "${currentKeyConfig.name}". Đang chuyển key...`;
-                                 setLogs(prev => [...prev, maxRetriesMsg]);
-                                 addDetailedLog('error', 'Đạt giới hạn thử lại', maxRetriesMsg);
-                                 availableKeys.shift(); // Remove this key
-                                 break;
-                            }
-                        }
-                    }
-
-                    if (!batchSuccess && availableKeys.length === 0) {
-                        break; // No more keys to try
-                    }
-                }
-
-                if (!batchSuccess) {
-                    setAllCategorizedBookmarks(runningCategorizedBookmarks);
-                    const finalErrorMsg = `Xử lý batch ${i+1} thất bại sau khi thử tất cả các key.`;
-                    setLogs(prev => [...prev, finalErrorMsg]);
-                    addDetailedLog('error', 'Batch thất bại', finalErrorMsg);
-                    setErrorDetails(finalErrorMsg + " Bạn có thể thêm API key mới và tiếp tục.");
-                    setAppState(AppState.ERROR);
-                    return;
-                }
-            }
-
-            setAllCategorizedBookmarks(runningCategorizedBookmarks);
-
-            setAppState(AppState.REVIEW);
-            const successMsg = 'Tái cấu trúc đơn luồng hoàn tất! Xem lại các thay đổi.';
-            setLogs(prev => [...prev, successMsg]);
-            addDetailedLog('info', 'Hoàn tất', successMsg);
-        }
     };
     
     const applyChanges = async () => {
@@ -1382,7 +1086,7 @@ ${folderGuide}
         setTemplateSettings(prev => ({ ...prev, ...newSettings }));
     }, []);
 
-    const initializeDefaultTemplates = useCallback(async () => {
+    async function initializeDefaultTemplates() {
         const defaultTemplates: FolderTemplate[] = [
             {
                 id: 'template-web-dev',
@@ -1512,7 +1216,7 @@ ${folderGuide}
         // Save all default templates
         await Promise.all(defaultTemplates.map(template => db.saveFolderTemplate(template)));
         setFolderTemplates(defaultTemplates);
-    }, []);
+    }
 
     const foldersWithCounts = useMemo(() => {
         const addCounts = (items: (Folder | Bookmark)[]): (Folder | Bookmark)[] => {

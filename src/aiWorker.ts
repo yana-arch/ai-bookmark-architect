@@ -1,5 +1,6 @@
 // AI Worker for multi-threaded bookmark processing
 // This worker handles AI API calls for a single batch of bookmarks
+import { GoogleGenAI, Type } from "@google/genai";
 
 interface WorkerMessage {
   type: 'process_batch' | 'cancel';
@@ -22,9 +23,6 @@ interface WorkerResponse {
   error?: string;
   batchIndex?: number;
 }
-
-// Import necessary libraries for the worker
-// Note: Workers have limited access, so we need to be careful with imports
 
 // Helper function to parse and validate AI response content
 function parseAIResponse(content: string): any[] {
@@ -115,7 +113,7 @@ function parseAIResponse(content: string): any[] {
         }
 
         throw new Error('Could not extract any valid bookmarks');
-      } catch (finalError) {
+      } catch (finalError: any) {
         throw new Error(`Failed to parse AI response: ${finalError.message}. Raw content: ${content.substring(0, 200)}...`);
       }
     }
@@ -184,8 +182,6 @@ async function callAIProvider(
     return { categorizedBatch, usage };
 
   } else { // Gemini
-    // For Gemini, since workers can't import the library directly,
-    // we'll post a message back to main thread to handle the call
     let geminiSystemPrompt = systemPrompt + userInstructionBlock;
     if (domainKnowledge) {
       geminiSystemPrompt += `\n\nCONTEXT ENRICHMENT:\nDomain Knowledge: ${domainKnowledge}`; 
@@ -194,37 +190,41 @@ async function callAIProvider(
       geminiSystemPrompt += `\n\nUSER PREFERENCES (Based on corrections):\n${JSON.stringify(userHistory, null, 2)}`;
     }
 
-    self.postMessage({
-      type: 'gemini_request',
-      data: {
-        apiKey,
-        model,
-        systemPrompt: geminiSystemPrompt,
-        userContent: `EXISTING STRUCTURE:\n${JSON.stringify(currentTree, null, 2)}\n\nBOOKMARKS TO CATEGORIZE:\n${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}`,
-        batchIndex
-      }
-    });
-
-    // Wait for response from main thread
-    return new Promise((resolve, reject) => {
-      const handleGeminiResponse = (e: MessageEvent) => {
-        if (e.data.type === 'gemini_response' && e.data.batchIndex === batchIndex) {
-          self.removeEventListener('message', handleGeminiResponse);
-          if (e.data.error) {
-            reject(new Error(e.data.error));
-          } else {
-            resolve({ categorizedBatch: e.data.categorizedBatch, usage: e.data.usage });
-          }
+    const ai = new GoogleGenAI({ apiKey });
+    const genAiResponse = await ai.models.generateContent({
+        model: model,
+        contents: userContent + `\n\nBOOKMARKS TO CATEGORIZE:\n${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}`,
+        config: {
+            systemInstruction: geminiSystemPrompt,
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        title: { type: Type.STRING },
+                        url: { type: Type.STRING },
+                        path: { type: Type.ARRAY, items: { type: Type.STRING } },
+                        tags: { type: Type.ARRAY, items: { type: Type.STRING } }
+                    },
+                    required: ['title', 'url', 'path', 'tags']
+                }
+            }
         }
-      };
-      self.addEventListener('message', handleGeminiResponse);
-
-      // Timeout after 30 seconds
-      setTimeout(() => {
-        self.removeEventListener('message', handleGeminiResponse);
-        reject(new Error('Gemini request timeout'));
-      }, 30000);
     });
+
+    const usage = genAiResponse.usageMetadata;
+    const tokenInfo = usage ? {
+        promptTokens: usage.promptTokenCount,
+        completionTokens: usage.candidatesTokenCount,
+        totalTokens: usage.totalTokenCount
+    } : undefined;
+
+    // Use text() method if available, otherwise fallback (though generateContent awaits the full response)
+    const rawText = typeof (genAiResponse as any).text === 'function' ? (genAiResponse as any).text() : (genAiResponse as any).text || JSON.stringify((genAiResponse as any).response);
+    const categorizedBatch = parseAIResponse(rawText);
+
+    return { categorizedBatch, usage: tokenInfo };
   }
 }
 
@@ -268,7 +268,16 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
               batchIndex
             });
 
-            const userContent = `EXISTING STRUCTURE:\n${JSON.stringify(currentTree, null, 2)}\n\nBOOKMARKS TO CATEGORIZE:\n${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}`;
+            // For Gemini, we pass the raw content parts, for OpenRouter we construct the prompt differently
+            // but callAIProvider abstracts this.
+            // Note: userContent passed to callAIProvider for Gemini was pre-composed in the old code,
+            // but here we are recomposing it inside callAIProvider to match the specific provider's needs better possibly?
+            // Wait, looking at old code:
+            // OpenRouter userContent: `EXISTING STRUCTURE:\n...` (from data.currentTree mostly)
+            // Gemini userContent: same.
+            
+            // Let's keep it consistent.
+            const userContent = `EXISTING STRUCTURE:\n${JSON.stringify(currentTree, null, 2)}`;
 
             // Log request details
             self.postMessage({
