@@ -1,4 +1,4 @@
-import type { Bookmark } from '@/types';
+import type { Bookmark, Folder } from '@/types';
 
 /**
  * Formats a number using Vietnamese locale (dots as thousand separators)
@@ -174,3 +174,135 @@ export const exportBookmarksToCSV = (bookmarks: Bookmark[]): string => {
 
     return csvLines.join('\n');
 };
+
+/**
+ * Converts a flat list of bookmarks with paths into a folder tree structure.
+ * @param bookmarks - List of bookmarks with 'path' property
+ * @param existingTree - Existing folder structure to preserve
+ * @returns The new folder tree
+ */
+export const arrayToTree = (bookmarks: (Bookmark & { path?: string[] })[], existingTree: (Folder | Bookmark)[] = []): (Folder | Bookmark)[] => {
+    const root: Folder = { id: 'root', name: 'Thư Mục', children: [], parentId: null };
+    const foldersMap = new Map<string, Folder>();
+    foldersMap.set('root', root);
+
+    // Helper to clone existing tree
+    const cloneTree = (nodes: (Folder | Bookmark)[]): (Folder | Bookmark)[] => {
+        return nodes.filter(n => !('url' in n)).map(n => {
+            const folder = n as Folder;
+            const newFolder = { ...folder, children: cloneTree(folder.children) };
+            foldersMap.set(newFolder.id, newFolder);
+            return newFolder;
+        });
+    };
+
+    const clonedRootChildren = cloneTree(existingTree);
+    root.children = clonedRootChildren;
+
+    const getOrCreateFolder = (path: string[]): Folder => {
+        let currentLevel = root;
+        let currentPath = '';
+
+        for (const folderName of path) {
+            currentPath = currentPath ? `${currentPath}/${folderName}` : folderName;
+            let folder = foldersMap.get(currentPath);
+            
+            if (!folder) {
+                // Try to find by name in current level to avoid creating duplicates if ID is different
+                const existingInLevel = currentLevel.children.find(c => !('url' in c) && (c as Folder).name === folderName) as Folder;
+                if (existingInLevel) {
+                    folder = existingInLevel;
+                } else {
+                    const parentId = currentLevel.id;
+                    folder = { id: currentPath, name: folderName, children: [], parentId };
+                    currentLevel.children.push(folder);
+                }
+                foldersMap.set(currentPath, folder);
+            }
+            currentLevel = folder;
+        }
+        return currentLevel;
+    };
+
+    bookmarks.forEach(bm => {
+        if (bm.path && bm.path.length > 0) {
+            const parentFolder = getOrCreateFolder(bm.path);
+            parentFolder.children.push({ ...bm, parentId: parentFolder.id });
+        } else {
+             root.children.push({ ...bm, parentId: 'root' });
+        }
+    });
+    
+    return root.children;
+};
+
+/**
+ * Creates mock data for testing/initialization
+ * @returns Array of mock bookmarks
+ */
+export const createMockData = (): Bookmark[] => {
+  return [
+    // Web Development
+    { id: 'bm-1', title: 'React Docs - Trang chủ chính thức', url: 'https://react.dev/', parentId: null },
+    { id: 'bm-2', title: 'Tailwind CSS - Tiện ích CSS hàng đầu', url: 'https://tailwindcss.com/', parentId: null },
+    { id: 'bm-3', title: 'MDN Web Docs - Tài liệu cho Lập trình viên Web', url: 'https://developer.mozilla.org/', parentId: null },
+    { id: 'bm-4', title: 'Vite.js - Công cụ build thế hệ mới', url: 'https://vitejs.dev/', parentId: null },
+    { id: 'bm-5', title: 'Node.js - Môi trường chạy JavaScript', url: 'https://nodejs.org/', parentId: null },
+
+    // AI & Machine Learning
+    { id: 'bm-6', title: 'Google Gemini API - Hướng dẫn', url: 'https://ai.google.dev/docs', parentId: null },
+    { id: 'bm-7', title: 'Hugging Face - Cộng đồng AI', url: 'https://huggingface.co/', parentId: null },
+    { id: 'bm-8', title: 'TensorFlow - Nền tảng Machine Learning', url: 'https://www.tensorflow.org/', parentId: null },
+    { id: 'bm-9', title: 'PyTorch - Nền tảng Deep Learning', url: 'https://pytorch.org/', parentId: null },
+    { id: 'bm-10', title: 'Giới thiệu về Mạng nơ-ron tích chập (CNN)', url: 'https://en.wikipedia.org/wiki/Convolutional_neural_network', parentId: null },
+
+    // Design & UX/UI
+    { id: 'bm-11', title: 'Figma - Công cụ thiết kế giao diện', url: 'https://www.figma.com/', parentId: null },
+    { id: 'bm-12', title: 'Dribbble - Nơi trưng bày của các nhà thiết kế', url: 'https://dribbble.com/', parentId: null },
+    { id: 'bm-13', title: 'Nielsen Norman Group - Nghiên cứu UX', url: 'https://www.nngroup.com/', parentId: null },
+    
+    // Productivity & Tools
+    { id: 'bm-14', title: 'Notion - Không gian làm việc tất cả trong một', url: 'https://www.notion.so/', parentId: null },
+    { id: 'bm-15', title: 'GitHub - Nơi thế giới xây dựng phần mềm', url: 'https://github.com/', parentId: null },
+    
+    // DUPLICATE MOCK DATA
+    { id: 'bm-16', title: 'React Docs (Bản sao)', url: 'https://react.dev/', parentId: null },
+    { id: 'bm-17', title: 'Figma Mirror', url: 'https://www.figma.com/', parentId: null },
+  ];
+};
+
+/**
+ * Finds a folder by ID in the tree
+ */
+export function findFolder(items: (Folder | Bookmark)[], id: string | null): Folder | null {
+    if (id === null) return null;
+    const queue = [...items];
+    while (queue.length > 0) {
+        const item = queue.shift()!;
+        if ('url' in item) continue;
+        const folder = item as Folder;
+        if (folder.id === id) return folder;
+        if (folder.children) {
+            queue.push(...folder.children);
+        }
+    }
+    return null;
+}
+
+/**
+ * Gets all bookmarks within a folder and its subfolders
+ */
+export function getBookmarksInFolder(folder: Folder | null): Bookmark[] {
+    if (!folder) return [];
+    const bookmarks: Bookmark[] = [];
+    const queue: (Folder | Bookmark)[] = [folder];
+    while (queue.length > 0) {
+        const current = queue.shift()!;
+        if ('url' in current) {
+            bookmarks.push(current as Bookmark);
+        } else if (current.children) {
+            queue.push(...current.children);
+        }
+    }
+    return bookmarks;
+}
