@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { ApiConfig, ApiKeyStatus } from '@/types';
-import { CogIcon, TrashIcon, PowerIcon, ExclamationTriangleIcon, XIcon } from './Icons';
+import { CogIcon, TrashIcon, PowerIcon, ExclamationTriangleIcon, XIcon } from '../ui/Icons';
 
 interface ApiConfigModalProps {
     onClose: () => void;

@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Bookmark } from '@/types';
-import { BrokenLinkIcon, FileIcon } from './Icons';
+import { BrokenLinkIcon, FileIcon } from '../ui/Icons';
 
 interface BrokenLinkModalProps {
     brokenLinks: Bookmark[];

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { postgresqlService } from '@/src/services/postgresqlService';
 import type { BackupMetadata, Bookmark, Folder } from '@/types';
 import * as db from '@/db';
-import { ChartIcon, CalendarIcon, FolderIcon2, SaveIcon, UploadIcon, FolderOpenIcon } from './Icons';
+import { ChartIcon, CalendarIcon, FolderIcon2, SaveIcon, UploadIcon, FolderOpenIcon } from '../ui/Icons';
 
 interface BackupModalProps {
   isOpen: boolean;

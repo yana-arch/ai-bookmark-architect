@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Folder, Bookmark } from '@/types';
-import { ExportIcon, FolderIcon } from './Icons';
+import { ExportIcon, FolderIcon } from '../ui/Icons';
 
 interface ExportModalProps {
   folders: Folder[];

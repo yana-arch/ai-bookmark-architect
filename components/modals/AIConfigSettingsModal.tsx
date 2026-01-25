@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { FolderTemplate, ApiConfig, SmartClassifyRule } from '@/types';
-import { CogIcon, XIcon, AILogoIcon } from './Icons';
-import { generateSystemPrompt, generatePlanningPrompt, getActiveApiConfig } from '../src/services/promptGenerator';
+import { CogIcon, XIcon, AILogoIcon } from '../ui/Icons';
+import { generateSystemPrompt, generatePlanningPrompt, getActiveApiConfig } from '../../src/services/promptGenerator';
 
 interface AIConfigSettingsModalProps {
     isOpen: boolean;

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { AppState, BrokenLinkCheckState, type Folder, type Bookmark } from '@/types';
-import { FolderIcon, ChevronRightIcon, TrashIcon, ImportIcon, ExportIcon, SearchIcon, XIcon, DocumentDuplicateIcon, BrokenLinkIcon } from './Icons';
+import { FolderIcon, ChevronRightIcon, TrashIcon, ImportIcon, ExportIcon, SearchIcon, XIcon, DocumentDuplicateIcon, BrokenLinkIcon } from '../ui/Icons';
 import { formatNumber } from '@/src/utils';
 
 interface SidebarProps {

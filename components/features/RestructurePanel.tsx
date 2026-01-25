@@ -2,7 +2,7 @@
 import React from 'react';
 import { AppState } from '@/types';
 import type { Bookmark, Folder, ApiConfig, FolderTemplate, SmartClassifyRule } from '@/types';
-import { WarningIcon, CogIcon } from './Icons';
+import { WarningIcon, CogIcon } from '../ui/Icons';
 import { formatNumber } from '@/src/utils';
 
 interface RestructurePanelProps {

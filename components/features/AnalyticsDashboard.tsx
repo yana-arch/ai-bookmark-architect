@@ -14,7 +14,7 @@ import {
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import type { Bookmark, Folder, AnalyticsData } from '@/types';
 import * as db from '@/db';
-import { ChartIcon } from './Icons';
+import { ChartIcon } from '../ui/Icons';
 import { perfMonitor } from '@/src/performance';
 
 // Register Chart.js components

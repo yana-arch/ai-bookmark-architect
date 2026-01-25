@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useMemo, lazy, Suspense } from 'react';
 
-import { AILogoIcon, ChartIcon, UploadIcon, ImportIcon } from './components/Icons';
+import { AILogoIcon, ChartIcon, UploadIcon, ImportIcon } from './components/ui/Icons';
 import { AppState, Folder, Bookmark, CategorizedBookmark } from './types';
-import Sidebar from './components/Sidebar';
-import BookmarkList from './components/BookmarkList';
-import RestructurePanel from './components/RestructurePanel';
-import FileDropzone from './components/FileDropzone';
+import Sidebar from './components/layout/Sidebar';
+import BookmarkList from './components/features/BookmarkList';
+import RestructurePanel from './components/features/RestructurePanel';
+import FileDropzone from './components/ui/FileDropzone';
 import * as db from './db';
 import { searchCache, cacheKeys, generateHash } from './src/cache';
 import { perfMonitor } from './src/performance';
@@ -25,18 +25,18 @@ import { useBrokenLinks } from './hooks/useBrokenLinks';
 import { useImportExport } from './hooks/useImportExport';
 
 // Lazy load modals for better performance
-const ImportModal = lazy(() => import('./components/ImportModal'));
-const ExportModal = lazy(() => import('./components/ExportModal'));
-const ApiConfigModal = lazy(() => import('./components/ApiConfigModal'));
-const LogModal = lazy(() => import('./components/LogModal'));
-const DuplicateModal = lazy(() => import('./components/DuplicateModal'));
-const BrokenLinkModal = lazy(() => import('./components/BrokenLinkModal'));
-const InstructionPresetModal = lazy(() => import('./components/InstructionPresetModal'));
-const FolderTemplateModal = lazy(() => import('./components/FolderTemplateModal'));
-const AnalyticsDashboard = lazy(() => import('./components/AnalyticsDashboard'));
-const KeyInputModal = lazy(() => import('./components/KeyInputModal'));
-const NotificationToast = lazy(() => import('./components/NotificationToast'));
-const AIConfigSettingsModal = lazy(() => import('./components/AIConfigSettingsModal'));
+const ImportModal = lazy(() => import('./components/modals/ImportModal'));
+const ExportModal = lazy(() => import('./components/modals/ExportModal'));
+const ApiConfigModal = lazy(() => import('./components/modals/ApiConfigModal'));
+const LogModal = lazy(() => import('./components/modals/LogModal'));
+const DuplicateModal = lazy(() => import('./components/modals/DuplicateModal'));
+const BrokenLinkModal = lazy(() => import('./components/modals/BrokenLinkModal'));
+const InstructionPresetModal = lazy(() => import('./components/modals/InstructionPresetModal'));
+const FolderTemplateModal = lazy(() => import('./components/modals/FolderTemplateModal'));
+const AnalyticsDashboard = lazy(() => import('./components/features/AnalyticsDashboard'));
+const KeyInputModal = lazy(() => import('./components/modals/KeyInputModal'));
+const NotificationToast = lazy(() => import('./components/ui/NotificationToast'));
+const AIConfigSettingsModal = lazy(() => import('./components/modals/AIConfigSettingsModal'));
 
 const App: React.FC = () => {
     // 1. Core Data

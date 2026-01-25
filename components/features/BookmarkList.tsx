@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Bookmark } from '@/types';
-import { OpenBookIcon } from './Icons';
+import { OpenBookIcon } from '../ui/Icons';
 
 interface BookmarkListProps {
     bookmarks: Bookmark[];

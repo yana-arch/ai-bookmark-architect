@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FolderTemplate, FolderStructureNode, ApiConfig } from '@/types';
-import { XIcon, PlusIcon, TrashIcon, FolderIcon, ChevronRightIcon } from './Icons';
+import { XIcon, PlusIcon, TrashIcon, FolderIcon, ChevronRightIcon } from '../ui/Icons';
 import { GoogleGenAI, Type } from "@google/genai";
 
 interface FolderTemplateModalProps {
