@@ -1,6 +1,6 @@
 import React from 'react';
 import { AppState } from '@/types';
-import type { ApiConfig, FolderTemplate } from '@/types';
+import type { Bookmark, Folder, ApiConfig, FolderTemplate } from '@/types';
 import { WarningIcon, CogIcon } from './Icons';
 import { formatNumber } from '@/src/utils';
 
@@ -36,6 +36,12 @@ interface RestructurePanelProps {
     onProcessingModeChange: (mode: 'single' | 'multi') => void;
     onApplyFolderTemplate: (template: FolderTemplate) => void;
     onSelectedTemplateChange: (templateId: string | null) => void;
+    onSuggestStructure: (source: 'tags' | 'domains') => void;
+    onConfirmProposedStructure: () => void;
+    proposedStructure: (Folder | Bookmark)[];
+    isGeneratingStructure: boolean;
+    planningPrompt: string;
+    onPlanningPromptChange: (prompt: string) => void;
 }
 
 const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
@@ -46,7 +52,9 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
         customInstructions, onCustomInstructionsChange,
         batchSize, onBatchSizeChange, maxRetries, onMaxRetriesChange,
         processingMode, onProcessingModeChange,
-        hasPartialResults, folderTemplates, selectedTemplateId, onApplyFolderTemplate, onSelectedTemplateChange
+        hasPartialResults, folderTemplates, selectedTemplateId, onApplyFolderTemplate, onSelectedTemplateChange,
+        onSuggestStructure, onConfirmProposedStructure, proposedStructure, isGeneratingStructure,
+        planningPrompt, onPlanningPromptChange
     } = props;
     const progressPercentage = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
     
@@ -82,12 +90,41 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                     <>
                         <h3 className="text-xl font-bold text-white mb-2">Tái cấu trúc bằng AI</h3>
                         <p className="text-sm text-gray-400 mb-6">Sắp xếp lại các bookmarks của bạn vào một cấu trúc thư mục thông minh.</p>
-                        <button 
-                            onClick={onStart}
-                            disabled={apiConfigs.filter(c => c.status === 'active').length === 0}
-                            className="w-full bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-600 transition-all duration-200 transform hover:scale-105 shadow-lg disabled:bg-gray-600 disabled:cursor-not-allowed disabled:scale-100">
-                            {apiConfigs.filter(c => c.status === 'active').length === 0 ? 'Vui lòng thêm API Key' : 'BẮT ĐẦU TÁI CẤU TRÚC'}
-                        </button>
+                        
+                        <div className="space-y-3 mb-6">
+                            <button 
+                                onClick={onStart}
+                                disabled={apiConfigs.filter(c => c.status === 'active').length === 0}
+                                className="w-full bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-600 transition-all duration-200 shadow-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
+                                {apiConfigs.filter(c => c.status === 'active').length === 0 ? 'Vui lòng thêm API Key' : 'PHÂN LOẠI NHANH (BỎ QUA LẬP KẾ HOẠCH)'}
+                            </button>
+                            
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                                    <div className="w-full border-t border-gray-700"></div>
+                                </div>
+                                <div className="relative flex justify-center text-xs uppercase">
+                                    <span className="bg-[#21252C] px-2 text-gray-500 font-bold">Hoặc tối ưu hơn</span>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <button 
+                                    onClick={() => onSuggestStructure('tags')}
+                                    disabled={apiConfigs.filter(c => c.status === 'active').length === 0 || isGeneratingStructure}
+                                    className="text-[10px] bg-blue-600/20 text-blue-400 border border-blue-600/30 font-bold py-2 px-1 rounded-lg hover:bg-blue-600/30 transition-all disabled:opacity-50">
+                                    GỢI Ý THEO TAG
+                                </button>
+                                <button 
+                                    onClick={() => onSuggestStructure('domains')}
+                                    disabled={apiConfigs.filter(c => c.status === 'active').length === 0 || isGeneratingStructure}
+                                    className="text-[10px] bg-purple-600/20 text-purple-400 border border-purple-600/30 font-bold py-2 px-1 rounded-lg hover:bg-purple-600/30 transition-all disabled:opacity-50">
+                                    GỢI Ý THEO LINK
+                                </button>
+                            </div>
+                            <p className="text-[10px] text-gray-500 italic text-center">Lập kế hoạch cấu trúc thư mục trước khi bắt đầu giúp AI chính xác hơn 40%.</p>
+                        </div>
+
                         <div className="mt-6">
                             <details className="group">
                                 <summary className="text-sm font-medium text-gray-400 cursor-pointer list-none flex items-center justify-between group-hover:text-white transition-colors">
@@ -98,8 +135,21 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                                 </summary>
                                 <div className="mt-3 space-y-4">
                                     <div>
+                                        <label htmlFor="planning-prompt" className="block text-xs text-gray-400 mb-1">
+                                            Chỉ dẫn lập kế hoạch (Planning Prompt):
+                                        </label>
+                                        <textarea
+                                            id="planning-prompt"
+                                            value={planningPrompt}
+                                            onChange={(e) => onPlanningPromptChange(e.target.value)}
+                                            rows={4}
+                                            className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y mb-2"
+                                            placeholder="AI sẽ dùng chỉ dẫn này để thiết kế sơ đồ thư mục ban đầu..."
+                                        />
+                                    </div>
+                                    <div>
                                         <label htmlFor="system-prompt" className="block text-xs text-gray-400 mb-1">
-                                            Chỉ dẫn hệ thống cho AI (System Prompt):
+                                            Chỉ dẫn phân loại (System Prompt):
                                         </label>
                                         <textarea
                                             id="system-prompt"
@@ -241,6 +291,54 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                                     </div>
                                 </div>
                             </details>
+                        </div>
+                    </>
+                );
+            case AppState.PLANNING:
+                const renderTree = (nodes: any[]) => (
+                    <ul className="pl-4 border-l border-gray-700 space-y-1 mt-1">
+                        {nodes.map((node: any) => (
+                            <li key={node.id} className="text-xs">
+                                <span className="text-blue-400">📁</span> {node.name}
+                                {node.children && node.children.length > 0 && renderTree(node.children)}
+                            </li>
+                        ))}
+                    </ul>
+                );
+
+                return (
+                    <>
+                        <h3 className="text-xl font-bold text-white mb-2">Lập kế hoạch cấu trúc</h3>
+                        <p className="text-sm text-gray-400 mb-4">Dựa trên dữ liệu của bạn, AI đề xuất cấu trúc sau. Hãy xác nhận để bắt đầu phân loại chi tiết.</p>
+                        
+                        <div className="bg-gray-900/50 rounded-lg p-4 flex-1 overflow-y-auto mb-6 border border-gray-700/50 shadow-inner">
+                            {isGeneratingStructure ? (
+                                <div className="flex flex-col items-center justify-center h-full space-y-3">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                                    <span className="text-xs text-emerald-400 font-medium">AI đang thiết kế kiến trúc...</span>
+                                </div>
+                            ) : proposedStructure.length > 0 ? (
+                                <div className="text-gray-300">
+                                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Sơ đồ đề xuất:</span>
+                                    {renderTree(proposedStructure)}
+                                </div>
+                            ) : (
+                                <div className="text-center text-gray-500 text-xs py-10">Đang chờ AI phản hồi...</div>
+                            )}
+                        </div>
+
+                        <div className="space-y-3 mt-auto">
+                            <button 
+                                onClick={onConfirmProposedStructure}
+                                disabled={proposedStructure.length === 0}
+                                className="w-full bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-600 transition-all shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:scale-100">
+                                XÁC NHẬN CẤU TRÚC NÀY
+                            </button>
+                            <button 
+                                onClick={onDiscard}
+                                className="w-full bg-gray-700 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-600 transition-colors">
+                                HỦY & THỬ LẠI
+                            </button>
                         </div>
                     </>
                 );

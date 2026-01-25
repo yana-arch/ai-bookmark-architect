@@ -64,6 +64,12 @@ const DEFAULT_SYSTEM_PROMPT = `You are an intelligent bookmark organizer. Your g
 3. **EXISTING STRUCTURE PRIORITY:** Always prefer using existing folders over creating new ones. The existing structure should be respected and utilized.
 4. Generate 3-5 relevant, concise, VIETNAMESE tags for the bookmark.`;
 
+const DEFAULT_PLANNING_PROMPT = `You are a professional librarian and information architect. Your task is to design a clean, hierarchical folder structure based on the provided list of tags or sample URLs. 
+- Use Vietnamese for folder names.
+- Maximum depth: 3 levels.
+- Output ONLY a JSON array of folder objects. Each folder object must have: "id" (string), "name" (string), "children" (array of folder objects), and "parentId" (string or null).
+- Do not include individual bookmarks in this output, only the folder skeleton.`;
+
 
 const App: React.FC = () => {
     const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
@@ -83,6 +89,7 @@ const App: React.FC = () => {
     const [userCorrections, setUserCorrections] = useState<UserCorrection[]>([]);
     const [customInstructions, setCustomInstructions] = useState<string>('');
     const [systemPrompt, setSystemPrompt] = useState<string>(DEFAULT_SYSTEM_PROMPT);
+    const [planningPrompt, setPlanningPrompt] = useState<string>(DEFAULT_PLANNING_PROMPT);
     const [sessionTokenUsage, setSessionTokenUsage] = useState({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
     const [batchSize, setBatchSize] = useState(5);
     const [maxRetries, setMaxRetries] = useState(2);
@@ -112,6 +119,8 @@ const App: React.FC = () => {
     const [brokenLinkCheckState, setBrokenLinkCheckState] = useState<BrokenLinkCheckState>(BrokenLinkCheckState.IDLE);
     const [brokenLinkCheckProgress, setBrokenLinkCheckProgress] = useState({ current: 0, total: 0 });
     const [allCategorizedBookmarks, setAllCategorizedBookmarks] = useState<CategorizedBookmark[]>([]);
+    const [proposedStructure, setProposedStructure] = useState<(Folder | Bookmark)[]>([]);
+    const [isGeneratingStructure, setIsGeneratingStructure] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const importInputRef = useRef<HTMLInputElement>(null);
     const stopProcessingRef = useRef(false);
@@ -343,10 +352,41 @@ const App: React.FC = () => {
         });
     }, [brokenLinks, bookmarks, appState]);
 
-    const arrayToTree = (bookmarks: (Bookmark & { path?: string[] })[]): (Folder | Bookmark)[] => {
+    const arrayToTree = useCallback((bookmarks: (Bookmark & { path?: string[] })[], existingTree: (Folder | Bookmark)[] = []): (Folder | Bookmark)[] => {
         const root: Folder = { id: 'root', name: 'Thư Mục', children: [], parentId: null };
         const foldersMap = new Map<string, Folder>();
         foldersMap.set('root', root);
+
+        // Helper to add existing folders to the map
+        const mapExistingFolders = (nodes: (Folder | Bookmark)[]) => {
+            nodes.forEach(node => {
+                if (!('url' in node)) {
+                    foldersMap.set(node.id, node as Folder);
+                    // Clear children but keep the folder
+                    (node as Folder).children = [];
+                    if (node.parentId === null) {
+                        root.children.push(node);
+                    }
+                    if ((node as Folder).children) {
+                        mapExistingFolders((node as Folder).children);
+                    }
+                }
+            });
+        };
+
+        // Note: The simple mapExistingFolders above is a bit flawed for deep nested structures.
+        // Let's use a cleaner approach that clones the existing structure first.
+        const cloneTree = (nodes: (Folder | Bookmark)[]): (Folder | Bookmark)[] => {
+            return nodes.filter(n => !('url' in n)).map(n => {
+                const folder = n as Folder;
+                const newFolder = { ...folder, children: cloneTree(folder.children) };
+                foldersMap.set(newFolder.id, newFolder);
+                return newFolder;
+            });
+        };
+
+        const clonedRootChildren = cloneTree(existingTree);
+        root.children = clonedRootChildren;
 
         const getOrCreateFolder = (path: string[]): Folder => {
             let currentLevel = root;
@@ -357,9 +397,15 @@ const App: React.FC = () => {
                 let folder = foldersMap.get(currentPath);
                 
                 if (!folder) {
-                    const parentId = currentLevel.id;
-                    folder = { id: currentPath, name: folderName, children: [], parentId };
-                    currentLevel.children.push(folder);
+                    // Try to find by name in current level to avoid creating duplicates if ID is different
+                    const existingInLevel = currentLevel.children.find(c => !('url' in c) && (c as Folder).name === folderName) as Folder;
+                    if (existingInLevel) {
+                        folder = existingInLevel;
+                    } else {
+                        const parentId = currentLevel.id;
+                        folder = { id: currentPath, name: folderName, children: [], parentId };
+                        currentLevel.children.push(folder);
+                    }
                     foldersMap.set(currentPath, folder);
                 }
                 currentLevel = folder;
@@ -377,7 +423,7 @@ const App: React.FC = () => {
         });
         
         return root.children;
-    };
+    }, []);
     
     const handleStopRestructuring = () => {
         stopProcessingRef.current = true;
@@ -426,6 +472,83 @@ const App: React.FC = () => {
     const handleDismissNotification = useCallback((id: string) => {
         setNotifications(prev => prev.filter(n => n.id !== id));
     }, []);
+
+    const generateStructureSuggestion = async (source: 'tags' | 'domains') => {
+        setIsGeneratingStructure(true);
+        setAppState(AppState.PLANNING);
+        setLogs(prev => [...prev, `Đang phân tích ${source === 'tags' ? 'tag' : 'link gốc'} để gợi ý cấu trúc...`]);
+
+        try {
+            const availableKeys = apiConfigs.filter(c => c.status === 'active');
+            if (availableKeys.length === 0) throw new Error("Chưa có API key hoạt động.");
+
+            let inputData = '';
+            if (source === 'tags') {
+                const allTags = new Set<string>();
+                bookmarks.forEach(bm => bm.tags?.forEach(tag => allTags.add(tag)));
+                inputData = Array.from(allTags).join(', ');
+            } else {
+                const domains = new Set<string>();
+                bookmarks.forEach(bm => domains.add(normalizeURL(bm.url)));
+                inputData = Array.from(domains).slice(0, 100).join('\n'); // Limit to first 100 unique links for context
+            }
+
+            const userPrompt = `Dựa trên danh sách ${source === 'tags' ? 'tag' : 'link'} sau đây, hãy tạo một cấu trúc thư mục logic:\n\n${inputData}`;
+
+            // We'll reuse the aiWorker but with a special message type or just a direct fetch for simplicity if we want to wait
+            // For now, let's use a temporary worker or direct call to keep it clean
+            const currentKey = availableKeys[0]; // Use first active key
+            
+            // To avoid complex worker management for a single call, we'll use a simplified version of the worker logic here
+            const result = await fetch(currentKey.provider === 'openrouter' ? 'https://openrouter.ai/api/v1/chat/completions' : currentKey.apiUrl || '', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${currentKey.apiKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: currentKey.model,
+                    messages: [
+                        { role: 'system', content: planningPrompt },
+                        { role: 'user', content: userPrompt }
+                    ],
+                    response_format: { type: "json_object" }
+                })
+            });
+
+            if (!result.ok) throw new Error("API call failed");
+            const data = await result.json();
+            const content = data.choices[0].message.content;
+            
+            // Parse response - assuming the AI returns { "folders": [...] } or similar
+            let parsed;
+            try {
+                const rawParsed = JSON.parse(content);
+                parsed = rawParsed.folders || rawParsed;
+            } catch (e) {
+                // Fallback to regex if JSON is slightly malformed
+                const match = content.match(/\[\s*{[\s\S]*}\s*\]/);
+                if (match) parsed = JSON.parse(match[0]);
+                else throw new Error("Could not parse AI response");
+            }
+
+            setProposedStructure(parsed);
+            setLogs(prev => [...prev, "Đã tạo cấu trúc gợi ý thành công."]);
+        } catch (error: any) {
+            setLogs(prev => [...prev, `Lỗi: ${error.message}`]);
+            setErrorDetails(`Không thể tạo gợi ý cấu trúc: ${error.message}`);
+        } finally {
+            setIsGeneratingStructure(false);
+        }
+    };
+
+    const confirmProposedStructure = async () => {
+        setFolders(proposedStructure);
+        await db.saveFolders(proposedStructure);
+        setAppState(AppState.STRUCTURED);
+        setProposedStructure([]);
+        setNotifications(prev => [...prev, { id: 'confirm-struct', message: 'Đã áp dụng cấu trúc mới. Bạn có thể bắt đầu tái cấu trúc chi tiết.', type: 'success' }]);
+    };
 
     const startRestructuring = async (isContinuation = false) => {
         await perfMonitor.timeAsyncFunction('start_restructuring', async () => {
@@ -523,12 +646,15 @@ const App: React.FC = () => {
                         const currentProgress = allCategorizedBookmarks.length + Object.values(batchResults).flat().length;
                         setProgress({ current: currentProgress, total: bookmarks.length });
 
-                        // Update folders
+                        // Update folders - IMPORTANT: Preserve existing folder structure if we are in PLANNING/STRUCTURED mode
                         const allResults = Object.values(batchResults).flat();
-                        const currentFolders = arrayToTree(bookmarks.map(bm => {
-                            const categorized = [...runningCategorizedBookmarks, ...allResults].find(cb => cb.url === bm.url);
-                            return { ...bm, path: categorized?.path || [], tags: categorized?.tags || [] };
-                        }));
+                        const currentFolders = arrayToTree(
+                            bookmarks.map(bm => {
+                                const categorized = [...runningCategorizedBookmarks, ...allResults].find(cb => cb.url === bm.url);
+                                return { ...bm, path: categorized?.path || [], tags: categorized?.tags || [] };
+                            }),
+                            folders // Pass existing folders to preserve structure
+                        );
                         setFolders(currentFolders);
 
                         // Check if all batches are done
@@ -589,10 +715,13 @@ const App: React.FC = () => {
             nextBatchToStart++;
 
             const batch = bookmarksToProcess.slice(batchIndex * BATCH_SIZE, (batchIndex + 1) * BATCH_SIZE);
-            const currentTree = arrayToTree(bookmarks.map(bm => {
-                const categorized = [...runningCategorizedBookmarks, ...Object.values(batchResults).flat()].find(cb => cb.url === bm.url);
-                return { ...bm, path: categorized?.path || [], tags: categorized?.tags || [] };
-            }));
+            const currentTree = arrayToTree(
+                bookmarks.map(bm => {
+                    const categorized = [...runningCategorizedBookmarks, ...Object.values(batchResults).flat()].find(cb => cb.url === bm.url);
+                    return { ...bm, path: categorized?.path || [], tags: categorized?.tags || [] };
+                }),
+                folders // Preserve the "baseline" structure
+            );
 
             // Find available worker
             const availableWorker = workersRef.current.find((_, index) => !activeWorkersRef.current.has(index));
@@ -1522,6 +1651,12 @@ ${folderGuide}
                                             setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
                                         }
                                     }}
+                                    onSuggestStructure={generateStructureSuggestion}
+                                    onConfirmProposedStructure={confirmProposedStructure}
+                                    proposedStructure={proposedStructure}
+                                    isGeneratingStructure={isGeneratingStructure}
+                                    planningPrompt={planningPrompt}
+                                    onPlanningPromptChange={setPlanningPrompt}
                                 />
                             </div>
                         )}
