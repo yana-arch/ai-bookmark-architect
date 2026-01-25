@@ -330,26 +330,44 @@ export const deleteOAuthToken = async (id: string): Promise<void> => {
     await db.delete(OAUTH_TOKENS_STORE, id);
 };
 
-// Utility function to convert folder structure to folder tree
+// Utility function to convert folder structure to folder tree (Iterative implementation)
 export const convertStructureToTree = (structure: FolderTemplate['structure']): (Folder | Bookmark)[] => {
-    const convertNode = (node: FolderTemplate['structure'][0], parentId: string | null = null): Folder => {
+    if (!structure || structure.length === 0) return [];
+
+    const result: Folder[] = [];
+    const stack: { node: FolderTemplate['structure'][0]; parent: Folder | null }[] = 
+        structure.map(n => ({ node: n, parent: null }));
+
+    // Map to keep track of created folders by their ID for quick access
+    const folderMap = new Map<string, Folder>();
+
+    while (stack.length > 0) {
+        const { node, parent } = stack.pop()!;
+        
         const folder: Folder = {
             id: node.id,
             name: node.name,
             children: [],
-            parentId
+            parentId: parent ? parent.id : null
         };
 
-        // Convert children recursively
-        node.children.forEach(childNode => {
-            const childFolder = convertNode(childNode, folder.id);
-            folder.children.push(childFolder);
-        });
+        folderMap.set(folder.id, folder);
 
-        return folder;
-    };
+        if (parent) {
+            parent.children.push(folder);
+        } else {
+            result.push(folder);
+        }
 
-    return structure.map(node => convertNode(node));
+        // Add children to stack in reverse order to maintain original order when popping
+        if (node.children && node.children.length > 0) {
+            for (let i = node.children.length - 1; i >= 0; i--) {
+                stack.push({ node: node.children[i], parent: folder });
+            }
+        }
+    }
+
+    return result;
 };
 
 // Cloud Database Connection Store
@@ -464,11 +482,18 @@ export const exportToCloud = async (connection: DbConnection): Promise<{ success
         // Clear existing data for this user/connection
         await client.query('DELETE FROM bookmarks WHERE user_id = $1 AND db_connection_hash = $2', [connection.username, userHash]);
 
-        // Insert bookmarks one by one (simpler for HTTP API)
+        // Batch insert bookmarks for better performance
+        const BATCH_SIZE = 50;
         let successCount = 0;
-        for (const bm of bookmarks) {
-            try {
-                await client.query(
+
+        for (let i = 0; i < bookmarks.length; i += BATCH_SIZE) {
+            const batch = bookmarks.slice(i, i + BATCH_SIZE);
+            
+            // Construct a single multi-row INSERT statement for the batch
+            // Note: This is more efficient than individual calls but needs careful SQL construction
+            // For simplicity and reliability with Neon's HTTP API, we use Promise.all for the batch
+            const batchPromises = batch.map(bm => 
+                client.query(
                     `INSERT INTO bookmarks (id, user_id, db_connection_hash, title, url, path, tags, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
                     [
                         bm.id,
@@ -480,10 +505,35 @@ export const exportToCloud = async (connection: DbConnection): Promise<{ success
                         bm.tags || [],
                         bm.parentId
                     ]
-                );
-                successCount++;
+                )
+            );
+
+            try {
+                await Promise.all(batchPromises);
+                successCount += batch.length;
             } catch (error) {
-                console.error('Failed to insert bookmark:', bm.id, error);
+                console.error('Failed to insert batch starting at index', i, error);
+                // Fallback to individual inserts if batch fails
+                for (const bm of batch) {
+                    try {
+                        await client.query(
+                            `INSERT INTO bookmarks (id, user_id, db_connection_hash, title, url, path, tags, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                            [
+                                bm.id,
+                                connection.username,
+                                userHash,
+                                bm.title,
+                                bm.url,
+                                bm.path || [],
+                                bm.tags || [],
+                                bm.parentId
+                            ]
+                        );
+                        successCount++;
+                    } catch (innerError) {
+                        console.error('Failed to insert individual bookmark:', bm.id, innerError);
+                    }
+                }
             }
         }
 

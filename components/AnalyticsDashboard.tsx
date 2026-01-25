@@ -15,6 +15,7 @@ import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import type { Bookmark, Folder, AnalyticsData } from '@/types';
 import * as db from '@/db';
 import { ChartIcon } from './Icons';
+import { perfMonitor } from '@/src/performance';
 
 // Register Chart.js components
 ChartJS.register(
@@ -44,120 +45,26 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        calculateAnalytics();
+        const worker = new Worker(new URL('@/src/analyticsWorker.ts', import.meta.url), {
+            type: 'module',
+        });
+
+        worker.onmessage = async (e: MessageEvent<AnalyticsData>) => {
+            await perfMonitor.timeAsyncFunction('set_analytics_data', async () => {
+                setAnalyticsData(e.data);
+                await db.saveAnalyticsData(e.data);
+                setIsLoading(false);
+            });
+        };
+
+        perfMonitor.timeAsyncFunction('calculate_analytics', async () => {
+            worker.postMessage({ bookmarks, folders });
+        });
+
+        return () => {
+            worker.terminate();
+        };
     }, [bookmarks, folders]);
-
-    const calculateAnalytics = async () => {
-        setIsLoading(true);
-
-        // Calculate basic stats
-        const totalBookmarks = bookmarks.length;
-        const totalFolders = folders.filter(item => 'children' in item).length;
-        const avgBookmarksPerFolder = totalFolders > 0 ? totalBookmarks / totalFolders : 0;
-
-        // Calculate top domains
-        const domainMap = new Map<string, number>();
-        bookmarks.forEach(bookmark => {
-            try {
-                const url = new URL(bookmark.url);
-                const domain = url.hostname;
-                domainMap.set(domain, (domainMap.get(domain) || 0) + 1);
-            } catch (e) {
-                // Invalid URL, skip
-            }
-        });
-        const topDomains = Array.from(domainMap.entries())
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 10)
-            .map(([domain, count]) => ({ domain, count }));
-
-        // Calculate folder distribution
-        const folderDistribution = folders
-            .filter(item => 'children' in item)
-            .map(folder => {
-                const bookmarkCount = getBookmarksInFolder(folder as Folder).length;
-                return { folder: (folder as Folder).name, count: bookmarkCount };
-            })
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 10);
-
-        // Calculate tag usage
-        const tagMap = new Map<string, number>();
-        bookmarks.forEach(bookmark => {
-            if (bookmark.tags) {
-                bookmark.tags.forEach(tag => {
-                    tagMap.set(tag, (tagMap.get(tag) || 0) + 1);
-                });
-            }
-        });
-        const tagUsage = Array.from(tagMap.entries())
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 10)
-            .map(([tag, count]) => ({ tag, count }));
-
-        // Get AI performance data from logs
-        const logs = await db.getLogs();
-        const aiRequests = logs.filter(log => log.type === 'request' && log.title.includes('Request'));
-        const aiResponses = logs.filter(log => log.type === 'response' && log.title.includes('Response'));
-
-        const totalRequests = aiRequests.length;
-        const successRate = totalRequests > 0 ? (aiResponses.length / totalRequests) * 100 : 0;
-
-        // Calculate average tokens per request
-        const tokenUsages = logs
-            .filter(log => log.usage)
-            .map(log => log.usage!.totalTokens);
-        const avgTokensPerRequest = tokenUsages.length > 0
-            ? tokenUsages.reduce((sum, tokens) => sum + tokens, 0) / tokenUsages.length
-            : 0;
-
-        // Get user corrections for accuracy score
-        const corrections = await db.getUserCorrections();
-        const accuracyScore = totalRequests > 0
-            ? ((totalRequests - corrections.length) / totalRequests) * 100
-            : 100;
-
-        // Mock usage stats (in a real app, these would be tracked)
-        const usageStats = {
-            totalSessions: 1, // Would be tracked
-            avgSessionDuration: 0, // Would be tracked
-            mostUsedFeatures: ['Import', 'Restructure', 'Export'], // Would be tracked
-            importCount: logs.filter(log => log.title.includes('Import')).length,
-            exportCount: logs.filter(log => log.title.includes('Export')).length,
-        };
-
-        // Mock growth trends (in a real app, historical data would be stored)
-        const growthTrends = [
-            { date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], bookmarks: Math.max(0, totalBookmarks - 10), folders: Math.max(0, totalFolders - 2) },
-            { date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], bookmarks: Math.max(0, totalBookmarks - 8), folders: Math.max(0, totalFolders - 1) },
-            { date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], bookmarks: Math.max(0, totalBookmarks - 6), folders: totalFolders },
-            { date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], bookmarks: Math.max(0, totalBookmarks - 4), folders: totalFolders },
-            { date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], bookmarks: Math.max(0, totalBookmarks - 2), folders: totalFolders },
-            { date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], bookmarks: totalBookmarks, folders: totalFolders },
-            { date: new Date().toISOString().split('T')[0], bookmarks: totalBookmarks, folders: totalFolders },
-        ];
-
-        const analytics: AnalyticsData = {
-            totalBookmarks,
-            totalFolders,
-            avgBookmarksPerFolder,
-            topDomains,
-            folderDistribution,
-            tagUsage,
-            aiPerformance: {
-                totalRequests,
-                successRate,
-                avgTokensPerRequest,
-                accuracyScore,
-            },
-            usageStats,
-            growthTrends,
-        };
-
-        setAnalyticsData(analytics);
-        await db.saveAnalyticsData(analytics);
-        setIsLoading(false);
-    };
 
     const chartOptions = {
         responsive: true,
@@ -347,23 +254,5 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     );
 };
 
-// Helper function to count bookmarks in a folder recursively
-function getBookmarksInFolder(folder: Folder): Bookmark[] {
-    let bookmarks: Bookmark[] = [];
-
-    function recurse(current: Folder | Bookmark) {
-        if ('url' in current) {
-            bookmarks.push(current);
-        } else if (current.children) {
-            current.children.forEach(recurse);
-        }
-    }
-
-    if (folder.children) {
-        folder.children.forEach(recurse);
-    }
-
-    return bookmarks;
-}
 
 export default AnalyticsDashboard;

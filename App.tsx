@@ -12,6 +12,7 @@ import { saveLog, getUserCorrections } from './db';
 import { searchCache, cacheKeys, generateHash, cacheStats } from './src/cache';
 import { formatNumber, parseCSVBookmarks, exportBookmarksToCSV } from './src/utils';
 import { backupScheduler } from './src/services/backupScheduler';
+import { perfMonitor } from './src/performance';
 
 // Lazy load modals for better performance
 const ImportModal = lazy(() => import('./components/ImportModal'));
@@ -119,7 +120,8 @@ const App: React.FC = () => {
 
     useEffect(() => {
         const loadData = async () => {
-            setIsLoading(true);
+            await perfMonitor.timeAsyncFunction('app_load_data', async () => {
+                setIsLoading(true);
             const savedFolders = await db.getFolders();
             const savedBookmarks = await db.getBookmarks();
             const savedApiConfigs = await db.getApiConfigs();
@@ -155,7 +157,8 @@ const App: React.FC = () => {
                 setBookmarks(mockBookmarks);
                 setAppState(AppState.LOADED);
             }
-            setIsLoading(false);
+                setIsLoading(false);
+            });
         };
         loadData();
     }, []);
@@ -170,7 +173,8 @@ const App: React.FC = () => {
 
     useEffect(() => {
         const findDuplicates = () => {
-            const urlMap = new Map<string, Bookmark[]>();
+            perfMonitor.timeFunction('find_duplicates', () => {
+                const urlMap = new Map<string, Bookmark[]>();
             bookmarks.forEach(bm => {
                 const existing = urlMap.get(bm.url);
                 if (existing) {
@@ -191,9 +195,10 @@ const App: React.FC = () => {
                     byHost[host] = (byHost[host] || 0) + duplicateCount;
                 });
                 setDuplicateStats({ count: totalDuplicates, byHost });
-            } else {
-                setDuplicateStats({ count: 0, byHost: {} });
-            }
+                } else {
+                    setDuplicateStats({ count: 0, byHost: {} });
+                }
+            });
         };
 
         // Debounce duplicate detection to avoid excessive calculations
@@ -246,7 +251,8 @@ const App: React.FC = () => {
     }, [apiConfigs, handleSaveApiConfig]);
 
     const handleCleanDuplicates = useCallback(async () => {
-        const seenUrls = new Set<string>();
+        await perfMonitor.timeAsyncFunction('clean_duplicates', async () => {
+            const seenUrls = new Set<string>();
         const uniqueBookmarks: Bookmark[] = [];
         // Iterate backwards to keep the "last" (most recent) bookmark
         for (let i = bookmarks.length - 1; i >= 0; i--) {
@@ -273,7 +279,8 @@ const App: React.FC = () => {
             setAppState(AppState.LOADED);
         }
 
-        setIsDuplicateModalOpen(false);
+            setIsDuplicateModalOpen(false);
+        });
     }, [bookmarks, appState]);
 
     const isLinkBroken = async (url: string): Promise<boolean> => {
@@ -287,6 +294,7 @@ const App: React.FC = () => {
 
     const handleStartBrokenLinkCheck = useCallback(async () => {
         if (brokenLinkCheckState === BrokenLinkCheckState.CHECKING) return;
+        await perfMonitor.timeAsyncFunction('check_broken_links', async () => {
         setBrokenLinkCheckState(BrokenLinkCheckState.CHECKING);
         setBrokenLinkCheckProgress({ current: 0, total: bookmarks.length });
         const foundBrokenLinks: Bookmark[] = [];
@@ -316,12 +324,14 @@ const App: React.FC = () => {
         if (foundBrokenLinks.length > 0) {
             setIsBrokenLinkModalOpen(true);
         } else {
-            alert('Không tìm thấy liên kết hỏng nào.');
-        }
+                alert('Không tìm thấy liên kết hỏng nào.');
+            }
+        });
     }, [brokenLinkCheckState, bookmarks.length]);
 
     const handleCleanBrokenLinks = useCallback(async () => {
-        const brokenLinkIds = new Set(brokenLinks.map(bl => bl.id));
+        await perfMonitor.timeAsyncFunction('clean_broken_links', async () => {
+            const brokenLinkIds = new Set(brokenLinks.map(bl => bl.id));
         const cleanedBookmarks = bookmarks.filter(bm => !brokenLinkIds.has(bm.id));
 
         await db.saveBookmarks(cleanedBookmarks);
@@ -339,8 +349,9 @@ const App: React.FC = () => {
             setAppState(AppState.LOADED);
         }
 
-        setIsBrokenLinkModalOpen(false);
-        setBrokenLinks([]);
+            setIsBrokenLinkModalOpen(false);
+            setBrokenLinks([]);
+        });
     }, [brokenLinks, bookmarks, appState]);
 
     const arrayToTree = (bookmarks: (Bookmark & { path?: string[] })[]): (Folder | Bookmark)[] => {
@@ -428,7 +439,8 @@ const App: React.FC = () => {
     }, []);
 
     const startRestructuring = async (isContinuation = false) => {
-        const addDetailedLog = async (type: DetailedLog['type'], title: string, content: string | object, usage?: DetailedLog['usage']) => {
+        await perfMonitor.timeAsyncFunction('start_restructuring', async () => {
+            const addDetailedLog = async (type: DetailedLog['type'], title: string, content: string | object, usage?: DetailedLog['usage']) => {
             const newLog: DetailedLog = {
                 id: `log-${Date.now()}-${Math.random()}`,
                 timestamp: new Date().toLocaleTimeString('en-GB'),
@@ -643,17 +655,17 @@ const App: React.FC = () => {
             activeWorkersRef.current.clear();
         };
 
-        // Always use multi-threaded processing
-        initializeWorkers();
-        for (let i = 0; i < Math.min(MAX_CONCURRENT_WORKERS, totalBatches); i++) {
-            startNextBatch();
-        }
-
-
+            // Always use multi-threaded processing
+            initializeWorkers();
+            for (let i = 0; i < Math.min(MAX_CONCURRENT_WORKERS, totalBatches); i++) {
+                startNextBatch();
+            }
+        });
     };
     
     const applyChanges = async () => {
-       const finalBookmarks = bookmarks.map(bm => {
+       await perfMonitor.timeAsyncFunction('apply_changes', async () => {
+           const finalBookmarks = bookmarks.map(bm => {
            const categorized = allCategorizedBookmarks.find(cb => cb.url === bm.url);
            return { ...bm, ...categorized }; // merge path and tags
        });
@@ -663,8 +675,9 @@ const App: React.FC = () => {
        setAppState(AppState.STRUCTURED);
        setLogs([]);
        setProgress({current: 0, total: 0});
-       setSelectedFolderId('root');
-       setAllCategorizedBookmarks([]);
+           setSelectedFolderId('root');
+           setAllCategorizedBookmarks([]);
+       });
     };
 
     const discardChanges = () => {
@@ -740,6 +753,7 @@ const App: React.FC = () => {
 
     const processImport = useCallback(async (mode: 'merge' | 'overwrite') => {
         if (previewBookmarks.length === 0) return;
+        await perfMonitor.timeAsyncFunction('process_import', async () => {
 
         let combinedBookmarks: Bookmark[] = [];
         if (mode === 'merge') {
@@ -757,12 +771,14 @@ const App: React.FC = () => {
         setSelectedFolderId('root');
         setAppState(AppState.LOADED);
         setShowImportModal(false);
-        setImportFileName('');
-        setPreviewBookmarks([]);
+            setImportFileName('');
+            setPreviewBookmarks([]);
+        });
     }, [previewBookmarks, bookmarks]);
 
     const handleExportBookmarks = useCallback(async (options: any) => {
-        // Filter bookmarks based on options
+        await perfMonitor.timeAsyncFunction('export_bookmarks', async () => {
+            // Filter bookmarks based on options
         let filteredBookmarks = bookmarks;
 
         // Filter by folders
@@ -898,8 +914,9 @@ ${bookmarksHtml}</DL><p>`;
         a.download = fileName;
         document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
     }, [folders, bookmarks]);
 
     const handleOpenExportModal = useCallback(() => {
@@ -907,7 +924,8 @@ ${bookmarksHtml}</DL><p>`;
     }, []);
 
     const handleUploadData = useCallback(async (key: string) => {
-        try {
+        await perfMonitor.timeAsyncFunction('upload_data', async () => {
+            try {
             const { keyBasedService } = await import('./src/services/postgresqlService');
             const metadata = {
                 name: `Backup ${new Date().toLocaleString('vi-VN')}`,
@@ -939,12 +957,14 @@ ${bookmarksHtml}</DL><p>`;
                 message: `Upload thất bại: ${error.message}`,
                 type: 'error'
             }]);
-            throw error;
-        }
+                throw error;
+            }
+        });
     }, [bookmarks, folders]);
 
     const handleImportData = useCallback(async (key: string) => {
-        try {
+        await perfMonitor.timeAsyncFunction('import_data', async () => {
+            try {
             const { keyBasedService } = await import('./src/services/postgresqlService');
             const result = await keyBasedService.downloadBackup(key, (progress) => {
                 setNotifications(prev => [...prev, {
@@ -975,8 +995,9 @@ ${bookmarksHtml}</DL><p>`;
                 message: `Import thất bại: ${error.message}`,
                 type: 'error'
             }]);
-            throw error;
-        }
+                throw error;
+            }
+        });
     }, []);
 
     // Instruction Preset handlers
@@ -1521,16 +1542,17 @@ ${folderGuide}
     );
 };
 
-// Helper functions
+// Helper functions (Iterative implementations)
 function findFolder(items: (Folder | Bookmark)[], id: string | null): Folder | null {
     if (id === null) return null;
-    for (const item of items) {
+    const queue = [...items];
+    while (queue.length > 0) {
+        const item = queue.shift()!;
         if ('url' in item) continue;
         const folder = item as Folder;
         if (folder.id === id) return folder;
         if (folder.children) {
-            const found = findFolder(folder.children, id);
-            if (found) return found;
+            queue.push(...folder.children);
         }
     }
     return null;
@@ -1538,16 +1560,15 @@ function findFolder(items: (Folder | Bookmark)[], id: string | null): Folder | n
 
 function getBookmarksInFolder(folder: Folder | null): Bookmark[] {
     if (!folder) return [];
-    let bookmarks: Bookmark[] = [];
-    function recurse(current: Folder | Bookmark) {
+    const bookmarks: Bookmark[] = [];
+    const queue: (Folder | Bookmark)[] = [folder];
+    while (queue.length > 0) {
+        const current = queue.shift()!;
         if ('url' in current) {
-            bookmarks.push(current);
+            bookmarks.push(current as Bookmark);
         } else if (current.children) {
-            current.children.forEach(recurse);
+            queue.push(...current.children);
         }
-    }
-    if (folder.children) {
-        folder.children.forEach(recurse);
     }
     return bookmarks;
 }

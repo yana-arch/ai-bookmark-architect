@@ -24,100 +24,90 @@ interface WorkerResponse {
   batchIndex?: number;
 }
 
-// Helper function to parse and validate AI response content
+// Helper function to parse and validate AI response content (Optimized)
 function parseAIResponse(content: string): any[] {
+  let cleanedContent = content.trim();
+
+  // 1. Quick check for empty content
+  if (!cleanedContent) return [];
+
+  // 2. Remove markdown code blocks if present
+  if (cleanedContent.includes('```')) {
+    cleanedContent = cleanedContent.replace(/```(?:json)?\s*([\s\S]*?)\s*```/g, '$1').trim();
+  }
+
+  // 3. Try direct parsing first (fastest)
   try {
-    // First attempt: direct JSON parsing
-    const parsed = JSON.parse(content);
-    if (parsed && parsed.bookmarks && Array.isArray(parsed.bookmarks)) {
-      return parsed.bookmarks;
-    }
-    throw new Error('Invalid response structure');
-  } catch (error) {
-    // Second attempt: try to extract and repair JSON
+    const parsed = JSON.parse(cleanedContent);
+    const bookmarks = Array.isArray(parsed) ? parsed : (parsed.bookmarks || []);
+    if (Array.isArray(bookmarks)) return validateBookmarks(bookmarks);
+  } catch (e) {
+    // If direct parse fails, proceed to more aggressive extraction
+  }
+
+  // 4. Extract JSON object using boundaries
+  const jsonStart = cleanedContent.indexOf('{');
+  const jsonEnd = cleanedContent.lastIndexOf('}');
+  if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+    const jsonCandidate = cleanedContent.substring(jsonStart, jsonEnd + 1);
     try {
-      // Remove any leading/trailing whitespace and potential markdown formatting
-      let cleanedContent = content.trim();
-
-      // Remove markdown code blocks if present
-      if (cleanedContent.startsWith('```json')) {
-        cleanedContent = cleanedContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-      } else if (cleanedContent.startsWith('```')) {
-        cleanedContent = cleanedContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
-      }
-
-      // Try to find JSON object boundaries
-      const jsonStart = cleanedContent.indexOf('{');
-      const jsonEnd = cleanedContent.lastIndexOf('}');
-
-      if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
-        cleanedContent = cleanedContent.substring(jsonStart, jsonEnd + 1);
-      }
-
-      // Attempt basic JSON repair for common issues
-      let repairedContent = cleanedContent
-        // Fix trailing commas before closing brackets
-        .replace(/,(\s*[}\]])/g, '$1')
-        // Fix missing commas between array elements
-        .replace(/}(\s*){/g, '},{')
-        // Fix unescaped quotes in strings (basic)
-        .replace(/([^\\])"([^"]*)"([^,}\]]*[^\\])"([^"]*)"([^,}\]]*)/g, '$1"$2\\"$3\\"$4"$5');
-
-      const parsed = JSON.parse(repairedContent);
-      if (parsed && parsed.bookmarks && Array.isArray(parsed.bookmarks)) {
-        // Validate each bookmark has required fields
-        const validBookmarks = parsed.bookmarks.filter((bookmark: any) => {
-          return bookmark &&
-                 typeof bookmark.title === 'string' &&
-                 typeof bookmark.url === 'string' &&
-                 Array.isArray(bookmark.path) &&
-                 Array.isArray(bookmark.tags);
-        });
-
-        if (validBookmarks.length > 0) {
-          return validBookmarks;
-        }
-      }
-
-      throw new Error('No valid bookmarks found after repair');
-    } catch (repairError) {
-      // Final fallback: try to extract individual bookmark objects using the cleaned content
-      try {
-        const bookmarks: any[] = [];
-        // Use the cleaned content from the outer scope
-        let searchContent = content.trim();
-
-        // Remove markdown if present
-        if (searchContent.startsWith('```json')) {
-          searchContent = searchContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-        } else if (searchContent.startsWith('```')) {
-          searchContent = searchContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
-        }
-
-        const bookmarkRegex = /{\s*"id"\s*:\s*"[^"]*"\s*,\s*"title"\s*:\s*"[^"]*"\s*,\s*"url"\s*:\s*"[^"]*"\s*,\s*"parentId"\s*:\s*"(?:[^"]*)"\s*,\s*"path"\s*:\s*\[[^\]]*\]\s*,\s*"tags"\s*:\s*\[[^\]]*\]\s*}/g;
-
-        let match;
-        while ((match = bookmarkRegex.exec(searchContent)) !== null) {
-          try {
-            const bookmark = JSON.parse(match[0]);
-            if (bookmark.title && bookmark.url && Array.isArray(bookmark.path) && Array.isArray(bookmark.tags)) {
-              bookmarks.push(bookmark);
-            }
-          } catch (e) {
-            // Skip malformed individual bookmarks
-          }
-        }
-
-        if (bookmarks.length > 0) {
-          return bookmarks;
-        }
-
-        throw new Error('Could not extract any valid bookmarks');
-      } catch (finalError: any) {
-        throw new Error(`Failed to parse AI response: ${finalError.message}. Raw content: ${content.substring(0, 200)}...`);
-      }
+      const parsed = JSON.parse(repairJson(jsonCandidate));
+      const bookmarks = Array.isArray(parsed) ? parsed : (parsed.bookmarks || []);
+      if (Array.isArray(bookmarks)) return validateBookmarks(bookmarks);
+    } catch (e) {
+      // Failed to parse extracted object
     }
   }
+
+  // 5. Last resort: regex-based individual bookmark extraction
+  return extractBookmarksByRegex(cleanedContent);
+}
+
+// Sub-helper: Validate bookmark objects
+function validateBookmarks(bookmarks: any[]): any[] {
+  return bookmarks.filter(bm => 
+    bm && 
+    typeof bm.title === 'string' && 
+    typeof bm.url === 'string' && 
+    Array.isArray(bm.path) && 
+    Array.isArray(bm.tags)
+  );
+}
+
+// Sub-helper: Basic JSON repair
+function repairJson(json: string): string {
+  return json
+    .replace(/,(\s*[}\]])/g, '$1') // Remove trailing commas
+    .replace(/}(\s*){/g, '},{')    // Fix missing commas between objects
+    .replace(/\](\s*)\[/g, '],[')  // Fix missing commas between arrays
+    .trim();
+}
+
+// Sub-helper: Regex-based extraction
+function extractBookmarksByRegex(content: string): any[] {
+  const bookmarks: any[] = [];
+  // Look for patterns that look like bookmark objects
+  // This is more flexible than the previous rigid regex
+  const regex = /{[^{}]*"title"\s*:\s*"[^"]*"[^{}]*"url"\s*:\s*"[^"]*"[^{}]*}/g;
+  
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    try {
+      // Try to parse the match, maybe with a little repair
+      const bm = JSON.parse(repairJson(match[0]));
+      if (bm.title && bm.url) {
+        bookmarks.push({
+          title: bm.title,
+          url: bm.url,
+          path: Array.isArray(bm.path) ? bm.path : [],
+          tags: Array.isArray(bm.tags) ? bm.tags : []
+        });
+      }
+    } catch (e) {
+      // Skip invalid matches
+    }
+  }
+  return bookmarks;
 }
 
 // Helper function to make API calls
