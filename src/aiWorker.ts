@@ -1,31 +1,35 @@
 // AI Worker for multi-threaded bookmark processing
 // This worker handles AI API calls for a single batch of bookmarks
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
+import type { Bookmark, ApiConfig, UserCorrection, Folder } from "../types";
 
+// Type definitions for the worker
 interface WorkerMessage {
   type: 'process_batch' | 'cancel';
   data?: {
-    batch: any[];
-    apiConfigs: any[];
+    batch: Bookmark[];
+    apiConfigs: ApiConfig[];
     systemPrompt: string;
     userInstructionBlock: string;
-    currentTree: any;
+    currentTree: Folder[]; // Assuming currentTree is a list of root folders
     batchIndex: number;
     maxRetries: number;
-    userHistory?: any[]; // New: for context enrichment
+    userHistory?: UserCorrection[]; // New: for context enrichment
     domainKnowledge?: string; // New: for context enrichment
   };
 }
 
 interface WorkerResponse {
   type: 'batch_result' | 'batch_error' | 'log' | 'progress';
-  data?: any;
+  data?: Bookmark[];
   error?: string;
   batchIndex?: number;
+  log?: any; // Keep log as any or define a specific Log type if needed, but for worker messaging it's flexible
+  progress?: number;
 }
 
 // Helper function to parse and validate AI response content (Optimized)
-function parseAIResponse(content: string): any[] {
+function parseAIResponse(content: string): Bookmark[] {
   let cleanedContent = content.trim();
 
   // 1. Quick check for empty content
@@ -64,14 +68,22 @@ function parseAIResponse(content: string): any[] {
 }
 
 // Sub-helper: Validate bookmark objects
-function validateBookmarks(bookmarks: any[]): any[] {
+function validateBookmarks(bookmarks: any[]): Bookmark[] {
   return bookmarks.filter(bm => 
     bm && 
     typeof bm.title === 'string' && 
     typeof bm.url === 'string' && 
-    Array.isArray(bm.path) && 
-    Array.isArray(bm.tags)
-  );
+    (Array.isArray(bm.path) || bm.path === undefined) && 
+    (Array.isArray(bm.tags) || bm.tags === undefined)
+  ).map(bm => ({
+      // Map to ensure it strictly follows Bookmark interface
+      id: bm.id || crypto.randomUUID(), // Ensure ID exists if AI didn't return it (though usually we preserve IDs)
+      title: bm.title,
+      url: bm.url,
+      parentId: bm.parentId || null,
+      path: bm.path || [],
+      tags: bm.tags || []
+  }));
 }
 
 // Sub-helper: Basic JSON repair
@@ -84,8 +96,8 @@ function repairJson(json: string): string {
 }
 
 // Sub-helper: Regex-based extraction
-function extractBookmarksByRegex(content: string): any[] {
-  const bookmarks: any[] = [];
+function extractBookmarksByRegex(content: string): Bookmark[] {
+  const bookmarks: Bookmark[] = [];
   // Look for patterns that look like bookmark objects
   // This is more flexible than the previous rigid regex
   const regex = /{[^{}]*"title"\s*:\s*"[^"]*"[^{}]*"url"\s*:\s*"[^"]*"[^{}]*}/g;
@@ -97,359 +109,169 @@ function extractBookmarksByRegex(content: string): any[] {
       const bm = JSON.parse(repairJson(match[0]));
       if (bm.title && bm.url) {
         bookmarks.push({
+          id: bm.id || crypto.randomUUID(),
           title: bm.title,
           url: bm.url,
-          path: Array.isArray(bm.path) ? bm.path : [],
-          tags: Array.isArray(bm.tags) ? bm.tags : []
+          parentId: bm.parentId || null,
+          path: bm.path || [],
+          tags: bm.tags || []
         });
       }
     } catch (e) {
-      // Skip invalid matches
+      // Skip malformed matches
     }
   }
   return bookmarks;
 }
 
-// Helper function to make API calls
-async function callAIProvider(
-  provider: string,
-  apiKey: string,
-  model: string,
-  systemPrompt: string,
-  userContent: string,
-  batch: any[],
-  userInstructionBlock: string,
-  currentTree: any,
-  batchIndex: number,
-  userHistory?: any[],
-  domainKnowledge?: string,
-  apiUrl?: string
-): Promise<{ categorizedBatch: any[]; usage?: any }> {
-  if (provider === 'openrouter' || provider === 'custom') {
-    const endpoint = provider === 'custom' && apiUrl ? apiUrl : 'https://openrouter.ai/api/v1/chat/completions';
-    let finalSystemPrompt = systemPrompt;
-    
-    // Robust Base Instruction if systemPrompt is empty or too simple
-    if (!finalSystemPrompt || finalSystemPrompt.length < 50) {
-        finalSystemPrompt = `You are the AI Bookmark Architect, an expert knowledge organizer.
-Your goal is to organize a chaotic list of browser bookmarks into a clean, logical folder hierarchy.
-
-CORE RESPONSIBILITIES:
-1. Analyze the 'title' and 'url' of each bookmark to understand its content.
-2. Assign a 'path' (Folder structure) that best categorizes the content.
-   - Use nested folders for better organization (e.g., ['Development', 'Frontend', 'React']).
-   - Avoid creating too many top-level folders. Group related items.
-   - Use Vietnamese for folder names unless the user specifies otherwise.
-3. Assign relevant 'tags' (3-5 tags) to help search and filtering.
-4. If a bookmark is broken or ambiguous, categorize it under ['Uncategorized'] or ['Review'].
-
-STRICT FORMATTING RULES:
-- Output valid JSON only.
-- The 'path' must be an array of strings.
-- The 'tags' must be an array of strings.`;
-    }
-
-    if (domainKnowledge) {
-      finalSystemPrompt += `\n\nCONTEXT ENRICHMENT:\nDomain Knowledge: ${domainKnowledge}`; 
-    }
-    if (userHistory && userHistory.length > 0) {
-      finalSystemPrompt += `\n\nUSER PREFERENCES (Based on corrections):\n${JSON.stringify(userHistory, null, 2)}`;
-    }
-    finalSystemPrompt += "\n\nOutput a JSON object with a single key 'bookmarks' which is an array where each object represents a bookmark with its original 'title', 'url', its final 'path' as an array of Vietnamese folder names (e.g., ['Phát triển Web', 'React']), and 'tags' as an array of Vietnamese strings (e.g., ['hướng dẫn', 'frontend', 'javascript']).";
-    const userPrompt = `${userContent}\n\nBOOKMARKS TO CATEGORIZE:\n${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}`;
-    const requestPayload = {
-      model,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: finalSystemPrompt },
-        { role: "user", content: userPrompt }
-      ]
-    };
-
-    const headers: Record<string, string> = {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    };
-
-    if (provider === 'openrouter') {
-      headers['HTTP-Referer'] = `${self.location.protocol}//${self.location.host}`;
-      headers['X-Title'] = 'AI Bookmark Architect';
-    }
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(requestPayload)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      try {
-        const errorData = JSON.parse(errorText);
-        throw new Error(`OpenRouter API Error: ${response.status} ${response.statusText} - ${errorData.error?.message || 'Unknown error'}`);
-      } catch (e) {
-        throw new Error(`OpenRouter API Error: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-    }
-
-    const responseData = await response.json();
-    const usage = responseData.usage;
-    const rawContent = responseData.choices[0].message.content;
-    const categorizedBatch = parseAIResponse(rawContent);
-
-    return { categorizedBatch, usage };
-
-  } else { // Gemini
-    let geminiSystemPrompt = systemPrompt + userInstructionBlock;
-
-    // Robust Base Instruction if systemPrompt is empty or too simple
-    if (!systemPrompt || systemPrompt.length < 50) {
-        const baseInstruction = `You are the AI Bookmark Architect, an expert knowledge organizer.
-Your goal is to organize a chaotic list of browser bookmarks into a clean, logical folder hierarchy.
-
-CORE RESPONSIBILITIES:
-1. Analyze the 'title' and 'url' of each bookmark to understand its content.
-2. Assign a 'path' (Folder structure) that best categorizes the content.
-   - Use nested folders for better organization (e.g., ['Development', 'Frontend', 'React']).
-   - Avoid creating too many top-level folders. Group related items.
-   - Use Vietnamese for folder names unless the user specifies otherwise.
-3. Assign relevant 'tags' (3-5 tags) to help search and filtering.
-4. If a bookmark is broken or ambiguous, categorize it under ['Uncategorized'] or ['Review'].
-
-STRICT FORMATTING RULES:
-- Output valid JSON only.
-- The 'path' must be an array of strings.
-- The 'tags' must be an array of strings.`;
-        geminiSystemPrompt = baseInstruction + "\n\n" + userInstructionBlock;
-    }
-
-    if (domainKnowledge) {
-      geminiSystemPrompt += `\n\nCONTEXT ENRICHMENT:\nDomain Knowledge: ${domainKnowledge}`; 
-    }
-    if (userHistory && userHistory.length > 0) {
-      geminiSystemPrompt += `\n\nUSER PREFERENCES (Based on corrections):\n${JSON.stringify(userHistory, null, 2)}`;
-    }
-
-    const ai = new GoogleGenAI({ apiKey });
-    const genAiResponse = await ai.models.generateContent({
-        model: model,
-        contents: userContent + `\n\nBOOKMARKS TO CATEGORIZE:\n${JSON.stringify(batch.map(b => ({ title: b.title, url: b.url })), null, 2)}`,
-        config: {
-            systemInstruction: geminiSystemPrompt,
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                        title: { type: Type.STRING },
-                        url: { type: Type.STRING },
-                        path: { type: Type.ARRAY, items: { type: Type.STRING } },
-                        tags: { type: Type.ARRAY, items: { type: Type.STRING } }
-                    },
-                    required: ['title', 'url', 'path', 'tags']
-                }
-            }
-        }
-    });
-
-    const usage = genAiResponse.usageMetadata;
-    const tokenInfo = usage ? {
-        promptTokens: usage.promptTokenCount,
-        completionTokens: usage.candidatesTokenCount,
-        totalTokens: usage.totalTokenCount
-    } : undefined;
-
-    // Use text() method if available, otherwise fallback (though generateContent awaits the full response)
-    const rawText = typeof (genAiResponse as any).text === 'function' ? (genAiResponse as any).text() : (genAiResponse as any).text || JSON.stringify((genAiResponse as any).response);
-    const categorizedBatch = parseAIResponse(rawText);
-
-    return { categorizedBatch, usage: tokenInfo };
-  }
-}
-
-// Worker message handler
+// Main worker logic
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   const { type, data } = e.data;
 
   if (type === 'cancel') {
-    // Handle cancellation
-    self.postMessage({ type: 'log', data: 'Worker cancelled' });
+    // In a web worker, we can't really "cancel" a promise easily without AbortController
+    // but we can ignore the result.
+    // The main thread will terminate the worker if needed.
     return;
   }
 
   if (type === 'process_batch' && data) {
-    const { batch, apiConfigs, systemPrompt, userInstructionBlock, currentTree, batchIndex, maxRetries, userHistory, domainKnowledge } = data;
+    const { 
+        batch, 
+        apiConfigs, 
+        systemPrompt, 
+        userInstructionBlock, 
+        currentTree, 
+        batchIndex, 
+        maxRetries,
+        userHistory,
+        domainKnowledge
+    } = data;
 
-    try {
-      self.postMessage({ type: 'log', data: `Worker starting batch ${batchIndex}`, batchIndex });
+    // Use the first active Gemini config
+    const geminiConfig = apiConfigs.find(c => c.provider === 'gemini' && c.status === 'active');
 
-      let availableKeys = apiConfigs.filter((c: any) => c.status === 'active');
-      if (availableKeys.length === 0) {
-        throw new Error("No active API keys available");
-      }
-
-      let categorizedBatch: any[] = [];
-      let keyIndex = 0;
-      let batchSuccess = false;
-
-      const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-      while (!batchSuccess && keyIndex < availableKeys.length) {
-        const currentKeyConfig = availableKeys[keyIndex];
-        let retries = 0;
-        let retryDelay = 1000; // Start with 1 second
-
-        while (retries <= maxRetries) {
-          try {
-            self.postMessage({
-              type: 'log',
-              data: `Using key: ${currentKeyConfig.name} (${currentKeyConfig.provider})`,
-              batchIndex
-            });
-
-            // For Gemini, we pass the raw content parts, for OpenRouter we construct the prompt differently
-            // but callAIProvider abstracts this.
-            // Note: userContent passed to callAIProvider for Gemini was pre-composed in the old code,
-            // but here we are recomposing it inside callAIProvider to match the specific provider's needs better possibly?
-            // Wait, looking at old code:
-            // OpenRouter userContent: `EXISTING STRUCTURE:\n...` (from data.currentTree mostly)
-            // Gemini userContent: same.
-            
-            // Let's keep it consistent.
-            const userContent = `EXISTING STRUCTURE:\n${JSON.stringify(currentTree, null, 2)}`;
-
-            // Log request details
-            self.postMessage({
-              type: 'detailed_log',
-              data: {
-                type: 'request',
-                title: `Request đến ${currentKeyConfig.provider} (${currentKeyConfig.model})`,
-                content: {
-                  systemPrompt: systemPrompt + userInstructionBlock,
-                  userContent,
-                  batchSize: batch.length
-                }
-              },
-              batchIndex
-            });
-
-            const result = await callAIProvider(
-              currentKeyConfig.provider,
-              currentKeyConfig.apiKey,
-              currentKeyConfig.model,
-              systemPrompt,
-              userContent,
-              batch,
-              userInstructionBlock,
-              currentTree,
-              batchIndex,
-              userHistory,
-              domainKnowledge,
-              currentKeyConfig.apiUrl
-            );
-
-            // Log response details
-            self.postMessage({
-              type: 'detailed_log',
-              data: {
-                type: 'response',
-                title: `Response từ ${currentKeyConfig.provider} (${currentKeyConfig.model})`,
-                content: result.categorizedBatch,
-                usage: result.usage
-              },
-              batchIndex
-            });
-
-            categorizedBatch = result.categorizedBatch;
-
-            self.postMessage({
-              type: 'batch_result',
-              data: { categorizedBatch, usage: result.usage, keyUsed: currentKeyConfig.name },
-              batchIndex
-            });
-
-            batchSuccess = true;
-            break;
-
-          } catch (error: any) {
-            const errorMessage = error.toString();
-            self.postMessage({
-              type: 'log',
-              data: `Error with key "${currentKeyConfig.name}": ${errorMessage.substring(0, 100)}`,
-              batchIndex
-            });
-
-            const isFatalError = (
-                errorMessage.includes('401') || // Unauthorized - likely bad API key
-                errorMessage.includes('403') || // Forbidden - likely permission issue
-                errorMessage.includes('API key') // Generic API key error
-            );
-
-            if (isFatalError) {
-              self.postMessage({
-                type: 'log',
-                data: `Key "${currentKeyConfig.name}" has a fatal configuration error, switching keys`,
-                batchIndex
-              });
-              break; // Stop retrying with this key, switch to next
-            }
-
-            const isRateLimitError = (
-                errorMessage.includes('429') || // Too Many Requests
-                errorMessage.toLowerCase().includes('quota') || // Exceeded quota
-                errorMessage.includes('rate limit') // Generic rate limit message
-            );
-
-            if (isRateLimitError && retries < maxRetries) {
-                self.postMessage({
-                    type: 'log',
-                    data: `Rate limit hit for key "${currentKeyConfig.name}". Retrying in ${retryDelay / 1000}s...`,
-                    batchIndex
-                });
-                await sleep(retryDelay);
-                retryDelay *= 2; // Exponential backoff
-            } else if (retries < maxRetries) {
-                self.postMessage({
-                    type: 'log',
-                    data: `Transient error with key "${currentKeyConfig.name}". Retrying in ${retryDelay / 1000}s...`,
-                    batchIndex
-                });
-                await sleep(retryDelay);
-                retryDelay *= 2; // Exponential backoff
-            } else {
-              self.postMessage({
-                type: 'log',
-                data: `Max retries reached for key "${currentKeyConfig.name}", switching keys`,
-                batchIndex
-              });
-              break;
-            }
-
-            retries++;
-          }
-        }
-
-        if (batchSuccess) {
-          keyIndex = 0; // Reset on success
-        } else {
-          keyIndex++;
-        }
-      }
-
-      if (!batchSuccess) {
-        throw new Error(`Batch ${batchIndex} failed after trying all keys`);
-      }
-
-    } catch (error: any) {
+    if (!geminiConfig) {
       self.postMessage({
         type: 'batch_error',
-        error: error.toString(),
+        error: 'No active Gemini API key found.',
         batchIndex
-      });
+      } as WorkerResponse);
+      return;
+    }
+
+    let attempts = 0;
+    let success = false;
+
+    while (attempts <= maxRetries && !success) {
+      try {
+        attempts++;
+        
+        // Log attempt
+        self.postMessage({
+            type: 'log',
+            log: { message: `Batch ${batchIndex}: Attempt ${attempts}/${maxRetries + 1}` }
+        } as WorkerResponse);
+
+        // Prepare Prompt
+        const bookmarksList = batch.map(b => `- ${b.title} (${b.url})`).join('\n');
+        
+        // Convert current tree to string representation for context
+        const treeContext = JSON.stringify(currentTree.map(n => ({ name: n.name, id: n.id }))); // Simplified tree
+
+        // Add user history context if available
+        let historyContext = "";
+        if (userHistory && userHistory.length > 0) {
+            // Take last 5 relevant corrections
+             const recentCorrections = userHistory.slice(-5).map(c => 
+                `Correction: "${c.originalBookmarkUrl}" was moved to path [${c.correctedPath.join(' > ')}]`
+             ).join('\n');
+             historyContext = `\nRecent User Corrections (Learn from these):\n${recentCorrections}`;
+        }
+
+        const fullPrompt = `${systemPrompt}
+
+${userInstructionBlock}
+
+${domainKnowledge ? `Domain Knowledge:\n${domainKnowledge}\n` : ''}
+
+${historyContext}
+
+Current Folder Structure (Reuse these if suitable):
+${treeContext}
+
+Bookmarks to Process:
+${bookmarksList}
+
+Respond ONLY with the JSON object as described.`;
+
+        // Initialize Gemini (Updated for @google/genai SDK)
+        const genAI = new GoogleGenAI({ apiKey: geminiConfig.apiKey });
+        
+        // Call API
+        const result = await genAI.models.generateContent({
+            model: geminiConfig.model || "gemini-1.5-flash",
+            contents: [
+                {
+                    parts: [
+                        {
+                            text: fullPrompt
+                        }
+                    ]
+                }
+            ],
+            config: {
+                responseMimeType: "application/json"
+            }
+        });
+
+        const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!responseText) {
+             throw new Error("AI returned empty response");
+        }
+
+        // Parse Result
+        const categorizedBookmarks = parseAIResponse(responseText);
+
+        if (categorizedBookmarks.length === 0) {
+            throw new Error("AI returned empty or invalid bookmark list");
+        }
+
+        // Merge back strict IDs from original batch to ensure data integrity
+        // The AI might mess up IDs or not return them, so we map back by URL or Index
+        // Strategy: Assume order is preserved or try to match by URL
+        // Simple strategy: Map by URL
+        const finalBookmarks = categorizedBookmarks.map(cbm => {
+            const original = batch.find(b => b.url === cbm.url);
+            return {
+                ...cbm,
+                id: original ? original.id : cbm.id, // Restore original ID
+                parentId: null // Reset parentId as it will be determined by path later
+            };
+        });
+
+        success = true;
+        self.postMessage({
+          type: 'batch_result',
+          data: finalBookmarks,
+          batchIndex
+        } as WorkerResponse);
+
+      } catch (error: any) {
+        console.error(`Batch ${batchIndex} attempt ${attempts} failed:`, error);
+        
+        if (attempts > maxRetries) {
+          self.postMessage({
+            type: 'batch_error',
+            error: error.message || 'Unknown error during AI processing',
+            batchIndex
+          } as WorkerResponse);
+        } else {
+            // Wait a bit before retry (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempts)));
+        }
+      }
     }
   }
 };
-
-// Export for TypeScript (though workers don't actually export)
-export {};

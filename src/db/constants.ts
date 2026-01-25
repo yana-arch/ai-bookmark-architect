@@ -1,0 +1,15 @@
+export const DB_NAME = 'AIBookmarkArchitectDB';
+export const BOOKMARKS_STORE = 'bookmarks';
+export const FOLDERS_STORE = 'folders';
+export const API_CONFIGS_STORE = 'apiConfigs';
+export const INSTRUCTION_PRESETS_STORE = 'instructionPresets';
+export const FOLDER_TEMPLATES_STORE = 'folderTemplates';
+export const EMPTY_FOLDER_TREES_STORE = 'emptyFolderTrees';
+export const LOGS_STORE = 'logs';
+export const USER_CORRECTIONS_STORE = 'userCorrections';
+export const BACKUPS_STORE = 'backups';
+export const SYNC_STATUS_STORE = 'syncStatus';
+export const ANALYTICS_STORE = 'analytics';
+export const OAUTH_TOKENS_STORE = 'oauthTokens';
+export const SMART_RULES_STORE = 'smartClassifyRules';
+export const DB_CONNECTIONS_STORE = 'dbConnections';

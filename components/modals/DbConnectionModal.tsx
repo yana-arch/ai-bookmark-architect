@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import type { DbConnection } from "../types";
+import type { DbConnection } from "../../types";
 import {
   saveDbConnection,
   getDbConnections,
@@ -8,7 +8,7 @@ import {
   parseDbConnectionString,
   exportToCloud,
   importFromCloud,
-} from "../db";
+} from "../../db";
 
 interface DbConnectionModalProps {
   isOpen: boolean;
