@@ -28,6 +28,7 @@ const InstructionPresetModal: React.FC<InstructionPresetModalProps> = ({
     customInstructions: ''
   });
 
+
   useEffect(() => {
     if (editingPreset) {
       setFormData({

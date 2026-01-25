@@ -404,6 +404,7 @@ const App: React.FC = () => {
                         smartClassifyRules={smartClassifyRules}
                         onSaveSmartRule={handleSaveSmartRule}
                         onDeleteSmartRule={handleDeleteSmartRule}
+                        apiConfigs={apiConfigs}
                     />
                 )}
 

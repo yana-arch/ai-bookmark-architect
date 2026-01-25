@@ -128,6 +128,27 @@ async function callAIProvider(
   if (provider === 'openrouter' || provider === 'custom') {
     const endpoint = provider === 'custom' && apiUrl ? apiUrl : 'https://openrouter.ai/api/v1/chat/completions';
     let finalSystemPrompt = systemPrompt;
+    
+    // Robust Base Instruction if systemPrompt is empty or too simple
+    if (!finalSystemPrompt || finalSystemPrompt.length < 50) {
+        finalSystemPrompt = `You are the AI Bookmark Architect, an expert knowledge organizer.
+Your goal is to organize a chaotic list of browser bookmarks into a clean, logical folder hierarchy.
+
+CORE RESPONSIBILITIES:
+1. Analyze the 'title' and 'url' of each bookmark to understand its content.
+2. Assign a 'path' (Folder structure) that best categorizes the content.
+   - Use nested folders for better organization (e.g., ['Development', 'Frontend', 'React']).
+   - Avoid creating too many top-level folders. Group related items.
+   - Use Vietnamese for folder names unless the user specifies otherwise.
+3. Assign relevant 'tags' (3-5 tags) to help search and filtering.
+4. If a bookmark is broken or ambiguous, categorize it under ['Uncategorized'] or ['Review'].
+
+STRICT FORMATTING RULES:
+- Output valid JSON only.
+- The 'path' must be an array of strings.
+- The 'tags' must be an array of strings.`;
+    }
+
     if (domainKnowledge) {
       finalSystemPrompt += `\n\nCONTEXT ENRICHMENT:\nDomain Knowledge: ${domainKnowledge}`; 
     }
@@ -180,6 +201,28 @@ async function callAIProvider(
 
   } else { // Gemini
     let geminiSystemPrompt = systemPrompt + userInstructionBlock;
+
+    // Robust Base Instruction if systemPrompt is empty or too simple
+    if (!systemPrompt || systemPrompt.length < 50) {
+        const baseInstruction = `You are the AI Bookmark Architect, an expert knowledge organizer.
+Your goal is to organize a chaotic list of browser bookmarks into a clean, logical folder hierarchy.
+
+CORE RESPONSIBILITIES:
+1. Analyze the 'title' and 'url' of each bookmark to understand its content.
+2. Assign a 'path' (Folder structure) that best categorizes the content.
+   - Use nested folders for better organization (e.g., ['Development', 'Frontend', 'React']).
+   - Avoid creating too many top-level folders. Group related items.
+   - Use Vietnamese for folder names unless the user specifies otherwise.
+3. Assign relevant 'tags' (3-5 tags) to help search and filtering.
+4. If a bookmark is broken or ambiguous, categorize it under ['Uncategorized'] or ['Review'].
+
+STRICT FORMATTING RULES:
+- Output valid JSON only.
+- The 'path' must be an array of strings.
+- The 'tags' must be an array of strings.`;
+        geminiSystemPrompt = baseInstruction + "\n\n" + userInstructionBlock;
+    }
+
     if (domainKnowledge) {
       geminiSystemPrompt += `\n\nCONTEXT ENRICHMENT:\nDomain Knowledge: ${domainKnowledge}`; 
     }

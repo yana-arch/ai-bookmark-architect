@@ -78,6 +78,20 @@ export const useBookmarkProcessing = ({
         setIsProcessing(false);
     }, [addDetailedLog]);
 
+
+    // Helper to simplify folder structure for AI context (removes IDs and Bookmarks)
+    const simplifyFolderStructure = (folders: (Folder | Bookmark)[]): any[] => {
+        return folders
+            .filter(item => !('url' in item)) // Filter out bookmarks at this level
+            .map(item => {
+                const folder = item as Folder;
+                return {
+                    name: folder.name,
+                    children: simplifyFolderStructure(folder.children)
+                };
+            });
+    };
+
     const startProcessing = useCallback(async (
         initialProcessed: CategorizedBookmark[], 
         currentFolders: (Folder | Bookmark)[],
@@ -112,6 +126,9 @@ export const useBookmarkProcessing = ({
             const userInstructionBlock = customInstructions.trim()
                 ? `\n\nUSER'S CUSTOM INSTRUCTIONS (Follow these strictly):\n- ${customInstructions.trim().replace(/\n/g, '\n- ')}`
                 : '';
+
+            // Prepare the simplified tree once
+            const currentTree = simplifyFolderStructure(currentFolders);
 
             const finalizeProcessing = (allNewResults: CategorizedBookmark[]) => {
                 setIsProcessing(false);
@@ -161,11 +178,15 @@ export const useBookmarkProcessing = ({
 
                 worker.postMessage({
                     type: 'process_batch',
-                    batch,
-                    batchIndex,
-                    systemPrompt: systemPrompt + userInstructionBlock,
-                    apiConfigs: availableKeys,
-                    maxRetries
+                    data: {
+                        batch,
+                        batchIndex,
+                        systemPrompt, // Pass raw system prompt
+                        userInstructionBlock, // Pass user instructions separately
+                        apiConfigs: availableKeys,
+                        maxRetries,
+                        currentTree // Pass the current folder structure
+                    }
                 });
             };
 
@@ -182,12 +203,12 @@ export const useBookmarkProcessing = ({
                     if (type === 'log') {
                         setLogs(prev => [...prev, `[Worker ${batchIndex}] ${data}`]);
                         addDetailedLog('info', `Worker ${batchIndex}`, data);
+                    } else if (type === 'detailed_log') {
+                        // Forward detailed logs from worker
+                        addDetailedLog(data.type, data.title, data.content, data.usage);
                     } else if (type === 'batch_result') {
-                        if (stopProcessingRef.current) {
-                            activeWorkersRef.current.delete(batchIndex);
-                            return;
-                        }
-
+                        // Graceful stop: Process the result, but don't start new batches
+                        
                         activeWorkersRef.current.delete(batchIndex);
                         completedBatches++;
                         batchResults[batchIndex] = data.categorizedBatch;
@@ -215,22 +236,26 @@ export const useBookmarkProcessing = ({
                         );
                         onFoldersUpdate(newFolders);
 
-                        if (completedBatches + failedBatches >= totalBatches) {
+                        // Check completion OR Graceful Stop completion
+                        const isFinished = completedBatches + failedBatches >= totalBatches;
+                        const isGracefulStopFinished = stopProcessingRef.current && activeWorkersRef.current.size === 0;
+
+                        if (isFinished || isGracefulStopFinished) {
                             finalizeProcessing(allResults);
                         } else {
-                            // Reuse this worker for next batch
+                            // Reuse this worker for next batch (startNextBatch handles stopProcessingRef check)
                             startNextBatch(worker);
                         }
                     } else if (type === 'batch_error') {
-                         if (stopProcessingRef.current) {
-                            activeWorkersRef.current.delete(batchIndex);
-                            return;
-                        }
                         activeWorkersRef.current.delete(batchIndex);
                         failedBatches++;
                         setLogs(prev => [...prev, `[Worker] Batch ${batchIndex} thất bại: ${error}`]);
                         addDetailedLog('error', `Batch ${batchIndex} Failed`, error);
-                         if (completedBatches + failedBatches >= totalBatches) {
+                        
+                        const isFinished = completedBatches + failedBatches >= totalBatches;
+                        const isGracefulStopFinished = stopProcessingRef.current && activeWorkersRef.current.size === 0;
+
+                         if (isFinished || isGracefulStopFinished) {
                             finalizeProcessing(Object.values(batchResults).flat());
                         } else {
                             startNextBatch(worker);
