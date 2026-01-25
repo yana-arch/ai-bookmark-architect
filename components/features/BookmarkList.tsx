@@ -9,20 +9,45 @@ interface BookmarkListProps {
 }
 
 const BookmarkItem: React.FC<{ bookmark: Bookmark }> = ({ bookmark }) => {
-    const faviconUrl = `https://www.google.com/s2/favicons?sz=32&domain_url=${bookmark.url}`;
+    // Validates URL to prevent "about:blank" or malformed URLs from hitting Google's API
+    const getSafeFaviconUrl = (url: string) => {
+        try {
+            if (!url || url === 'about:blank' || !url.startsWith('http')) return null;
+            const domain = new URL(url).hostname;
+            return `https://www.google.com/s2/favicons?sz=32&domain_url=${domain}`;
+        } catch (e) {
+            return null;
+        }
+    };
+
+    const [imgSrc, setImgSrc] = useState<string | null>(getSafeFaviconUrl(bookmark.url));
+    const [hasError, setHasError] = useState(false);
+
+    // Fallback transparent pixel to stop loading endless 404s
+    const FALLBACK_IMAGE = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
     return (
         <div className="p-3 hover:bg-gray-700/40 rounded-lg transition-colors duration-150">
             <div className="flex items-center">
-                <img 
-                    src={faviconUrl} 
-                    alt="" 
-                    className="w-5 h-5 mr-4 flex-shrink-0" 
-                    loading="lazy"
-                    onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://www.google.com/s2/favicons?sz=32&domain_url=about:blank';
-                    }}
-                />
+                {!hasError && imgSrc ? (
+                    <img 
+                        src={imgSrc} 
+                        alt="" 
+                        className="w-5 h-5 mr-4 flex-shrink-0 rounded-sm" 
+                        loading="lazy"
+                        onError={() => {
+                            setHasError(true);
+                            setImgSrc(FALLBACK_IMAGE);
+                        }}
+                    />
+                ) : (
+                    // Render a generic icon when favicon fails or is invalid
+                    <div className="w-5 h-5 mr-4 flex-shrink-0 flex items-center justify-center bg-gray-700 rounded-sm text-gray-400">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                )}
                 <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-200 truncate">{bookmark.title}</p>
                     <p className="text-xs text-gray-500 truncate">{bookmark.url}</p>

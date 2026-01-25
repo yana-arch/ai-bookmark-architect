@@ -3,6 +3,7 @@ import { Bookmark, Folder, ApiConfig, AppState } from '../types';
 import { normalizeURL } from '../src/utils';
 import { DEFAULT_PLANNING_PROMPT } from '../src/constants';
 import * as db from '../db';
+import { GoogleGenAI } from "@google/genai";
 
 export const useAIPlanning = (
     bookmarks: Bookmark[],
@@ -42,39 +43,73 @@ export const useAIPlanning = (
             }
 
             const userPrompt = `Dựa trên danh sách ${source === 'tags' ? 'tag' : 'link'} sau đây, hãy tạo một cấu trúc thư mục logic:\n\n${inputData}`;
-
             const currentKey = availableKeys[0]; // Use first active key
-            
-            const result = await fetch(currentKey.provider === 'openrouter' ? 'https://openrouter.ai/api/v1/chat/completions' : currentKey.apiUrl || '', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${currentKey.apiKey}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    model: currentKey.model,
-                    messages: [
-                        { role: 'system', content: planningPrompt },
-                        { role: 'user', content: userPrompt }
-                    ],
-                    response_format: { type: "json_object" }
-                })
-            });
+            let content = '';
 
-            if (!result.ok) throw new Error("API call failed");
-            const data = await result.json();
-            const content = data.choices[0].message.content;
+            if (currentKey.provider === 'gemini') {
+                const ai = new GoogleGenAI({ apiKey: currentKey.apiKey });
+                const model = currentKey.model || 'gemini-2.5-flash';
+                
+                const result = await ai.models.generateContent({
+                    model: model,
+                    contents: [
+                        { role: 'user', parts: [{ text: userPrompt }] }
+                    ],
+                    config: {
+                        systemInstruction: planningPrompt,
+                        responseMimeType: "application/json",
+                    }
+                });
+                
+                const response = result;
+                content = typeof (response as any).text === 'function' 
+                    ? (response as any).text() 
+                    : (response as any).text || JSON.stringify((response as any));
+
+            } else {
+                // OpenRouter or Custom
+                const endpoint = currentKey.provider === 'custom' && currentKey.apiUrl 
+                    ? currentKey.apiUrl 
+                    : 'https://openrouter.ai/api/v1/chat/completions';
+
+                const result = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${currentKey.apiKey}`,
+                        'Content-Type': 'application/json',
+                        'HTTP-Referer': window.location.href,
+                        'X-Title': 'AI Bookmark Architect'
+                    },
+                    body: JSON.stringify({
+                        model: currentKey.model,
+                        messages: [
+                            { role: 'system', content: planningPrompt },
+                            { role: 'user', content: userPrompt }
+                        ],
+                        response_format: { type: "json_object" }
+                    })
+                });
+
+                if (!result.ok) {
+                    const errText = await result.text();
+                    throw new Error(`API call failed: ${result.status} - ${errText}`);
+                }
+                const data = await result.json();
+                content = data.choices[0].message.content;
+            }
             
             // Parse response - assuming the AI returns { "folders": [...] } or similar
             let parsed;
             try {
-                const rawParsed = JSON.parse(content);
+                // Clean markdown code blocks if present
+                const cleanedContent = content.replace(/```json\s*|\s*```/g, '').trim();
+                const rawParsed = JSON.parse(cleanedContent);
                 parsed = rawParsed.folders || rawParsed;
             } catch (e) {
                 // Fallback to regex if JSON is slightly malformed
                 const match = content.match(/\[\s*{[\s\S]*}\s*\]/);
                 if (match) parsed = JSON.parse(match[0]);
-                else throw new Error("Could not parse AI response");
+                else throw new Error("Could not parse AI response: " + content.substring(0, 100));
             }
 
             // Flatten logic: If AI returned a single root folder that wraps everything, promote its children
@@ -89,12 +124,14 @@ export const useAIPlanning = (
             setProposedStructure(parsed);
             setLogs(prev => [...prev, "Đã tạo cấu trúc gợi ý thành công."]);
         } catch (error: any) {
+            console.error("Planning Error:", error);
             setLogs(prev => [...prev, `Lỗi: ${error.message}`]);
             setErrorDetails(`Không thể tạo gợi ý cấu trúc: ${error.message}`);
         } finally {
             setIsPlanning(false);
         }
     };
+
 
     const getStructureGuide = useCallback((nodes: any[], path: string[] = []): string[] => {
         let list: string[] = [];
