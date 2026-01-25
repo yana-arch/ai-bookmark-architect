@@ -51,13 +51,13 @@ export const useBookmarkProcessing = ({
         };
         setDetailedLogs(prev => [...prev, newLog]);
         try {
-             await saveLog(newLog);
+            await saveLog(newLog);
         } catch (e) {
-            console.error("Failed to save log", e);
+            console.error('Failed to save log', e);
         }
         
         if (type === 'error' || (type === 'info' && title.includes('Hoàn tất'))) {
-             onNotificationsAdd({ id: newLog.id, message: `${newLog.title}: ${typeof newLog.content === 'string' ? newLog.content.substring(0, 100) : ''}...`, type: newLog.type === 'error' ? 'error' : 'success' });
+            onNotificationsAdd({ id: newLog.id, message: `${newLog.title}: ${typeof newLog.content === 'string' ? newLog.content.substring(0, 100) : ''}...`, type: newLog.type === 'error' ? 'error' : 'success' });
         }
     }, [onNotificationsAdd]);
 
@@ -99,8 +99,8 @@ export const useBookmarkProcessing = ({
     ) => {
         const availableKeys = apiConfigs.filter(c => c.status === 'active');
         if (availableKeys.length === 0) {
-            setErrorDetails("Không có API key nào đang hoạt động. Vui lòng thêm hoặc kích hoạt một key hợp lệ.");
-            addDetailedLog('error', "Không tìm thấy API key", "Không có API key nào được cấu hình hoặc đang hoạt động.");
+            setErrorDetails('Không có API key nào đang hoạt động. Vui lòng thêm hoặc kích hoạt một key hợp lệ.');
+            addDetailedLog('error', 'Không tìm thấy API key', 'Không có API key nào được cấu hình hoặc đang hoạt động.');
             return false;
         }
 
@@ -143,11 +143,11 @@ export const useBookmarkProcessing = ({
                 workersRef.current = [];
                 
                 if (failedBatches > 0) {
-                     addDetailedLog('warning', 'Hoàn tất với lỗi', `Đã xử lý xong nhưng có ${failedBatches} batch bị lỗi.`);
-                     setErrorDetails(`Hoàn tất với ${failedBatches} batch lỗi. Hãy kiểm tra log chi tiết.`);
+                    addDetailedLog('warning', 'Hoàn tất với lỗi', `Đã xử lý xong nhưng có ${failedBatches} batch bị lỗi.`);
+                    setErrorDetails(`Hoàn tất với ${failedBatches} batch lỗi. Hãy kiểm tra log chi tiết.`);
                 } else {
-                     addDetailedLog('success', 'Hoàn tất xử lý', `Đã phân loại thành công toàn bộ ${sourceBookmarks.length} bookmarks.`);
-                     setLogs(prev => [...prev, '--- HOÀN TẤT QUÁ TRÌNH ---']);
+                    addDetailedLog('success', 'Hoàn tất xử lý', `Đã phân loại thành công toàn bộ ${sourceBookmarks.length} bookmarks.`);
+                    setLogs(prev => [...prev, '--- HOÀN TẤT QUÁ TRÌNH ---']);
                 }
             };
 
@@ -255,7 +255,7 @@ export const useBookmarkProcessing = ({
                         const isFinished = completedBatches + failedBatches >= totalBatches;
                         const isGracefulStopFinished = stopProcessingRef.current && activeWorkersRef.current.size === 0;
 
-                         if (isFinished || isGracefulStopFinished) {
+                        if (isFinished || isGracefulStopFinished) {
                             finalizeProcessing(Object.values(batchResults).flat());
                         } else {
                             startNextBatch(worker);

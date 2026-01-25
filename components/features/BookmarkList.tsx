@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import type { Bookmark } from '@/types';
 import { OpenBookIcon } from '../ui/Icons';
 
@@ -15,7 +15,7 @@ const BookmarkItem: React.FC<{ bookmark: Bookmark }> = ({ bookmark }) => {
             if (!url || url === 'about:blank' || !url.startsWith('http')) return null;
             const domain = new URL(url).hostname;
             return `https://www.google.com/s2/favicons?sz=32&domain_url=${domain}`;
-        } catch (e) {
+        } catch (_e) {
             return null;
         }
     };
@@ -145,7 +145,6 @@ const VirtualizedBookmarkList: React.FC<{
 
 const BookmarkList: React.FC<BookmarkListProps> = ({ bookmarks, folderName, noBookmarksMessage }) => {
     const ITEM_HEIGHT = 100; // Increased height to accommodate tags
-    const HEADER_HEIGHT = 80; // Height of the header
     const CONTAINER_HEIGHT = 600; // Fixed height for virtual scrolling
 
     // Use virtual scrolling for large lists (>50 items) to improve performance

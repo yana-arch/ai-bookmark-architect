@@ -102,7 +102,7 @@ class SessionStorageCache<T> {
         try {
             sessionStorage.setItem(this.getKey(key), JSON.stringify(entry));
         } catch (e) {
-            console.error("Error writing to sessionStorage:", e);
+            console.error('Error writing to sessionStorage:', e);
         }
     }
 
@@ -118,7 +118,7 @@ class SessionStorageCache<T> {
             }
             return entry.data;
         } catch (e) {
-            console.error("Error reading from sessionStorage:", e);
+            console.error('Error reading from sessionStorage:', e);
             return null;
         }
     }
@@ -168,7 +168,7 @@ class IndexedDBCache<T> {
             };
 
             request.onerror = (event) => {
-                console.error("IndexedDB error:", (event.target as IDBOpenDBRequest).error);
+                console.error('IndexedDB error:', (event.target as IDBOpenDBRequest).error);
                 reject((event.target as IDBOpenDBRequest).error);
             };
         });
@@ -379,12 +379,12 @@ const searchIndexedDBCache = new IndexedDBCache<any>('Search', 'results');
 
 export const apiResponseCache = new CachedOperation(
     [memoryApiResponseCache, apiResponseSessionCache, apiResponseIndexedDBCache],
-    async () => { throw new Error("Operation not provided for apiResponseCache"); },
+    async () => { throw new Error('Operation not provided for apiResponseCache'); },
     5 * 60 * 1000 // Default TTL 5 minutes
 );
 export const folderCache = new CachedOperation(
     [memoryFolderCache, folderSessionCache, folderIndexedDBCache],
-    async () => { throw new Error("Operation not provided for folderCache"); },
+    async () => { throw new Error('Operation not provided for folderCache'); },
     20 * 60 * 1000 // Default TTL 20 minutes
 );
 export const searchCache = new CachedOperation(

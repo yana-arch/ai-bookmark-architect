@@ -1,7 +1,7 @@
 // AI Worker for multi-threaded bookmark processing
 // This worker handles AI API calls for a single batch of bookmarks
-import { GoogleGenAI } from "@google/genai";
-import type { Bookmark, ApiConfig, UserCorrection, Folder } from "../types";
+import { GoogleGenAI } from '@google/genai';
+import type { Bookmark, ApiConfig, UserCorrection, Folder } from '../types';
 
 // Type definitions for the worker
 interface WorkerMessage {
@@ -30,166 +30,166 @@ interface WorkerResponse {
 
 // Helper function to parse and validate AI response content (Optimized)
 function parseAIResponse(content: string): Bookmark[] {
-  let cleanedContent = content.trim();
+    let cleanedContent = content.trim();
 
-  // 1. Quick check for empty content
-  if (!cleanedContent) return [];
+    // 1. Quick check for empty content
+    if (!cleanedContent) return [];
 
-  // 2. Remove markdown code blocks if present
-  if (cleanedContent.includes('```')) {
-    cleanedContent = cleanedContent.replace(/```(?:json)?\s*([\s\S]*?)\s*```/g, '$1').trim();
-  }
-
-  // 3. Try direct parsing first (fastest)
-  try {
-    const parsed = JSON.parse(cleanedContent);
-    const bookmarks = Array.isArray(parsed) ? parsed : (parsed.bookmarks || []);
-    if (Array.isArray(bookmarks)) return validateBookmarks(bookmarks);
-  } catch (e) {
-    // If direct parse fails, proceed to more aggressive extraction
-  }
-
-  // 4. Extract JSON object using boundaries
-  const jsonStart = cleanedContent.indexOf('{');
-  const jsonEnd = cleanedContent.lastIndexOf('}');
-  if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
-    const jsonCandidate = cleanedContent.substring(jsonStart, jsonEnd + 1);
-    try {
-      const parsed = JSON.parse(repairJson(jsonCandidate));
-      const bookmarks = Array.isArray(parsed) ? parsed : (parsed.bookmarks || []);
-      if (Array.isArray(bookmarks)) return validateBookmarks(bookmarks);
-    } catch (e) {
-      // Failed to parse extracted object
+    // 2. Remove markdown code blocks if present
+    if (cleanedContent.includes('```')) {
+        cleanedContent = cleanedContent.replace(/```(?:json)?\s*([\s\S]*?)\s*```/g, '$1').trim();
     }
-  }
 
-  // 5. Last resort: regex-based individual bookmark extraction
-  return extractBookmarksByRegex(cleanedContent);
+    // 3. Try direct parsing first (fastest)
+    try {
+        const parsed = JSON.parse(cleanedContent);
+        const bookmarks = Array.isArray(parsed) ? parsed : (parsed.bookmarks || []);
+        if (Array.isArray(bookmarks)) return validateBookmarks(bookmarks);
+    } catch (e) {
+    // If direct parse fails, proceed to more aggressive extraction
+    }
+
+    // 4. Extract JSON object using boundaries
+    const jsonStart = cleanedContent.indexOf('{');
+    const jsonEnd = cleanedContent.lastIndexOf('}');
+    if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+        const jsonCandidate = cleanedContent.substring(jsonStart, jsonEnd + 1);
+        try {
+            const parsed = JSON.parse(repairJson(jsonCandidate));
+            const bookmarks = Array.isArray(parsed) ? parsed : (parsed.bookmarks || []);
+            if (Array.isArray(bookmarks)) return validateBookmarks(bookmarks);
+        } catch (e) {
+            // Failed to parse extracted object
+        }
+    }
+
+    // 5. Last resort: regex-based individual bookmark extraction
+    return extractBookmarksByRegex(cleanedContent);
 }
 
 // Sub-helper: Validate bookmark objects
 function validateBookmarks(bookmarks: any[]): Bookmark[] {
-  return bookmarks.filter(bm => 
-    bm && 
+    return bookmarks.filter(bm => 
+        bm && 
     typeof bm.title === 'string' && 
     typeof bm.url === 'string' && 
     (Array.isArray(bm.path) || bm.path === undefined) && 
     (Array.isArray(bm.tags) || bm.tags === undefined)
-  ).map(bm => ({
-      // Map to ensure it strictly follows Bookmark interface
-      id: bm.id || crypto.randomUUID(), // Ensure ID exists if AI didn't return it (though usually we preserve IDs)
-      title: bm.title,
-      url: bm.url,
-      parentId: bm.parentId || null,
-      path: bm.path || [],
-      tags: bm.tags || []
-  }));
+    ).map(bm => ({
+        // Map to ensure it strictly follows Bookmark interface
+        id: bm.id || crypto.randomUUID(), // Ensure ID exists if AI didn't return it (though usually we preserve IDs)
+        title: bm.title,
+        url: bm.url,
+        parentId: bm.parentId || null,
+        path: bm.path || [],
+        tags: bm.tags || []
+    }));
 }
 
 // Sub-helper: Basic JSON repair
 function repairJson(json: string): string {
-  return json
-    .replace(/,(\s*[}\]])/g, '$1') // Remove trailing commas
-    .replace(/}(\s*){/g, '},{')    // Fix missing commas between objects
-    .replace(/\](\s*)\[/g, '],[')  // Fix missing commas between arrays
-    .trim();
+    return json
+        .replace(/,(\s*[}\]])/g, '$1') // Remove trailing commas
+        .replace(/}(\s*){/g, '},{')    // Fix missing commas between objects
+        .replace(/\](\s*)\[/g, '],[')  // Fix missing commas between arrays
+        .trim();
 }
 
 // Sub-helper: Regex-based extraction
 function extractBookmarksByRegex(content: string): Bookmark[] {
-  const bookmarks: Bookmark[] = [];
-  // Look for patterns that look like bookmark objects
-  // This is more flexible than the previous rigid regex
-  const regex = /{[^{}]*"title"\s*:\s*"[^"]*"[^{}]*"url"\s*:\s*"[^"]*"[^{}]*}/g;
+    const bookmarks: Bookmark[] = [];
+    // Look for patterns that look like bookmark objects
+    // This is more flexible than the previous rigid regex
+    const regex = /{[^{}]*"title"\s*:\s*"[^"]*"[^{}]*"url"\s*:\s*"[^"]*"[^{}]*}/g;
   
-  let match;
-  while ((match = regex.exec(content)) !== null) {
-    try {
-      // Try to parse the match, maybe with a little repair
-      const bm = JSON.parse(repairJson(match[0]));
-      if (bm.title && bm.url) {
-        bookmarks.push({
-          id: bm.id || crypto.randomUUID(),
-          title: bm.title,
-          url: bm.url,
-          parentId: bm.parentId || null,
-          path: bm.path || [],
-          tags: bm.tags || []
-        });
-      }
-    } catch (e) {
-      // Skip malformed matches
+    let match;
+    while ((match = regex.exec(content)) !== null) {
+        try {
+            // Try to parse the match, maybe with a little repair
+            const bm = JSON.parse(repairJson(match[0]));
+            if (bm.title && bm.url) {
+                bookmarks.push({
+                    id: bm.id || crypto.randomUUID(),
+                    title: bm.title,
+                    url: bm.url,
+                    parentId: bm.parentId || null,
+                    path: bm.path || [],
+                    tags: bm.tags || []
+                });
+            }
+        } catch (e) {
+            // Skip malformed matches
+        }
     }
-  }
-  return bookmarks;
+    return bookmarks;
 }
 
 // Main worker logic
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
-  const { type, data } = e.data;
+    const { type, data } = e.data;
 
-  if (type === 'cancel') {
+    if (type === 'cancel') {
     // In a web worker, we can't really "cancel" a promise easily without AbortController
     // but we can ignore the result.
     // The main thread will terminate the worker if needed.
-    return;
-  }
-
-  if (type === 'process_batch' && data) {
-    const { 
-        batch, 
-        apiConfigs, 
-        systemPrompt, 
-        userInstructionBlock, 
-        currentTree, 
-        batchIndex, 
-        maxRetries,
-        userHistory,
-        domainKnowledge
-    } = data;
-
-    // Use the first active Gemini config
-    const geminiConfig = apiConfigs.find(c => c.provider === 'gemini' && c.status === 'active');
-
-    if (!geminiConfig) {
-      self.postMessage({
-        type: 'batch_error',
-        error: 'No active Gemini API key found.',
-        batchIndex
-      } as WorkerResponse);
-      return;
+        return;
     }
 
-    let attempts = 0;
-    let success = false;
+    if (type === 'process_batch' && data) {
+        const { 
+            batch, 
+            apiConfigs, 
+            systemPrompt, 
+            userInstructionBlock, 
+            currentTree, 
+            batchIndex, 
+            maxRetries,
+            userHistory,
+            domainKnowledge
+        } = data;
 
-    while (attempts <= maxRetries && !success) {
-      try {
-        attempts++;
-        
-        // Log attempt
-        self.postMessage({
-            type: 'log',
-            log: { message: `Batch ${batchIndex}: Attempt ${attempts}/${maxRetries + 1}` }
-        } as WorkerResponse);
+        // Use the first active Gemini config
+        const geminiConfig = apiConfigs.find(c => c.provider === 'gemini' && c.status === 'active');
 
-        // Prepare Prompt
-        const bookmarksList = batch.map(b => `- ${b.title} (${b.url})`).join('\n');
-        
-        // Convert current tree to string representation for context
-        const treeContext = JSON.stringify(currentTree.map(n => ({ name: n.name, id: n.id }))); // Simplified tree
-
-        // Add user history context if available
-        let historyContext = "";
-        if (userHistory && userHistory.length > 0) {
-            // Take last 5 relevant corrections
-             const recentCorrections = userHistory.slice(-5).map(c => 
-                `Correction: "${c.originalBookmarkUrl}" was moved to path [${c.correctedPath.join(' > ')}]`
-             ).join('\n');
-             historyContext = `\nRecent User Corrections (Learn from these):\n${recentCorrections}`;
+        if (!geminiConfig) {
+            self.postMessage({
+                type: 'batch_error',
+                error: 'No active Gemini API key found.',
+                batchIndex
+            } as WorkerResponse);
+            return;
         }
 
-        const fullPrompt = `${systemPrompt}
+        let attempts = 0;
+        let success = false;
+
+        while (attempts <= maxRetries && !success) {
+            try {
+                attempts++;
+        
+                // Log attempt
+                self.postMessage({
+                    type: 'log',
+                    log: { message: `Batch ${batchIndex}: Attempt ${attempts}/${maxRetries + 1}` }
+                } as WorkerResponse);
+
+                // Prepare Prompt
+                const bookmarksList = batch.map(b => `- ${b.title} (${b.url})`).join('\n');
+        
+                // Convert current tree to string representation for context
+                const treeContext = JSON.stringify(currentTree.map(n => ({ name: n.name, id: n.id }))); // Simplified tree
+
+                // Add user history context if available
+                let historyContext = '';
+                if (userHistory && userHistory.length > 0) {
+                    // Take last 5 relevant corrections
+                    const recentCorrections = userHistory.slice(-5).map(c => 
+                        `Correction: "${c.originalBookmarkUrl}" was moved to path [${c.correctedPath.join(' > ')}]`
+                    ).join('\n');
+                    historyContext = `\nRecent User Corrections (Learn from these):\n${recentCorrections}`;
+                }
+
+                const fullPrompt = `${systemPrompt}
 
 ${userInstructionBlock}
 
@@ -205,73 +205,73 @@ ${bookmarksList}
 
 Respond ONLY with the JSON object as described.`;
 
-        // Initialize Gemini (Updated for @google/genai SDK)
-        const genAI = new GoogleGenAI({ apiKey: geminiConfig.apiKey });
+                // Initialize Gemini (Updated for @google/genai SDK)
+                const genAI = new GoogleGenAI({ apiKey: geminiConfig.apiKey });
         
-        // Call API
-        const result = await genAI.models.generateContent({
-            model: geminiConfig.model || "gemini-1.5-flash",
-            contents: [
-                {
-                    parts: [
+                // Call API
+                const result = await genAI.models.generateContent({
+                    model: geminiConfig.model || 'gemini-1.5-flash',
+                    contents: [
                         {
-                            text: fullPrompt
+                            parts: [
+                                {
+                                    text: fullPrompt
+                                }
+                            ]
                         }
-                    ]
+                    ],
+                    config: {
+                        responseMimeType: 'application/json'
+                    }
+                });
+
+                const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (!responseText) {
+                    throw new Error('AI returned empty response');
                 }
-            ],
-            config: {
-                responseMimeType: "application/json"
-            }
-        });
 
-        const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                // Parse Result
+                const categorizedBookmarks = parseAIResponse(responseText);
 
-        if (!responseText) {
-             throw new Error("AI returned empty response");
-        }
+                if (categorizedBookmarks.length === 0) {
+                    throw new Error('AI returned empty or invalid bookmark list');
+                }
 
-        // Parse Result
-        const categorizedBookmarks = parseAIResponse(responseText);
+                // Merge back strict IDs from original batch to ensure data integrity
+                // The AI might mess up IDs or not return them, so we map back by URL or Index
+                // Strategy: Assume order is preserved or try to match by URL
+                // Simple strategy: Map by URL
+                const finalBookmarks = categorizedBookmarks.map(cbm => {
+                    const original = batch.find(b => b.url === cbm.url);
+                    return {
+                        ...cbm,
+                        id: original ? original.id : cbm.id, // Restore original ID
+                        parentId: null // Reset parentId as it will be determined by path later
+                    };
+                });
 
-        if (categorizedBookmarks.length === 0) {
-            throw new Error("AI returned empty or invalid bookmark list");
-        }
+                success = true;
+                self.postMessage({
+                    type: 'batch_result',
+                    data: finalBookmarks,
+                    batchIndex
+                } as WorkerResponse);
 
-        // Merge back strict IDs from original batch to ensure data integrity
-        // The AI might mess up IDs or not return them, so we map back by URL or Index
-        // Strategy: Assume order is preserved or try to match by URL
-        // Simple strategy: Map by URL
-        const finalBookmarks = categorizedBookmarks.map(cbm => {
-            const original = batch.find(b => b.url === cbm.url);
-            return {
-                ...cbm,
-                id: original ? original.id : cbm.id, // Restore original ID
-                parentId: null // Reset parentId as it will be determined by path later
-            };
-        });
-
-        success = true;
-        self.postMessage({
-          type: 'batch_result',
-          data: finalBookmarks,
-          batchIndex
-        } as WorkerResponse);
-
-      } catch (error: any) {
-        console.error(`Batch ${batchIndex} attempt ${attempts} failed:`, error);
+            } catch (error: any) {
+                console.error(`Batch ${batchIndex} attempt ${attempts} failed:`, error);
         
-        if (attempts > maxRetries) {
-          self.postMessage({
-            type: 'batch_error',
-            error: error.message || 'Unknown error during AI processing',
-            batchIndex
-          } as WorkerResponse);
-        } else {
-            // Wait a bit before retry (exponential backoff)
-            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempts)));
+                if (attempts > maxRetries) {
+                    self.postMessage({
+                        type: 'batch_error',
+                        error: error.message || 'Unknown error during AI processing',
+                        batchIndex
+                    } as WorkerResponse);
+                } else {
+                    // Wait a bit before retry (exponential backoff)
+                    await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempts)));
+                }
+            }
         }
-      }
     }
-  }
 };

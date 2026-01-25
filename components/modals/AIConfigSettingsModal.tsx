@@ -303,8 +303,8 @@ const AIConfigSettingsModal: React.FC<AIConfigSettingsModalProps> = (props) => {
                                 />
                             </div>
 
-                             {/* Smart Classify Rules Logic */}
-                             <div className="bg-gray-900/30 p-4 rounded-lg border border-gray-700/50">
+                            {/* Smart Classify Rules Logic */}
+                            <div className="bg-gray-900/30 p-4 rounded-lg border border-gray-700/50">
                                 <h3 className="text-sm font-bold text-white mb-4 uppercase tracking-wider">Smart Classify Rules (Không dùng AI)</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                     <div className="space-y-2">
@@ -324,7 +324,7 @@ const AIConfigSettingsModal: React.FC<AIConfigSettingsModalProps> = (props) => {
                                             type="text"
                                             value={newRule.pattern}
                                             onChange={(e) => setNewRule({...newRule, pattern: e.target.value})}
-                                            placeholder={newRule.type === 'tag' ? "Ví dụ: Github" : "Ví dụ: youtube.com"}
+                                            placeholder={newRule.type === 'tag' ? 'Ví dụ: Github' : 'Ví dụ: youtube.com'}
                                             className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-300"
                                         />
                                     </div>
@@ -376,7 +376,7 @@ const AIConfigSettingsModal: React.FC<AIConfigSettingsModalProps> = (props) => {
 
                     {activeTab === 'config' && (
                         <div className="space-y-6 animate-fadeIn">
-                             <div className="grid grid-cols-2 gap-6">
+                            <div className="grid grid-cols-2 gap-6">
                                 <div>
                                     <label htmlFor="modal-batch-size" className="block text-xs text-gray-400 mb-1 uppercase font-bold tracking-wider">
                                         Số lượng bookmark / batch

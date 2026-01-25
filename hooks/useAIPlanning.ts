@@ -3,7 +3,7 @@ import { Bookmark, Folder, ApiConfig, AppState } from '../types';
 import { normalizeURL } from '../src/utils';
 import { DEFAULT_PLANNING_PROMPT } from '../src/constants';
 import * as db from '../db';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from '@google/genai';
 
 export const useAIPlanning = (
     bookmarks: Bookmark[],
@@ -29,7 +29,7 @@ export const useAIPlanning = (
 
         try {
             const availableKeys = apiConfigs.filter(c => c.status === 'active');
-            if (availableKeys.length === 0) throw new Error("Chưa có API key hoạt động.");
+            if (availableKeys.length === 0) throw new Error('Chưa có API key hoạt động.');
 
             let inputData = '';
             if (source === 'tags') {
@@ -57,7 +57,7 @@ export const useAIPlanning = (
                     ],
                     config: {
                         systemInstruction: planningPrompt,
-                        responseMimeType: "application/json",
+                        responseMimeType: 'application/json',
                     }
                 });
                 
@@ -86,7 +86,7 @@ export const useAIPlanning = (
                             { role: 'system', content: planningPrompt },
                             { role: 'user', content: userPrompt }
                         ],
-                        response_format: { type: "json_object" }
+                        response_format: { type: 'json_object' }
                     })
                 });
 
@@ -109,7 +109,7 @@ export const useAIPlanning = (
                 // Fallback to regex if JSON is slightly malformed
                 const match = content.match(/\[\s*{[\s\S]*}\s*\]/);
                 if (match) parsed = JSON.parse(match[0]);
-                else throw new Error("Could not parse AI response: " + content.substring(0, 100));
+                else throw new Error('Could not parse AI response: ' + content.substring(0, 100));
             }
 
             // Flatten logic: If AI returned a single root folder that wraps everything, promote its children
@@ -122,9 +122,9 @@ export const useAIPlanning = (
             }
 
             setProposedStructure(parsed);
-            setLogs(prev => [...prev, "Đã tạo cấu trúc gợi ý thành công."]);
+            setLogs(prev => [...prev, 'Đã tạo cấu trúc gợi ý thành công.']);
         } catch (error: any) {
-            console.error("Planning Error:", error);
+            console.error('Planning Error:', error);
             setLogs(prev => [...prev, `Lỗi: ${error.message}`]);
             setErrorDetails(`Không thể tạo gợi ý cấu trúc: ${error.message}`);
         } finally {

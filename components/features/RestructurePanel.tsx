@@ -68,7 +68,7 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
         switch(appState) {
             case AppState.LOADED:
             case AppState.STRUCTURED:
-                 return (
+                return (
                     <>
                         <h3 className="text-xl font-bold text-white mb-2">Tái cấu trúc bằng AI</h3>
                         <p className="text-sm text-gray-400 mb-6">Sắp xếp lại các bookmarks của bạn vào một cấu trúc thư mục thông minh.</p>
@@ -118,7 +118,7 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                         </div>
                     </>
                 );
-            case AppState.PLANNING:
+            case AppState.PLANNING: {
                 const handleAddSessionRule = (folderName: string, path: string[]) => {
                     const pattern = prompt(`Gán quy tắc cho thư mục "${folderName}":\nNhập Tag hoặc nội dung Link (ví dụ: Github, youtube.com)`);
                     if (pattern) {
@@ -208,13 +208,14 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                         </div>
                     </>
                 );
+            }
             case AppState.PROCESSING:
                 return (
                     <>
                         <h3 className="text-xl font-bold text-white mb-2">
                            Đang Xử Lý...
                         </h3>
-                         <p className="text-sm text-gray-400 mb-6">
+                        <p className="text-sm text-gray-400 mb-6">
                             Đã xử lý {formatNumber(progress.current)} / {formatNumber(progress.total)} bookmarks.
                         </p>
                         <div className="w-full bg-gray-700 rounded-full h-2.5 mb-6">
@@ -223,34 +224,34 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                         <div className="bg-gray-900/50 rounded-lg p-3 flex-1 overflow-y-auto">
                             <h4 className="text-sm font-semibold text-gray-300 mb-3">Nhật ký tái cấu trúc</h4>
                             <div className="space-y-2">
-                               {logs.slice(-10).map((log, index) => {
-                                   const isError = log.toLowerCase().includes('lỗi') || log.toLowerCase().includes('error');
-                                   const isSuccess = log.toLowerCase().includes('hoàn tất') || log.toLowerCase().includes('success');
-                                   const isProcessing = log.toLowerCase().includes('đang xử lý') || log.toLowerCase().includes('processing');
-                                   const isInfo = !isError && !isSuccess && !isProcessing;
+                                {logs.slice(-10).map((log, index) => {
+                                    const isError = log.toLowerCase().includes('lỗi') || log.toLowerCase().includes('error');
+                                    const isSuccess = log.toLowerCase().includes('hoàn tất') || log.toLowerCase().includes('success');
+                                    const isProcessing = log.toLowerCase().includes('đang xử lý') || log.toLowerCase().includes('processing');
+                                    const isInfo = !isError && !isSuccess && !isProcessing;
 
-                                   let iconColor = 'text-gray-400';
-                                   let bgColor = 'bg-gray-800/50';
-                                   if (isError) {
-                                       iconColor = 'text-red-400';
-                                       bgColor = 'bg-red-900/20';
-                                   } else if (isSuccess) {
-                                       iconColor = 'text-emerald-400';
-                                       bgColor = 'bg-emerald-900/20';
-                                   } else if (isProcessing) {
-                                       iconColor = 'text-sky-400';
-                                       bgColor = 'bg-sky-900/20';
-                                   }
+                                    let iconColor = 'text-gray-400';
+                                    let bgColor = 'bg-gray-800/50';
+                                    if (isError) {
+                                        iconColor = 'text-red-400';
+                                        bgColor = 'bg-red-900/20';
+                                    } else if (isSuccess) {
+                                        iconColor = 'text-emerald-400';
+                                        bgColor = 'bg-emerald-900/20';
+                                    } else if (isProcessing) {
+                                        iconColor = 'text-sky-400';
+                                        bgColor = 'bg-sky-900/20';
+                                    }
 
-                                   return (
-                                       <div key={index} className={`flex items-start p-2 rounded-md ${bgColor} border-l-2 ${isError ? 'border-red-500' : isSuccess ? 'border-emerald-500' : isProcessing ? 'border-sky-500' : 'border-gray-600'}`}>
-                                           <span className={`text-xs mr-3 mt-0.5 ${iconColor}`}>
-                                               {isError ? '✗' : isSuccess ? '✓' : isProcessing ? '⟳' : 'ℹ'}
-                                           </span>
-                                           <span className="text-xs text-gray-300 flex-1">{log}</span>
-                                       </div>
-                                   );
-                               })}
+                                    return (
+                                        <div key={index} className={`flex items-start p-2 rounded-md ${bgColor} border-l-2 ${isError ? 'border-red-500' : isSuccess ? 'border-emerald-500' : isProcessing ? 'border-sky-500' : 'border-gray-600'}`}>
+                                            <span className={`text-xs mr-3 mt-0.5 ${iconColor}`}>
+                                                {isError ? '✗' : isSuccess ? '✓' : isProcessing ? '⟳' : 'ℹ'}
+                                            </span>
+                                            <span className="text-xs text-gray-300 flex-1">{log}</span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                         <div className="space-y-2 mt-4">
@@ -273,42 +274,42 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                     </>
                 );
             case AppState.REVIEW:
-                 return (
+                return (
                     <>
                         <h3 className="text-xl font-bold text-white mb-2">Xem lại Cấu trúc Mới</h3>
                         <p className="text-sm text-gray-400 mb-4">AI đã đề xuất một cấu trúc mới. Áp dụng các thay đổi hoặc hủy bỏ.</p>
                         <TokenUsageDisplay />
-                         <div className="bg-gray-900/50 rounded-lg p-3 flex-1 overflow-y-auto mb-6">
+                        <div className="bg-gray-900/50 rounded-lg p-3 flex-1 overflow-y-auto mb-6">
                             <h4 className="text-sm font-semibold text-gray-300 mb-3">Nhật ký tái cấu trúc</h4>
                             <div className="space-y-2">
-                               {logs.slice(-10).map((log, index) => {
-                                   const isError = log.toLowerCase().includes('lỗi') || log.toLowerCase().includes('error');
-                                   const isSuccess = log.toLowerCase().includes('hoàn tất') || log.toLowerCase().includes('success');
-                                   const isProcessing = log.toLowerCase().includes('đang xử lý') || log.toLowerCase().includes('processing');
-                                   const isInfo = !isError && !isSuccess && !isProcessing;
+                                {logs.slice(-10).map((log, index) => {
+                                    const isError = log.toLowerCase().includes('lỗi') || log.toLowerCase().includes('error');
+                                    const isSuccess = log.toLowerCase().includes('hoàn tất') || log.toLowerCase().includes('success');
+                                    const isProcessing = log.toLowerCase().includes('đang xử lý') || log.toLowerCase().includes('processing');
+                                    const isInfo = !isError && !isSuccess && !isProcessing;
 
-                                   let iconColor = 'text-gray-400';
-                                   let bgColor = 'bg-gray-800/50';
-                                   if (isError) {
-                                       iconColor = 'text-red-400';
-                                       bgColor = 'bg-red-900/20';
-                                   } else if (isSuccess) {
-                                       iconColor = 'text-emerald-400';
-                                       bgColor = 'bg-emerald-900/20';
-                                   } else if (isProcessing) {
-                                       iconColor = 'text-sky-400';
-                                       bgColor = 'bg-sky-900/20';
-                                   }
+                                    let iconColor = 'text-gray-400';
+                                    let bgColor = 'bg-gray-800/50';
+                                    if (isError) {
+                                        iconColor = 'text-red-400';
+                                        bgColor = 'bg-red-900/20';
+                                    } else if (isSuccess) {
+                                        iconColor = 'text-emerald-400';
+                                        bgColor = 'bg-emerald-900/20';
+                                    } else if (isProcessing) {
+                                        iconColor = 'text-sky-400';
+                                        bgColor = 'bg-sky-900/20';
+                                    }
 
-                                   return (
-                                       <div key={index} className={`flex items-start p-2 rounded-md ${bgColor} border-l-2 ${isError ? 'border-red-500' : isSuccess ? 'border-emerald-500' : isProcessing ? 'border-sky-500' : 'border-gray-600'}`}>
-                                           <span className={`text-xs mr-3 mt-0.5 ${iconColor}`}>
-                                               {isError ? '✗' : isSuccess ? '✓' : isProcessing ? '⟳' : 'ℹ'}
-                                           </span>
-                                           <span className="text-xs text-gray-300 flex-1">{log}</span>
-                                       </div>
-                                   );
-                               })}
+                                    return (
+                                        <div key={index} className={`flex items-start p-2 rounded-md ${bgColor} border-l-2 ${isError ? 'border-red-500' : isSuccess ? 'border-emerald-500' : isProcessing ? 'border-sky-500' : 'border-gray-600'}`}>
+                                            <span className={`text-xs mr-3 mt-0.5 ${iconColor}`}>
+                                                {isError ? '✗' : isSuccess ? '✓' : isProcessing ? '⟳' : 'ℹ'}
+                                            </span>
+                                            <span className="text-xs text-gray-300 flex-1">{log}</span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                         <LogViewerButton />
@@ -318,7 +319,7 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                                 className="w-full bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-600 transition-all duration-200 transform hover:scale-105 shadow-lg">
                                 Áp Dụng Thay Đổi
                             </button>
-                             <button 
+                            <button 
                                 onClick={onDiscard}
                                 className="w-full bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors">
                                 Hủy Bỏ
@@ -327,7 +328,7 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                     </>
                 );
             case AppState.ERROR:
-                 return (
+                return (
                     <>
                         <h3 className="text-xl font-bold text-white mb-2">Xử lý bị gián đoạn</h3>
                         <TokenUsageDisplay />
@@ -345,21 +346,21 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
 
                         <div className="bg-gray-900/50 rounded-lg p-3 flex-1 overflow-y-auto mb-6">
                             <ul className="text-xs text-gray-400 space-y-2 font-mono">
-                               {logs.map((log, index) => (
-                                   <li key={index} className={log.toLowerCase().includes('lỗi') ? 'text-red-400' : ''}>{log}</li>
-                               ))}
+                                {logs.map((log, index) => (
+                                    <li key={index} className={log.toLowerCase().includes('lỗi') ? 'text-red-400' : ''}>{log}</li>
+                                ))}
                             </ul>
                         </div>
                         <LogViewerButton />
                         <div className="space-y-3 mt-4">
-                             {hasPartialResults && (
+                            {hasPartialResults && (
                                 <button 
                                     onClick={onContinue}
                                     className="w-full bg-sky-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-sky-600 transition-colors transform hover:scale-105 shadow-lg">
                                     Tiếp tục xử lí
                                 </button>
                             )}
-                             {hasPartialResults && (
+                            {hasPartialResults && (
                                 <button 
                                     onClick={onApply}
                                     className="w-full bg-emerald-500/80 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-500 transition-colors">
@@ -375,7 +376,7 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                     </>
                 );
         }
-    }
+    };
     
     return (
         <aside className="w-96 bg-[#21252C] p-6 flex-shrink-0 flex flex-col border-l border-gray-700/50">
@@ -383,7 +384,7 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                 {renderContent()}
             </div>
             {(appState === AppState.LOADED || appState === AppState.STRUCTURED || appState === AppState.ERROR) && (
-                 <div className="mt-auto pt-6 border-t border-gray-700/50">
+                <div className="mt-auto pt-6 border-t border-gray-700/50">
                     <button 
                         onClick={onOpenApiModal} 
                         className="w-full flex items-center justify-center text-sm bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors"

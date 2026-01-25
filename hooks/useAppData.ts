@@ -194,7 +194,7 @@ export const useAppData = () => {
     }, [loadData]);
 
     const handleClearData = useCallback(async () => {
-        if (window.confirm("Bạn có chắc chắn muốn xóa tất cả dữ liệu bookmarks không? Hành động này không thể hoàn tác.")) {
+        if (window.confirm('Bạn có chắc chắn muốn xóa tất cả dữ liệu bookmarks không? Hành động này không thể hoàn tác.')) {
             await db.clearAllData();
             setBookmarks([]);
             setFolders([]);

@@ -19,7 +19,7 @@ export const useSmartClassify = () => {
                     }
                 }
             } catch (error) {
-                console.error("Failed to load smart classify rules:", error);
+                console.error('Failed to load smart classify rules:', error);
             } finally {
                 setIsLoadingRules(false);
             }
@@ -30,7 +30,7 @@ export const useSmartClassify = () => {
     const saveRule = useCallback(async (rule: SmartClassifyRule) => {
         // Basic validation
         if (!rule.pattern?.trim() || !rule.targetPath || rule.targetPath.length === 0) {
-            console.warn("Invalid rule: Pattern or Target Path is missing");
+            console.warn('Invalid rule: Pattern or Target Path is missing');
             return;
         }
 

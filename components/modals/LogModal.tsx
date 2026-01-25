@@ -40,11 +40,11 @@ const LogEntry: React.FC<{ log: DetailedLog }> = ({ log }) => {
                         {typeof log.content === 'string' ? log.content : JSON.stringify(log.content, null, 2)}
                     </code>
                 </pre>
-                 <button 
+                <button 
                     onClick={handleCopy}
                     className="absolute top-2 right-2 p-1.5 bg-gray-700/50 rounded-md hover:bg-gray-600 transition-colors"
                     title="Copy to clipboard"
-                 >
+                >
                     <ClipboardIcon className="w-4 h-4 text-gray-400" />
                 </button>
                 {copied && <span className="absolute top-10 right-2 text-xs text-emerald-400">Đã sao chép!</span>}

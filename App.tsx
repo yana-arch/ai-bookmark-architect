@@ -163,18 +163,18 @@ const App: React.FC = () => {
         let bookmarksToProcessList = bookmarks;
 
         if (isContinuation) {
-             initialProcessed = allCategorizedBookmarks;
+            initialProcessed = allCategorizedBookmarks;
         } else {
             // Apply Smart Classify rules
             const { classified, remaining } = applySmartClassify(bookmarks, [...smartClassifyRules, ...sessionRules]);
             
             if (classified.length > 0) {
-                 initialProcessed = classified;
-                 const reorderedBookmarks = [...classified, ...remaining];
-                 setBookmarks(reorderedBookmarks); 
-                 bookmarksToProcessList = reorderedBookmarks;
+                initialProcessed = classified;
+                const reorderedBookmarks = [...classified, ...remaining];
+                setBookmarks(reorderedBookmarks); 
+                bookmarksToProcessList = reorderedBookmarks;
                  
-                 setLogs(prev => [...prev, `Smart Classify: Đã tự động phân loại ${classified.length} bookmark.`]);
+                setLogs(prev => [...prev, `Smart Classify: Đã tự động phân loại ${classified.length} bookmark.`]);
             } else {
                 resetProcessingState();
                 setLogs(['Bắt đầu quá trình tái cấu trúc đa luồng...']);
@@ -187,18 +187,18 @@ const App: React.FC = () => {
     };
 
     const applyChanges = async () => {
-       await perfMonitor.timeAsyncFunction('apply_changes', async () => {
-           const finalBookmarks = bookmarks.map(bm => {
-           const categorized = allCategorizedBookmarks.find(cb => cb.url === bm.url);
-           return { ...bm, ...categorized }; // merge path and tags
-       });
-       await db.saveBookmarks(finalBookmarks);
-       await db.saveFolders(folders);
-        setBookmarks(finalBookmarks);
-        setAppState(AppState.STRUCTURED);
-        setSessionRules([]);
-        resetProcessingState();
-        setSelectedFolderId('root');
+        await perfMonitor.timeAsyncFunction('apply_changes', async () => {
+            const finalBookmarks = bookmarks.map(bm => {
+                const categorized = allCategorizedBookmarks.find(cb => cb.url === bm.url);
+                return { ...bm, ...categorized }; // merge path and tags
+            });
+            await db.saveBookmarks(finalBookmarks);
+            await db.saveFolders(folders);
+            setBookmarks(finalBookmarks);
+            setAppState(AppState.STRUCTURED);
+            setSessionRules([]);
+            resetProcessingState();
+            setSelectedFolderId('root');
         });
     };
 
@@ -298,10 +298,10 @@ const App: React.FC = () => {
     const bookmarksToDisplay = isSearching ? filteredBookmarks : displayedBookmarks;
     const listTitle = isSearching
         ? `Kết quả tìm kiếm cho "${searchQuery}"`
-        : (selectedFolder?.name || "Tất cả Bookmarks");
+        : (selectedFolder?.name || 'Tất cả Bookmarks');
     const noBookmarksMessage = isSearching
         ? `Không tìm thấy kết quả nào cho "${searchQuery}".`
-        : "Không có bookmark nào trong thư mục này.";
+        : 'Không có bookmark nào trong thư mục này.';
 
     return (
         <div className="flex h-screen w-full bg-[#1E2127] text-gray-300 font-sans">
@@ -463,7 +463,7 @@ const App: React.FC = () => {
                     />
 
                     <div className="flex-1 flex flex-col min-w-0">
-                         <header className="flex items-center justify-between p-4 border-b border-gray-700/50 flex-shrink-0">
+                        <header className="flex items-center justify-between p-4 border-b border-gray-700/50 flex-shrink-0">
                             <h1 className="text-lg font-bold text-white flex items-center">
                                 <AILogoIcon className="w-6 h-6 mr-3 text-emerald-400" />
                                 AI Bookmark Architect

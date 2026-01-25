@@ -63,7 +63,7 @@ const FolderItem: React.FC<{
                 />
                 <FolderIcon className="w-5 h-5 mr-3 text-yellow-500 flex-shrink-0" isOpen={isOpen} />
                 <span className="truncate font-medium flex-1">{folder.name}</span>
-                 {typeof folder.bookmarkCount !== 'undefined' && (
+                {typeof folder.bookmarkCount !== 'undefined' && (
                     <span className="ml-2 text-xs font-mono bg-gray-700 px-1.5 py-0.5 rounded">{formatNumber(folder.bookmarkCount)}</span>
                 )}
             </div>
@@ -98,7 +98,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Thư Mục</h2>
                 <div className="flex items-center space-x-3">
-                     <button
+                    <button
                         onClick={onImport}
                         className="text-gray-400 hover:text-sky-400 transition-colors"
                         title="Nhập bookmarks"
@@ -138,7 +138,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 )}
             </div>
             <nav className="flex-1 space-y-1 overflow-y-auto pr-1">
-                 <div
+                <div
                     onClick={() => onSelectFolder('root')}
                     className={`flex items-center p-2 rounded-md cursor-pointer transition-colors duration-150 ${
                         selectedFolderId === 'root' ? 'bg-emerald-500/20 text-emerald-400' : 'hover:bg-gray-700/50'
@@ -158,7 +158,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                             selectedFolderId={selectedFolderId}
                             onSelectFolder={onSelectFolder}
                         />
-                ))}
+                    ))}
             </nav>
             <div className="mt-auto pt-3 border-t border-gray-700/50 space-y-2">
                 {duplicateCount > 0 && (
@@ -179,7 +179,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <BrokenLinkIcon className={`w-5 h-5 mr-2 ${isCheckingLinks ? 'animate-spin' : ''}`} />
                     {isCheckingLinks
                         ? `Đang kiểm tra... (${formatNumber(brokenLinkCheckProgress.current)}/${formatNumber(brokenLinkCheckProgress.total)})`
-                        : "Kiểm tra liên kết hỏng"
+                        : 'Kiểm tra liên kết hỏng'
                     }
                 </button>
             </div>

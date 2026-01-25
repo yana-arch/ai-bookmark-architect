@@ -39,15 +39,15 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
     const handleAddKey = (e: React.FormEvent) => {
         e.preventDefault();
         if(!name.trim() || !apiKey.trim()) {
-            alert("Vui lòng nhập tên và API key.");
+            alert('Vui lòng nhập tên và API key.');
             return;
         }
         if ((provider === 'openrouter' || provider === 'custom') && !model.trim()) {
-            alert("Vui lòng nhập tên model.");
+            alert('Vui lòng nhập tên model.');
             return;
         }
         if (provider === 'custom' && !apiUrl.trim()) {
-            alert("Vui lòng nhập URL API.");
+            alert('Vui lòng nhập URL API.');
             return;
         }
 
@@ -110,28 +110,28 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
                 <div className="space-y-2 mb-4 max-h-48 overflow-y-auto bg-gray-900/30 p-2 rounded-md">
                     {apiConfigs.length > 0 ? apiConfigs.map(config => (
                         <div key={config.id} className="flex items-center justify-between bg-gray-900/50 p-2 rounded-md text-sm">
-                           <div className="flex items-center min-w-0 flex-1">
+                            <div className="flex items-center min-w-0 flex-1">
                                 <span className={`px-2 py-1 rounded-md text-xs font-bold mr-3 flex-shrink-0 ${providerClasses[config.provider]}`}>{config.provider}</span>
                                 <span className="text-gray-300 font-medium truncate mr-2">{config.name}</span>
                                 <span className={`px-2 py-0.5 rounded text-xs font-semibold ${statusInfo[config.status].className}`}>{statusInfo[config.status].text}</span>
                             </div>
                             <div className="flex items-center flex-shrink-0 ml-2 space-x-2">
-                               {config.status === 'active' && (
-                                   <button onClick={() => onToggleApiConfigStatus(config.id, 'inactive')} className="p-1.5 rounded-full hover:bg-yellow-500/20" title="Vô hiệu hóa key"><PowerIcon className="w-4 h-4 text-yellow-400" /></button>
-                               )}
-                               {config.status === 'inactive' && (
-                                   <button onClick={() => onToggleApiConfigStatus(config.id, 'active')} className="p-1.5 rounded-full hover:bg-green-500/20" title="Kích hoạt key"><PowerIcon className="w-4 h-4 text-green-400" /></button>
-                               )}
-                               {config.status === 'error' && (
-                                   <button onClick={() => onToggleApiConfigStatus(config.id, 'active')} className="p-1.5 rounded-full hover:bg-sky-500/20" title="Kích hoạt lại key"><ExclamationTriangleIcon className="w-4 h-4 text-sky-400" /></button>
-                               )}
-                               <button onClick={() => handleEditConfig(config)} className="p-1.5 rounded-full hover:bg-blue-500/20" title={`Sửa key ${config.name}`}>
-                                   <CogIcon className="w-4 h-4 text-gray-500 hover:text-blue-500 cursor-pointer transition-colors" />
-                               </button>
-                               <button onClick={() => onDeleteApiConfig(config.id)} className="p-1.5 rounded-full hover:bg-red-500/20" title={`Xóa key ${config.name}`}>
-                                   <TrashIcon className="w-4 h-4 text-gray-500 hover:text-red-500 cursor-pointer transition-colors" />
-                               </button>
-                           </div>
+                                {config.status === 'active' && (
+                                    <button onClick={() => onToggleApiConfigStatus(config.id, 'inactive')} className="p-1.5 rounded-full hover:bg-yellow-500/20" title="Vô hiệu hóa key"><PowerIcon className="w-4 h-4 text-yellow-400" /></button>
+                                )}
+                                {config.status === 'inactive' && (
+                                    <button onClick={() => onToggleApiConfigStatus(config.id, 'active')} className="p-1.5 rounded-full hover:bg-green-500/20" title="Kích hoạt key"><PowerIcon className="w-4 h-4 text-green-400" /></button>
+                                )}
+                                {config.status === 'error' && (
+                                    <button onClick={() => onToggleApiConfigStatus(config.id, 'active')} className="p-1.5 rounded-full hover:bg-sky-500/20" title="Kích hoạt lại key"><ExclamationTriangleIcon className="w-4 h-4 text-sky-400" /></button>
+                                )}
+                                <button onClick={() => handleEditConfig(config)} className="p-1.5 rounded-full hover:bg-blue-500/20" title={`Sửa key ${config.name}`}>
+                                    <CogIcon className="w-4 h-4 text-gray-500 hover:text-blue-500 cursor-pointer transition-colors" />
+                                </button>
+                                <button onClick={() => onDeleteApiConfig(config.id)} className="p-1.5 rounded-full hover:bg-red-500/20" title={`Xóa key ${config.name}`}>
+                                    <TrashIcon className="w-4 h-4 text-gray-500 hover:text-red-500 cursor-pointer transition-colors" />
+                                </button>
+                            </div>
                         </div>
                     )) : <p className="text-sm text-gray-500 text-center py-4">Chưa có API key nào.</p>}
                 </div>
@@ -156,9 +156,9 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
                     <div>
                         <label className="block text-xs text-gray-400 mb-2">Nhà cung cấp AI</label>
                         <div className="flex space-x-2">
-                           <button type="button" onClick={() => setProvider('gemini')} className={`flex-1 py-2 text-sm rounded-md transition-colors ${provider === 'gemini' ? 'bg-blue-500 text-white font-bold' : 'bg-gray-700 hover:bg-gray-600'}`}>Gemini</button>
-                           <button type="button" onClick={() => setProvider('openrouter')} className={`flex-1 py-2 text-sm rounded-md transition-colors ${provider === 'openrouter' ? 'bg-purple-500 text-white font-bold' : 'bg-gray-700 hover:bg-gray-600'}`}>OpenRouter</button>
-                           <button type="button" onClick={() => setProvider('custom')} className={`flex-1 py-2 text-sm rounded-md transition-colors ${provider === 'custom' ? 'bg-emerald-500 text-white font-bold' : 'bg-gray-700 hover:bg-gray-600'}`}>Custom</button>
+                            <button type="button" onClick={() => setProvider('gemini')} className={`flex-1 py-2 text-sm rounded-md transition-colors ${provider === 'gemini' ? 'bg-blue-500 text-white font-bold' : 'bg-gray-700 hover:bg-gray-600'}`}>Gemini</button>
+                            <button type="button" onClick={() => setProvider('openrouter')} className={`flex-1 py-2 text-sm rounded-md transition-colors ${provider === 'openrouter' ? 'bg-purple-500 text-white font-bold' : 'bg-gray-700 hover:bg-gray-600'}`}>OpenRouter</button>
+                            <button type="button" onClick={() => setProvider('custom')} className={`flex-1 py-2 text-sm rounded-md transition-colors ${provider === 'custom' ? 'bg-emerald-500 text-white font-bold' : 'bg-gray-700 hover:bg-gray-600'}`}>Custom</button>
                         </div>
                     </div>
                     <input 
@@ -168,7 +168,7 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
                         placeholder="Tên gợi nhớ (e.g., Key cá nhân)"
                         className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
-                     <input 
+                    <input 
                         type="password"
                         value={apiKey}
                         onChange={e => setApiKey(e.target.value)}
@@ -180,7 +180,7 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
                             type="text"
                             value={model}
                             onChange={e => setModel(e.target.value)}
-                            placeholder={provider === 'custom' ? "Tên model (e.g., llama3)" : "Tên model (e.g., openai/gpt-4o)"}
+                            placeholder={provider === 'custom' ? 'Tên model (e.g., llama3)' : 'Tên model (e.g., openai/gpt-4o)'}
                             className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                     )}

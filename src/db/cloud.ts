@@ -19,7 +19,7 @@ export class NeonHttpClient {
         this.authHeader = `Bearer ${connection.password}`;
     }
 
-    async query(sql: string, params: any[] = []): Promise<any> {
+    async query(sql: string, params: unknown[] = []): Promise<unknown> {
         const response = await fetch(this.baseUrl, {
             method: 'POST',
             headers: {
@@ -83,7 +83,7 @@ export const exportToCloud = async (connection: DbConnection): Promise<{ success
             const batch = bookmarks.slice(i, i + BATCH_SIZE);
             const batchPromises = batch.map(bm => 
                 client.query(
-                    `INSERT INTO bookmarks (id, user_id, db_connection_hash, title, url, path, tags, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                    'INSERT INTO bookmarks (id, user_id, db_connection_hash, title, url, path, tags, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
                     [
                         bm.id,
                         connection.username,
@@ -105,7 +105,7 @@ export const exportToCloud = async (connection: DbConnection): Promise<{ success
                 for (const bm of batch) {
                     try {
                         await client.query(
-                            `INSERT INTO bookmarks (id, user_id, db_connection_hash, title, url, path, tags, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                            'INSERT INTO bookmarks (id, user_id, db_connection_hash, title, url, path, tags, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
                             [
                                 bm.id,
                                 bm.title,
@@ -131,11 +131,21 @@ export const exportToCloud = async (connection: DbConnection): Promise<{ success
             return { success: false, message: 'Không thể export bookmark nào.' };
         }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Cloud export error:', error);
-        return { success: false, message: `Lỗi khi export: ${error.message}. Vui lòng kiểm tra kết nối.` };
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return { success: false, message: `Lỗi khi export: ${errorMessage}. Vui lòng kiểm tra kết nối.` };
     }
 };
+
+interface CloudBookmarkRow {
+    id: string;
+    title: string;
+    url: string;
+    parent_id: string | null;
+    path: string[];
+    tags: string[];
+}
 
 export const importFromCloud = async (connection: DbConnection, mode: 'merge' | 'replace' = 'merge'): Promise<{ success: boolean; message: string }> => {
     const client = new NeonHttpClient(connection);
@@ -145,7 +155,7 @@ export const importFromCloud = async (connection: DbConnection, mode: 'merge' | 
         const result = await client.query(
             'SELECT * FROM bookmarks WHERE user_id = $1 AND db_connection_hash = $2 ORDER BY created_at',
             [connection.username, userHash]
-        );
+        ) as { rows?: CloudBookmarkRow[]; data?: CloudBookmarkRow[] };
 
         const rows = result.rows || result.data || [];
 
@@ -153,7 +163,7 @@ export const importFromCloud = async (connection: DbConnection, mode: 'merge' | 
             return { success: false, message: 'Không tìm thấy bookmark nào trong cloud.' };
         }
 
-        const cloudBookmarks: Bookmark[] = rows.map((row: any) => ({
+        const cloudBookmarks: Bookmark[] = rows.map((row) => ({
             id: row.id,
             title: row.title,
             url: row.url,
@@ -188,9 +198,10 @@ export const importFromCloud = async (connection: DbConnection, mode: 'merge' | 
 
         return { success: true, message: `Đã import thành công ${cloudBookmarks.length} bookmark(s) từ cloud. Mode: ${mode}` };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Cloud import error:', error);
-        return { success: false, message: `Lỗi khi import: ${error.message}. Vui lòng kiểm tra kết nối.` };
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return { success: false, message: `Lỗi khi import: ${errorMessage}. Vui lòng kiểm tra kết nối.` };
     }
 };
 

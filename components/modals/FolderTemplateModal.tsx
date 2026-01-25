@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FolderTemplate, FolderStructureNode, ApiConfig } from '@/types';
 import { XIcon, PlusIcon, TrashIcon, FolderIcon, ChevronRightIcon } from '../ui/Icons';
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type } from '@google/genai';
 
 interface FolderTemplateModalProps {
     isOpen: boolean;
@@ -265,7 +265,7 @@ Trả về cấu trúc thư mục hợp lý theo định dạng JSON như sau:
 {"folders": [{"id": "folder1", "name": "Tên thư mục", "children": [{"id": "child1", "name": "Tên con", "children": []}]}]}`,
                 config: {
                     systemInstruction: systemPrompt,
-                    responseMimeType: "application/json"
+                    responseMimeType: 'application/json'
                 }
             });
 
