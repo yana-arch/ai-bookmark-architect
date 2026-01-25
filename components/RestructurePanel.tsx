@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { AppState } from '@/types';
-import type { Bookmark, Folder, ApiConfig, FolderTemplate } from '@/types';
+import type { Bookmark, Folder, ApiConfig, FolderTemplate, SmartClassifyRule } from '@/types';
 import { WarningIcon, CogIcon } from './Icons';
 import { formatNumber } from '@/src/utils';
 
@@ -26,6 +26,8 @@ interface RestructurePanelProps {
     proposedStructure: (Folder | Bookmark)[];
     isGeneratingStructure: boolean;
     onOpenAIConfigModal: () => void;
+    sessionRules: SmartClassifyRule[];
+    onSessionRulesChange: (rules: SmartClassifyRule[]) => void;
 }
 
 const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
@@ -33,7 +35,8 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
         appState, progress, logs, errorDetails, onStart, onStop, onForceStop, onApply, onDiscard, onContinue,
         apiConfigs, onOpenApiModal, onOpenLogModal, sessionTokenUsage,
         hasPartialResults, onSuggestStructure, onConfirmProposedStructure, 
-        proposedStructure, isGeneratingStructure, onOpenAIConfigModal
+        proposedStructure, isGeneratingStructure, onOpenAIConfigModal,
+        sessionRules, onSessionRulesChange
     } = props;
     const progressPercentage = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
     
@@ -116,14 +119,56 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                     </>
                 );
             case AppState.PLANNING:
-                const renderTree = (nodes: any[]) => (
-                    <ul className="pl-4 border-l border-gray-700 space-y-1 mt-1">
-                        {nodes.map((node: any) => (
-                            <li key={node.id} className="text-xs">
-                                <span className="text-blue-400">📁</span> {node.name}
-                                {node.children && node.children.length > 0 && renderTree(node.children)}
-                            </li>
-                        ))}
+                const handleAddSessionRule = (folderName: string, path: string[]) => {
+                    const pattern = prompt(`Gán quy tắc cho thư mục "${folderName}":\nNhập Tag hoặc nội dung Link (ví dụ: Github, youtube.com)`);
+                    if (pattern) {
+                        const type = pattern.includes('.') ? 'link' : 'tag';
+                        const newRule: SmartClassifyRule = {
+                            id: `session-${Date.now()}-${Math.random()}`,
+                            name: `Auto to ${folderName}`,
+                            type,
+                            pattern,
+                            targetPath: path,
+                            enabled: true,
+                            createdAt: Date.now()
+                        };
+                        onSessionRulesChange([...sessionRules, newRule]);
+                    }
+                };
+
+                const renderTree = (nodes: any[], currentPath: string[] = []) => (
+                    <ul className="pl-4 border-l border-gray-700 space-y-2 mt-1">
+                        {nodes.map((node: any) => {
+                            const nodePath = [...currentPath, node.name];
+                            const nodeRules = sessionRules.filter(r => r.targetPath.join('/') === nodePath.join('/'));
+                            
+                            return (
+                                <li key={node.id} className="text-xs group">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex-1 truncate">
+                                            <span className="text-blue-400">📁</span> {node.name}
+                                        </div>
+                                        <button 
+                                            onClick={() => handleAddSessionRule(node.name, nodePath)}
+                                            className="ml-2 text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-500/40"
+                                            title="Gán quy tắc tự động phân loại vào thư mục này"
+                                        >
+                                            + Quy tắc
+                                        </button>
+                                    </div>
+                                    {nodeRules.length > 0 && (
+                                        <div className="flex flex-wrap gap-1 mt-1 pl-4">
+                                            {nodeRules.map(r => (
+                                                <span key={r.id} className="text-[9px] bg-gray-800 text-gray-400 px-1 rounded border border-gray-700">
+                                                    {r.type === 'tag' ? '🏷️' : '🔗'} {r.pattern}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {node.children && node.children.length > 0 && renderTree(node.children, nodePath)}
+                                </li>
+                            );
+                        })}
                     </ul>
                 );
 

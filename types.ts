@@ -189,3 +189,13 @@ export interface DbConnection {
   password: string;
   provider: 'supabase' | 'postgresql' | 'neon';
 }
+
+export interface SmartClassifyRule {
+  id: string;
+  name: string; // Friendly name for the rule
+  type: 'tag' | 'link';
+  pattern: string; // The tag name or URL substring to match
+  targetPath: string[]; // The folder path to move matching bookmarks to
+  enabled: boolean;
+  createdAt: number;
+}

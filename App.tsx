@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspens
 
 import { AILogoIcon, ChartIcon, UploadIcon, ImportIcon } from './components/Icons';
 // Fix: Consolidate type imports into a single statement.
-import { AppState, BrokenLinkCheckState, type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, ApiKeyStatus, type DuplicateStats, type InstructionPreset, type FolderTemplate, type TemplateSettings, type FolderCreationMode, type UserCorrection } from './types';
+import { AppState, BrokenLinkCheckState, type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, ApiKeyStatus, type DuplicateStats, type InstructionPreset, type FolderTemplate, type TemplateSettings, type FolderCreationMode, type UserCorrection, type SmartClassifyRule } from './types';
 import Sidebar from './components/Sidebar';
 import BookmarkList from './components/BookmarkList';
 import RestructurePanel from './components/RestructurePanel';
@@ -123,6 +123,8 @@ const App: React.FC = () => {
     const [brokenLinkCheckProgress, setBrokenLinkCheckProgress] = useState({ current: 0, total: 0 });
     const [allCategorizedBookmarks, setAllCategorizedBookmarks] = useState<CategorizedBookmark[]>([]);
     const [proposedStructure, setProposedStructure] = useState<(Folder | Bookmark)[]>([]);
+    const [smartClassifyRules, setSmartClassifyRules] = useState<SmartClassifyRule[]>([]);
+    const [sessionRules, setSessionRules] = useState<SmartClassifyRule[]>([]);
     const [isGeneratingStructure, setIsGeneratingStructure] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const importInputRef = useRef<HTMLInputElement>(null);
@@ -140,8 +142,10 @@ const App: React.FC = () => {
             const savedInstructionPresets = await db.getInstructionPresets();
             const savedFolderTemplates = await db.getFolderTemplates();
             const savedUserCorrections = await db.getUserCorrections();
+            const savedSmartRules = await db.getSmartClassifyRules();
 
             setApiConfigs(savedApiConfigs || []);
+            setSmartClassifyRules(savedSmartRules || []);
             setInstructionPresets(savedInstructionPresets || []);
             setFolderTemplates(savedFolderTemplates || []);
             setUserCorrections(savedUserCorrections || []);
@@ -554,16 +558,103 @@ const App: React.FC = () => {
         }
     };
 
+    const handleSaveSmartRule = useCallback(async (rule: SmartClassifyRule) => {
+        await db.saveSmartClassifyRule(rule);
+        setSmartClassifyRules(prev => {
+            const existingIndex = prev.findIndex(r => r.id === rule.id);
+            if (existingIndex > -1) {
+                const newRules = [...prev];
+                newRules[existingIndex] = rule;
+                return newRules;
+            }
+            return [...prev, rule];
+        });
+    }, []);
+
+    const handleDeleteSmartRule = useCallback(async (id: string) => {
+        await db.deleteSmartClassifyRule(id);
+        setSmartClassifyRules(prev => prev.filter(r => r.id !== id));
+    }, []);
+
+    const applySmartClassify = useCallback((bookmarksToProcess: Bookmark[], rules: SmartClassifyRule[]): { classified: CategorizedBookmark[], remaining: Bookmark[] } => {
+        const classified: CategorizedBookmark[] = [];
+        const remaining: Bookmark[] = [];
+        const activeRules = rules.filter(r => r.enabled);
+
+        bookmarksToProcess.forEach(bm => {
+            let matched = false;
+            for (const rule of activeRules) {
+                if (rule.type === 'tag') {
+                    if (bm.tags?.some(tag => tag.toLowerCase().includes(rule.pattern.toLowerCase()))) {
+                        classified.push({ ...bm, path: rule.targetPath, tags: bm.tags || [] } as CategorizedBookmark);
+                        matched = true;
+                        break;
+                    }
+                } else if (rule.type === 'link') {
+                    if (bm.url.toLowerCase().includes(rule.pattern.toLowerCase())) {
+                        classified.push({ ...bm, path: rule.targetPath, tags: bm.tags || [] } as CategorizedBookmark);
+                        matched = true;
+                        break;
+                    }
+                }
+            }
+            if (!matched) remaining.push(bm);
+        });
+
+        return { classified, remaining };
+    }, []);
+
+    const getStructureGuide = useCallback((nodes: any[], path: string[] = []): string[] => {
+        let list: string[] = [];
+        nodes.forEach(node => {
+            if (!('url' in node)) {
+                const currentPath = [...path, node.name];
+                list.push(currentPath.join(' -> '));
+                if (node.children) {
+                    list = list.concat(getStructureGuide(node.children, currentPath));
+                }
+            }
+        });
+        return list;
+    }, []);
+
     const confirmProposedStructure = async () => {
         setFolders(proposedStructure);
         await db.saveFolders(proposedStructure);
+        
+        // Feed the confirmed structure into the system prompt as a rigid guide
+        const availableFolders = getStructureGuide(proposedStructure);
+        const folderGuide = availableFolders.map((folder, index) => `${index + 1}. ${folder}`).join('\n');
+        
+        const planningGuideline = `\n\n**PLANNED STRUCTURE (Prioritize these folders):**\n${folderGuide}\n\n**STRICT CATEGORIZATION RULES:**\n1. Use the folders listed above whenever possible.\n2. If a bookmark has a tag matching one of these folders, put it there.\n3. Only create a NEW folder if the bookmark absolutely does not fit into any of the planned categories.`;
+        
+        setSystemPrompt(prev => prev + planningGuideline);
+
+        // Apply session rules immediately
+        if (sessionRules.length > 0) {
+            const { classified } = applySmartClassify(bookmarks, sessionRules);
+            if (classified.length > 0) {
+                setAllCategorizedBookmarks(prev => [...prev, ...classified]);
+                setLogs(prev => [...prev, `Smart Classify: Đã tự động phân loại ${classified.length} bookmark theo quy tắc tùy chỉnh.`]);
+            }
+        }
+
         setAppState(AppState.STRUCTURED);
         setProposedStructure([]);
-        setNotifications(prev => [...prev, { id: 'confirm-struct', message: 'Đã áp dụng cấu trúc mới. Bạn có thể bắt đầu tái cấu trúc chi tiết.', type: 'success' }]);
+        setSessionRules([]);
+        setNotifications(prev => [...prev, { id: 'confirm-struct', message: 'Đã áp dụng cấu trúc và quy tắc mới. AI đã được cập nhật chỉ dẫn theo sơ đồ này.', type: 'success' }]);
     };
 
     const startRestructuring = async (isContinuation = false) => {
         await perfMonitor.timeAsyncFunction('start_restructuring', async () => {
+            // Apply Smart Classify rules before AI processing
+            const { classified, remaining } = applySmartClassify(bookmarks, [...smartClassifyRules, ...sessionRules]);
+            
+            if (!isContinuation && classified.length > 0) {
+                setAllCategorizedBookmarks(classified);
+                setLogs(prev => [...prev, `Smart Classify: Đã tự động phân loại ${classified.length} bookmark.`]);
+            }
+
             const addDetailedLog = async (type: DetailedLog['type'], title: string, content: string | object, usage?: DetailedLog['usage']) => {
             const newLog: DetailedLog = {
                 id: `log-${Date.now()}-${Math.random()}`,
@@ -607,7 +698,9 @@ const App: React.FC = () => {
         setProgress({ current: allCategorizedBookmarks.length, total: bookmarks.length });
         setErrorDetails(null);
 
-        const bookmarksToProcess = bookmarks.slice(allCategorizedBookmarks.length);
+        const bookmarksToProcess = isContinuation 
+            ? bookmarks.slice(allCategorizedBookmarks.length)
+            : remaining;
         const BATCH_SIZE = Math.max(1, batchSize);
         const totalBatches = Math.ceil(bookmarksToProcess.length / BATCH_SIZE);
         // Use 1 worker for single mode, up to 3 for multi mode
@@ -1185,9 +1278,6 @@ ${bookmarksHtml}</DL><p>`;
     }, []);
 
     const handleApplyFolderTemplate = useCallback(async (template: FolderTemplate) => {
-        // Set the template structure as current folders
-        const treeStructure = db.convertStructureToTree(template.structure);
-        setFolders(treeStructure);
         setTemplateSettings(prev => ({
             ...prev,
             selectedTemplateId: template.id,
@@ -1230,8 +1320,8 @@ ${folderGuide}
 - Python backend code → Backend -> Python`;
 
         setSystemPrompt(newSystemPrompt);
-        setAppState(AppState.STRUCTURED);
-        setSelectedFolderId('root');
+        // Do not call setFolders or setAppState here anymore to avoid showing empty folders in UI
+        setNotifications(prev => [...prev, { id: 'template-applied', message: `Đã áp dụng mẫu "${template.name}" làm chỉ dẫn cho AI.`, type: 'info' }]);
     }, []);
 
     const handleTemplateSettingsChange = useCallback((newSettings: Partial<TemplateSettings>) => {
@@ -1559,6 +1649,9 @@ ${folderGuide}
                         onOpenFolderTemplateModal={() => setIsFolderTemplateModalOpen(true)}
                         onOpenInstructionPresetModal={() => setIsInstructionPresetModalOpen(true)}
                         onApplyFolderTemplate={handleApplyFolderTemplate}
+                        smartClassifyRules={smartClassifyRules}
+                        onSaveSmartRule={handleSaveSmartRule}
+                        onDeleteSmartRule={handleDeleteSmartRule}
                     />
                 )}
 
@@ -1694,6 +1787,8 @@ ${folderGuide}
                                     planningPrompt={planningPrompt}
                                     onPlanningPromptChange={setPlanningPrompt}
                                     onOpenAIConfigModal={() => setIsAIConfigModalOpen(true)}
+                                    sessionRules={sessionRules}
+                                    onSessionRulesChange={setSessionRules}
                                 />
                             </div>
                         )}

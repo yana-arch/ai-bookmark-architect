@@ -1,7 +1,7 @@
 import { openDB, IDBPDatabase } from 'idb';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 // Fix: Import ApiConfig type.
-import type { Bookmark, Folder, ApiConfig, InstructionPreset, FolderTemplate, EmptyFolderTree, DetailedLog, UserCorrection, BackupMetadata, SyncStatus, AnalyticsData, OAuthToken, DbConnection } from './types';
+import type { Bookmark, Folder, ApiConfig, InstructionPreset, FolderTemplate, EmptyFolderTree, DetailedLog, UserCorrection, BackupMetadata, SyncStatus, AnalyticsData, OAuthToken, DbConnection, SmartClassifyRule } from './types';
 
 const DB_NAME = 'AIBookmarkArchitectDB';
 const BOOKMARKS_STORE = 'bookmarks';
@@ -18,13 +18,14 @@ const BACKUPS_STORE = 'backups';
 const SYNC_STATUS_STORE = 'syncStatus';
 const ANALYTICS_STORE = 'analytics';
 const OAUTH_TOKENS_STORE = 'oauthTokens';
+const SMART_RULES_STORE = 'smartClassifyRules';
 
 let dbPromise: Promise<IDBPDatabase>;
 
 const initDB = () => {
     if (!dbPromise) {
-        // Phase 2: Bump DB version to 8 and add new stores for enhanced features
-        dbPromise = openDB(DB_NAME, 8, {
+        // Phase 2: Bump DB version to 9 and add new stores
+        dbPromise = openDB(DB_NAME, 9, {
             upgrade(db, oldVersion) {
                 if (oldVersion < 1) {
                     if (!db.objectStoreNames.contains(BOOKMARKS_STORE)) {
@@ -95,6 +96,11 @@ const initDB = () => {
                         db.createObjectStore(OAUTH_TOKENS_STORE, { keyPath: 'id' });
                     }
                 }
+                if (oldVersion < 9) {
+                    if (!db.objectStoreNames.contains(SMART_RULES_STORE)) {
+                        db.createObjectStore(SMART_RULES_STORE, { keyPath: 'id' });
+                    }
+                }
             },
         });
     }
@@ -136,7 +142,7 @@ export const getFolders = async (): Promise<(Folder | Bookmark)[] | undefined> =
 
 export const clearAllData = async (): Promise<void> => {
     const db = await initDB();
-    const tx = db.transaction([BOOKMARKS_STORE, FOLDERS_STORE, API_CONFIGS_STORE, INSTRUCTION_PRESETS_STORE, FOLDER_TEMPLATES_STORE, EMPTY_FOLDER_TREES_STORE, LOGS_STORE, USER_CORRECTIONS_STORE, BACKUPS_STORE, SYNC_STATUS_STORE, ANALYTICS_STORE, OAUTH_TOKENS_STORE], 'readwrite');
+    const tx = db.transaction([BOOKMARKS_STORE, FOLDERS_STORE, API_CONFIGS_STORE, INSTRUCTION_PRESETS_STORE, FOLDER_TEMPLATES_STORE, EMPTY_FOLDER_TREES_STORE, LOGS_STORE, USER_CORRECTIONS_STORE, BACKUPS_STORE, SYNC_STATUS_STORE, ANALYTICS_STORE, OAUTH_TOKENS_STORE, SMART_RULES_STORE], 'readwrite');
     await tx.objectStore(BOOKMARKS_STORE).clear();
     await tx.objectStore(FOLDERS_STORE).clear();
     await tx.objectStore(API_CONFIGS_STORE).clear();
@@ -150,6 +156,7 @@ export const clearAllData = async (): Promise<void> => {
     await tx.objectStore(SYNC_STATUS_STORE).clear();
     await tx.objectStore(ANALYTICS_STORE).clear();
     await tx.objectStore(OAUTH_TOKENS_STORE).clear();
+    await tx.objectStore(SMART_RULES_STORE).clear();
     await tx.done;
 };
 
@@ -328,6 +335,22 @@ export const getAllOAuthTokens = async (): Promise<OAuthToken[]> => {
 export const deleteOAuthToken = async (id: string): Promise<void> => {
     const db = await initDB();
     await db.delete(OAUTH_TOKENS_STORE, id);
+};
+
+// Smart Classify Rules CRUD operations
+export const saveSmartClassifyRule = async (rule: SmartClassifyRule): Promise<void> => {
+    const db = await initDB();
+    await db.put(SMART_RULES_STORE, rule);
+};
+
+export const getSmartClassifyRules = async (): Promise<SmartClassifyRule[]> => {
+    const db = await initDB();
+    return db.getAll(SMART_RULES_STORE);
+};
+
+export const deleteSmartClassifyRule = async (id: string): Promise<void> => {
+    const db = await initDB();
+    await db.delete(SMART_RULES_STORE, id);
 };
 
 // Utility function to convert folder structure to folder tree (Iterative implementation)
