@@ -122,9 +122,11 @@ async function callAIProvider(
   currentTree: any,
   batchIndex: number,
   userHistory?: any[],
-  domainKnowledge?: string
+  domainKnowledge?: string,
+  apiUrl?: string
 ): Promise<{ categorizedBatch: any[]; usage?: any }> {
-  if (provider === 'openrouter') {
+  if (provider === 'openrouter' || provider === 'custom') {
+    const endpoint = provider === 'custom' && apiUrl ? apiUrl : 'https://openrouter.ai/api/v1/chat/completions';
     let finalSystemPrompt = systemPrompt;
     if (domainKnowledge) {
       finalSystemPrompt += `\n\nCONTEXT ENRICHMENT:\nDomain Knowledge: ${domainKnowledge}`; 
@@ -143,14 +145,19 @@ async function callAIProvider(
       ]
     };
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    };
+
+    if (provider === 'openrouter') {
+      headers['HTTP-Referer'] = `${self.location.protocol}//${self.location.host}`;
+      headers['X-Title'] = 'AI Bookmark Architect';
+    }
+
+    const response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': `${self.location.protocol}//${self.location.host}`,
-        'X-Title': 'AI Bookmark Architect'
-      },
+      headers,
       body: JSON.stringify(requestPayload)
     });
 
@@ -295,7 +302,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
               currentTree,
               batchIndex,
               userHistory,
-              domainKnowledge
+              domainKnowledge,
+              currentKeyConfig.apiUrl
             );
 
             // Log response details

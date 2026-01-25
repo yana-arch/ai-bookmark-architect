@@ -50,9 +50,10 @@ export interface InstructionPreset {
 export interface ApiConfig {
   id: string;
   name: string;
-  provider: 'gemini' | 'openrouter';
+  provider: 'gemini' | 'openrouter' | 'custom';
   apiKey: string;
   model: string;
+  apiUrl?: string; // Optional: custom API endpoint
   status: ApiKeyStatus;
 }
 

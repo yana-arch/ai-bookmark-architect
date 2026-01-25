@@ -13,8 +13,9 @@ interface ApiConfigModalProps {
 const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, onSaveApiConfig, onDeleteApiConfig, onToggleApiConfigStatus }) => {
     const [name, setName] = useState('');
     const [apiKey, setApiKey] = useState('');
-    const [provider, setProvider] = useState<'gemini' | 'openrouter'>('gemini');
+    const [provider, setProvider] = useState<'gemini' | 'openrouter' | 'custom'>('gemini');
     const [model, setModel] = useState('');
+    const [apiUrl, setApiUrl] = useState('');
     const [editingId, setEditingId] = useState<string | null>(null);
 
     const handleEditConfig = (config: ApiConfig) => {
@@ -23,6 +24,7 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
         setApiKey(config.apiKey);
         setProvider(config.provider);
         setModel(config.model);
+        setApiUrl(config.apiUrl || '');
     };
 
     const handleCancelEdit = () => {
@@ -30,6 +32,7 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
         setName('');
         setApiKey('');
         setModel('');
+        setApiUrl('');
         setProvider('gemini');
     };
 
@@ -39,8 +42,12 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
             alert("Vui lòng nhập tên và API key.");
             return;
         }
-        if (provider === 'openrouter' && !model.trim()) {
-            alert("Vui lòng nhập tên model cho OpenRouter.");
+        if ((provider === 'openrouter' || provider === 'custom') && !model.trim()) {
+            alert("Vui lòng nhập tên model.");
+            return;
+        }
+        if (provider === 'custom' && !apiUrl.trim()) {
+            alert("Vui lòng nhập URL API.");
             return;
         }
 
@@ -53,6 +60,7 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
                     name,
                     provider,
                     apiKey,
+                    apiUrl: provider === 'custom' ? apiUrl : undefined,
                     model: provider === 'gemini' ? 'gemini-2.5-flash' : model,
                 });
             }
@@ -63,6 +71,7 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
                 name,
                 provider,
                 apiKey,
+                apiUrl: provider === 'custom' ? apiUrl : undefined,
                 model: provider === 'gemini' ? 'gemini-2.5-flash' : model,
                 status: 'active'
             });
@@ -71,6 +80,7 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
         setName('');
         setApiKey('');
         setModel('');
+        setApiUrl('');
         setProvider('gemini');
         setEditingId(null);
     };
@@ -78,6 +88,7 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
     const providerClasses = {
         gemini: 'bg-blue-500/20 text-blue-300',
         openrouter: 'bg-purple-500/20 text-purple-300',
+        custom: 'bg-emerald-500/20 text-emerald-300',
     };
     
     const statusInfo: { [key in ApiKeyStatus]: { text: string; className: string } } = {
@@ -145,8 +156,9 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
                     <div>
                         <label className="block text-xs text-gray-400 mb-2">Nhà cung cấp AI</label>
                         <div className="flex space-x-2">
-                           <button type="button" onClick={() => setProvider('gemini')} className={`flex-1 py-2 text-sm rounded-md transition-colors ${provider === 'gemini' ? 'bg-blue-500 text-white font-bold' : 'bg-gray-700 hover:bg-gray-600'}`}>Google Gemini</button>
+                           <button type="button" onClick={() => setProvider('gemini')} className={`flex-1 py-2 text-sm rounded-md transition-colors ${provider === 'gemini' ? 'bg-blue-500 text-white font-bold' : 'bg-gray-700 hover:bg-gray-600'}`}>Gemini</button>
                            <button type="button" onClick={() => setProvider('openrouter')} className={`flex-1 py-2 text-sm rounded-md transition-colors ${provider === 'openrouter' ? 'bg-purple-500 text-white font-bold' : 'bg-gray-700 hover:bg-gray-600'}`}>OpenRouter</button>
+                           <button type="button" onClick={() => setProvider('custom')} className={`flex-1 py-2 text-sm rounded-md transition-colors ${provider === 'custom' ? 'bg-emerald-500 text-white font-bold' : 'bg-gray-700 hover:bg-gray-600'}`}>Custom</button>
                         </div>
                     </div>
                     <input 
@@ -163,12 +175,21 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ onClose, apiConfigs, on
                         placeholder="Dán API Key của bạn vào đây"
                         className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
-                    {provider === 'openrouter' && (
+                    {provider !== 'gemini' && (
                         <input 
                             type="text"
                             value={model}
                             onChange={e => setModel(e.target.value)}
-                            placeholder="Tên model (e.g., openai/gpt-4o)"
+                            placeholder={provider === 'custom' ? "Tên model (e.g., llama3)" : "Tên model (e.g., openai/gpt-4o)"}
+                            className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                    )}
+                    {provider === 'custom' && (
+                        <input 
+                            type="text"
+                            value={apiUrl}
+                            onChange={e => setApiUrl(e.target.value)}
+                            placeholder="API Endpoint URL (e.g., http://localhost:11434/v1/chat/completions)"
                             className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                     )}
