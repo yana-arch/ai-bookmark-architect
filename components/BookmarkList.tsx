@@ -119,7 +119,7 @@ const VirtualizedBookmarkList: React.FC<{
 };
 
 const BookmarkList: React.FC<BookmarkListProps> = ({ bookmarks, folderName, noBookmarksMessage }) => {
-    const ITEM_HEIGHT = 80; // Approximate height of each bookmark item
+    const ITEM_HEIGHT = 100; // Increased height to accommodate tags
     const HEADER_HEIGHT = 80; // Height of the header
     const CONTAINER_HEIGHT = 600; // Fixed height for virtual scrolling
 

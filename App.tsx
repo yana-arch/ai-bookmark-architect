@@ -10,7 +10,7 @@ import FileDropzone from './components/FileDropzone';
 import * as db from './db';
 import { saveLog, getUserCorrections } from './db';
 import { searchCache, cacheKeys, generateHash, cacheStats } from './src/cache';
-import { formatNumber, parseCSVBookmarks, exportBookmarksToCSV } from './src/utils';
+import { formatNumber, parseCSVBookmarks, parseHTMLBookmarks, exportBookmarksToCSV, normalizeURL } from './src/utils';
 import { backupScheduler } from './src/services/backupScheduler';
 import { perfMonitor } from './src/performance';
 
@@ -176,11 +176,12 @@ const App: React.FC = () => {
             perfMonitor.timeFunction('find_duplicates', () => {
                 const urlMap = new Map<string, Bookmark[]>();
             bookmarks.forEach(bm => {
-                const existing = urlMap.get(bm.url);
+                const normalizedUrl = normalizeURL(bm.url);
+                const existing = urlMap.get(normalizedUrl);
                 if (existing) {
                     existing.push(bm);
                 } else {
-                    urlMap.set(bm.url, [bm]);
+                    urlMap.set(normalizedUrl, [bm]);
                 }
             });
 
@@ -206,19 +207,6 @@ const App: React.FC = () => {
         return () => clearTimeout(timeoutId);
     }, [bookmarks]);
     
-    const parseBookmarksHTML = (htmlString: string): Bookmark[] => {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(htmlString, 'text/html');
-        const links = Array.from(doc.querySelectorAll('a'));
-        
-        return links.map((link, index) => ({
-            id: `bm-${Date.now()}-${index}`,
-            title: link.textContent || 'No Title',
-            url: link.href,
-            parentId: null
-        }));
-    };
-
     const handleFileLoaded = useCallback(async (fileName: string, loadedBookmarks: Bookmark[]) => {
         setImportFileName(fileName);
         setPreviewBookmarks(loadedBookmarks);
@@ -257,9 +245,10 @@ const App: React.FC = () => {
         // Iterate backwards to keep the "last" (most recent) bookmark
         for (let i = bookmarks.length - 1; i >= 0; i--) {
             const bm = bookmarks[i];
-            if (!seenUrls.has(bm.url)) {
+            const normalizedUrl = normalizeURL(bm.url);
+            if (!seenUrls.has(normalizedUrl)) {
                 uniqueBookmarks.push(bm);
-                seenUrls.add(bm.url);
+                seenUrls.add(normalizedUrl);
             }
         }
 
@@ -486,7 +475,8 @@ const App: React.FC = () => {
         const bookmarksToProcess = bookmarks.slice(allCategorizedBookmarks.length);
         const BATCH_SIZE = Math.max(1, batchSize);
         const totalBatches = Math.ceil(bookmarksToProcess.length / BATCH_SIZE);
-        const MAX_CONCURRENT_WORKERS = 3; // Limit concurrent workers
+        // Use 1 worker for single mode, up to 3 for multi mode
+        const MAX_CONCURRENT_WORKERS = processingMode === 'single' ? 1 : 3;
 
         let runningCategorizedBookmarks = [...allCategorizedBookmarks];
         let completedBatches = 0;
@@ -655,7 +645,6 @@ const App: React.FC = () => {
             activeWorkersRef.current.clear();
         };
 
-            // Always use multi-threaded processing
             initializeWorkers();
             for (let i = 0; i < Math.min(MAX_CONCURRENT_WORKERS, totalBatches); i++) {
                 startNextBatch();
@@ -717,39 +706,24 @@ const App: React.FC = () => {
                 reader.onload = (event) => {
                     const content = event.target?.result as string;
                     if (content) {
-                        let parsedBookmarks: Bookmark[] = [];
-                        if (file.name.endsWith('.html')) {
-                            const parser = new DOMParser();
-                            const doc = parser.parseFromString(content, 'text/html');
-                            const links = Array.from(doc.querySelectorAll('a'));
-                            parsedBookmarks = links.map((link, index) => ({
-                                id: `bm-${Date.now()}-${index}`,
-                                title: link.textContent || 'No Title',
-                                url: link.href,
-                                parentId: null
-                            }));
-                        } else if (file.name.endsWith('.csv')) {
-                            const lines = content.split('\n');
-                            lines.forEach((line, index) => {
-                                const [title, url] = line.split(',').map(s => s.trim());
-                                if (title && url) {
-                                    parsedBookmarks.push({
-                                        id: `bm-${Date.now()}-${index}`,
-                                        title,
-                                        url,
-                                        parentId: null
-                                    });
-                                }
-                            });
+                        try {
+                            let parsedBookmarks: Bookmark[] = [];
+                            if (file.name.endsWith('.html')) {
+                                parsedBookmarks = parseHTMLBookmarks(content);
+                            } else if (file.name.endsWith('.csv')) {
+                                parsedBookmarks = parseCSVBookmarks(content);
+                            }
+                            handleFileLoaded(file.name, parsedBookmarks);
+                        } catch (error: any) {
+                            alert(`Lỗi khi đọc file: ${error.message}`);
                         }
-                        handleFileLoaded(file.name, parsedBookmarks);
                     }
                 };
                 reader.readAsText(file);
             }
         };
         input.click();
-    }, []);
+    }, [handleFileLoaded]);
 
     const processImport = useCallback(async (mode: 'merge' | 'overwrite') => {
         if (previewBookmarks.length === 0) return;
@@ -757,9 +731,25 @@ const App: React.FC = () => {
 
         let combinedBookmarks: Bookmark[] = [];
         if (mode === 'merge') {
-            const existingUrls = new Set(bookmarks.map(bm => bm.url));
-            const newBookmarks = previewBookmarks.filter(bm => !existingUrls.has(bm.url));
-            combinedBookmarks = [...bookmarks, ...newBookmarks];
+            const urlMap = new Map(bookmarks.map(bm => [normalizeURL(bm.url), bm]));
+            
+            // For merge, we want to add new bookmarks AND potentially update existing ones if the new ones have tags
+            const newBookmarks = previewBookmarks.filter(bm => !urlMap.has(normalizeURL(bm.url)));
+            const existingToUpdate = previewBookmarks.filter(bm => urlMap.has(normalizeURL(bm.url)));
+            
+            // Create a copy of existing bookmarks
+            const updatedExisting = bookmarks.map(bm => {
+                const normalizedUrl = normalizeURL(bm.url);
+                const newInfo = existingToUpdate.find(ni => normalizeURL(ni.url) === normalizedUrl);
+                if (newInfo && newInfo.tags && newInfo.tags.length > 0) {
+                    // Update existing bookmark with new tags if it doesn't have any or merge them
+                    const mergedTags = Array.from(new Set([...(bm.tags || []), ...newInfo.tags]));
+                    return { ...bm, tags: mergedTags };
+                }
+                return bm;
+            });
+
+            combinedBookmarks = [...updatedExisting, ...newBookmarks];
         } else { // overwrite
             combinedBookmarks = previewBookmarks;
         }

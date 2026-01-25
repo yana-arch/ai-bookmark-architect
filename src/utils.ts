@@ -10,6 +10,68 @@ export const formatNumber = (num: number): string => {
 };
 
 /**
+ * Normalizes a URL for comparison
+ * @param url - The URL string to normalize
+ * @returns Normalized URL string
+ */
+export const normalizeURL = (url: string): string => {
+    try {
+        const parsed = new URL(url);
+        // Protocol and hostname are automatically lowercased by the URL constructor
+        let normalized = `${parsed.protocol}//${parsed.hostname}${parsed.port ? ':' + parsed.port : ''}${parsed.pathname}`;
+        
+        // Remove trailing slash if present
+        if (normalized.endsWith('/')) {
+            normalized = normalized.slice(0, -1);
+        }
+
+        // Add search params back, but sort them to handle different order
+        if (parsed.search) {
+            const searchParams = new URLSearchParams(parsed.search);
+            searchParams.sort();
+            normalized += '?' + searchParams.toString();
+        }
+
+        return normalized;
+    } catch (e) {
+        // Fallback for invalid URLs: trim and remove trailing slash
+        let fallback = url.trim();
+        if (fallback.endsWith('/')) {
+            fallback = fallback.slice(0, -1);
+        }
+        return fallback;
+    }
+};
+
+/**
+ * Parses HTML bookmark file content
+ * @param htmlContent - The HTML string content
+ * @returns Array of bookmarks
+ */
+export const parseHTMLBookmarks = (htmlContent: string): Bookmark[] => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlContent, 'text/html');
+    const links = Array.from(doc.querySelectorAll('a'));
+
+    return links.map((link, index) => {
+        const title = link.textContent || 'No Title';
+        const url = link.href;
+        
+        // Netscape format often uses TAGS or KEYWORDS attribute
+        const tagsAttr = link.getAttribute('TAGS') || link.getAttribute('KEYWORDS') || '';
+        const tags = tagsAttr ? tagsAttr.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+        return {
+            id: `html-${Date.now()}-${index}`,
+            title,
+            url,
+            parentId: null,
+            tags: tags.length > 0 ? tags : undefined
+        };
+    }).filter(bm => bm.url);
+};
+
+/**
  * Parses CSV content into bookmarks
  * @param csvContent - The CSV string content
  * @returns Array of bookmarks

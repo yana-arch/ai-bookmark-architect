@@ -111,7 +111,18 @@ const ImportPreview: React.FC<ImportPreviewProps> = ({
               <div key={bm.id || index} className="border border-gray-700/50 rounded p-3">
                 <div className="font-medium text-white truncate">{bm.title}</div>
                 <div className="text-sm text-gray-400 truncate">{bm.url}</div>
-                <div className="text-xs text-gray-500 mt-1">{getHostname(bm.url)}</div>
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <div className="text-xs text-gray-500">{getHostname(bm.url)}</div>
+                  {bm.tags && bm.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {bm.tags.map((tag, tIndex) => (
+                        <span key={tIndex} className="px-1.5 py-0.5 text-[10px] font-medium bg-blue-500/20 text-blue-300 rounded border border-blue-500/30">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
             {bookmarks.length > 10 && (
