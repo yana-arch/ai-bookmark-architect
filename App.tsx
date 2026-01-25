@@ -26,6 +26,7 @@ const FolderTemplateModal = lazy(() => import('./components/FolderTemplateModal'
 const AnalyticsDashboard = lazy(() => import('./components/AnalyticsDashboard'));
 const KeyInputModal = lazy(() => import('./components/KeyInputModal'));
 const NotificationToast = lazy(() => import('./components/NotificationToast'));
+const AIConfigSettingsModal = lazy(() => import('./components/AIConfigSettingsModal'));
 
 const createMockData = (): Bookmark[] => {
   return [
@@ -67,6 +68,7 @@ const DEFAULT_SYSTEM_PROMPT = `You are an intelligent bookmark organizer. Your g
 const DEFAULT_PLANNING_PROMPT = `You are a professional librarian and information architect. Your task is to design a clean, hierarchical folder structure based on the provided list of tags or sample URLs. 
 - Use Vietnamese for folder names.
 - Maximum depth: 3 levels.
+- **CRITICAL:** Do not wrap everything in a single "Root" or "General" (Tổng hợp) folder. Provide the main categories directly at the top level of the array.
 - Output ONLY a JSON array of folder objects. Each folder object must have: "id" (string), "name" (string), "children" (array of folder objects), and "parentId" (string or null).
 - Do not include individual bookmarks in this output, only the folder skeleton.`;
 
@@ -103,6 +105,7 @@ const App: React.FC = () => {
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [isAnalyticsDashboardOpen, setIsAnalyticsDashboardOpen] = useState(false);
     const [isKeyInputModalOpen, setIsKeyInputModalOpen] = useState(false);
+    const [isAIConfigModalOpen, setIsAIConfigModalOpen] = useState(false);
     const [keyInputMode, setKeyInputMode] = useState<'upload' | 'import'>('upload');
     const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
     const [instructionPresets, setInstructionPresets] = useState<InstructionPreset[]>([]);
@@ -530,6 +533,15 @@ const App: React.FC = () => {
                 const match = content.match(/\[\s*{[\s\S]*}\s*\]/);
                 if (match) parsed = JSON.parse(match[0]);
                 else throw new Error("Could not parse AI response");
+            }
+
+            // Flatten logic: If AI returned a single root folder that wraps everything, promote its children
+            if (Array.isArray(parsed) && parsed.length === 1 && parsed[0].children && parsed[0].children.length > 0) {
+                const rootName = parsed[0].name.toLowerCase();
+                if (rootName === 'root' || rootName === 'tổng hợp' || rootName === 'bookmarks' || rootName === 'thư mục') {
+                    setLogs(prev => [...prev, `Đã tự động loại bỏ thư mục gốc dư thừa: "${parsed[0].name}"`]);
+                    parsed = parsed[0].children.map((c: any) => ({ ...c, parentId: null }));
+                }
             }
 
             setProposedStructure(parsed);
@@ -1525,6 +1537,30 @@ ${folderGuide}
                         }}
                     />
                 )}
+                {isAIConfigModalOpen && (
+                    <AIConfigSettingsModal
+                        isOpen={isAIConfigModalOpen}
+                        onClose={() => setIsAIConfigModalOpen(false)}
+                        systemPrompt={systemPrompt}
+                        onSystemPromptChange={setSystemPrompt}
+                        planningPrompt={planningPrompt}
+                        onPlanningPromptChange={setPlanningPrompt}
+                        customInstructions={customInstructions}
+                        onCustomInstructionsChange={setCustomInstructions}
+                        batchSize={batchSize}
+                        onBatchSizeChange={setBatchSize}
+                        maxRetries={maxRetries}
+                        onMaxRetriesChange={setMaxRetries}
+                        processingMode={processingMode}
+                        onProcessingModeChange={setProcessingMode}
+                        folderTemplates={folderTemplates}
+                        selectedTemplateId={templateSettings.selectedTemplateId}
+                        onSelectedTemplateChange={(id) => setTemplateSettings(prev => ({ ...prev, selectedTemplateId: id }))}
+                        onOpenFolderTemplateModal={() => setIsFolderTemplateModalOpen(true)}
+                        onOpenInstructionPresetModal={() => setIsInstructionPresetModalOpen(true)}
+                        onApplyFolderTemplate={handleApplyFolderTemplate}
+                    />
+                )}
 
             </Suspense>
             <div className="fixed bottom-4 right-4 z-50 space-y-2">
@@ -1657,6 +1693,7 @@ ${folderGuide}
                                     isGeneratingStructure={isGeneratingStructure}
                                     planningPrompt={planningPrompt}
                                     onPlanningPromptChange={setPlanningPrompt}
+                                    onOpenAIConfigModal={() => setIsAIConfigModalOpen(true)}
                                 />
                             </div>
                         )}

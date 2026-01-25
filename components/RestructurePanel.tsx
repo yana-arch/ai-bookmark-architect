@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { AppState } from '@/types';
 import type { Bookmark, Folder, ApiConfig, FolderTemplate } from '@/types';
@@ -10,15 +11,8 @@ interface RestructurePanelProps {
     logs: string[];
     errorDetails: string | null;
     apiConfigs: ApiConfig[];
-    systemPrompt: string;
     sessionTokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number };
-    customInstructions: string;
-    batchSize: number;
-    maxRetries: number;
-    processingMode: 'single' | 'multi';
     hasPartialResults: boolean;
-    folderTemplates: FolderTemplate[];
-    selectedTemplateId: string | null;
     onStart: () => void;
     onStop: () => void;
     onForceStop?: () => void;
@@ -27,34 +21,19 @@ interface RestructurePanelProps {
     onContinue: () => void;
     onOpenApiModal: () => void;
     onOpenLogModal: () => void;
-    onOpenInstructionPresetModal: () => void;
-    onOpenFolderTemplateModal: () => void;
-    onSystemPromptChange: (prompt: string) => void;
-    onCustomInstructionsChange: (instructions: string) => void;
-    onBatchSizeChange: (size: number) => void;
-    onMaxRetriesChange: (retries: number) => void;
-    onProcessingModeChange: (mode: 'single' | 'multi') => void;
-    onApplyFolderTemplate: (template: FolderTemplate) => void;
-    onSelectedTemplateChange: (templateId: string | null) => void;
     onSuggestStructure: (source: 'tags' | 'domains') => void;
     onConfirmProposedStructure: () => void;
     proposedStructure: (Folder | Bookmark)[];
     isGeneratingStructure: boolean;
-    planningPrompt: string;
-    onPlanningPromptChange: (prompt: string) => void;
+    onOpenAIConfigModal: () => void;
 }
 
 const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
     const {
         appState, progress, logs, errorDetails, onStart, onStop, onForceStop, onApply, onDiscard, onContinue,
-        apiConfigs, onOpenApiModal, onOpenLogModal, onOpenInstructionPresetModal, onOpenFolderTemplateModal,
-        systemPrompt, onSystemPromptChange, sessionTokenUsage,
-        customInstructions, onCustomInstructionsChange,
-        batchSize, onBatchSizeChange, maxRetries, onMaxRetriesChange,
-        processingMode, onProcessingModeChange,
-        hasPartialResults, folderTemplates, selectedTemplateId, onApplyFolderTemplate, onSelectedTemplateChange,
-        onSuggestStructure, onConfirmProposedStructure, proposedStructure, isGeneratingStructure,
-        planningPrompt, onPlanningPromptChange
+        apiConfigs, onOpenApiModal, onOpenLogModal, sessionTokenUsage,
+        hasPartialResults, onSuggestStructure, onConfirmProposedStructure, 
+        proposedStructure, isGeneratingStructure, onOpenAIConfigModal
     } = props;
     const progressPercentage = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
     
@@ -126,171 +105,13 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                         </div>
 
                         <div className="mt-6">
-                            <details className="group">
-                                <summary className="text-sm font-medium text-gray-400 cursor-pointer list-none flex items-center justify-between group-hover:text-white transition-colors">
-                                    <span>Tùy chọn & Chỉ dẫn cho AI</span>
-                                    <svg className="w-4 h-4 transition-transform duration-200 transform-gpu group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                                    </svg>
-                                </summary>
-                                <div className="mt-3 space-y-4">
-                                    <div>
-                                        <label htmlFor="planning-prompt" className="block text-xs text-gray-400 mb-1">
-                                            Chỉ dẫn lập kế hoạch (Planning Prompt):
-                                        </label>
-                                        <textarea
-                                            id="planning-prompt"
-                                            value={planningPrompt}
-                                            onChange={(e) => onPlanningPromptChange(e.target.value)}
-                                            rows={4}
-                                            className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y mb-2"
-                                            placeholder="AI sẽ dùng chỉ dẫn này để thiết kế sơ đồ thư mục ban đầu..."
-                                        />
-                                    </div>
-                                    <div>
-                                        <label htmlFor="system-prompt" className="block text-xs text-gray-400 mb-1">
-                                            Chỉ dẫn phân loại (System Prompt):
-                                        </label>
-                                        <textarea
-                                            id="system-prompt"
-                                            value={systemPrompt}
-                                            onChange={(e) => onSystemPromptChange(e.target.value)}
-                                            rows={5}
-                                            className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-y"
-                                        />
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <label htmlFor="folder-template" className="block text-xs text-gray-400">
-                                                Mẫu thư mục:
-                                            </label>
-                                            <div className="flex items-center space-x-2">
-                                                <button
-                                                    onClick={onOpenFolderTemplateModal}
-                                                    className="text-xs text-blue-400 hover:text-blue-300 underline"
-                                                >
-                                                    Quản lý mẫu
-                                                </button>
-                                                {selectedTemplateId && (
-                                                    <button
-                                                        onClick={() => {
-                                                            const template = folderTemplates.find(t => t.id === selectedTemplateId);
-                                                            if (template) onApplyFolderTemplate(template);
-                                                        }}
-                                                        className="text-xs text-emerald-400 hover:text-emerald-300 underline"
-                                                    >
-                                                        Áp dụng
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <select
-                                            id="folder-template"
-                                            value={selectedTemplateId || ''}
-                                            onChange={(e) => onSelectedTemplateChange(e.target.value || null)}
-                                            className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                        >
-                                            <option value="">Không sử dụng mẫu</option>
-                                            {folderTemplates.map(template => (
-                                                <option key={template.id} value={template.id}>
-                                                    {template.name} - {template.description}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {selectedTemplateId && (
-                                            <p className="text-xs text-gray-500 mt-1">
-                                                AI sẽ phân loại bookmark vào đúng cấu trúc thư mục có sẵn của mẫu được chọn.
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <label htmlFor="ai-instructions" className="block text-xs text-gray-400">
-                                                Chỉ dẫn bổ sung (tên thư mục, phân loại):
-                                            </label>
-                                            <button
-                                                onClick={onOpenInstructionPresetModal}
-                                                className="text-xs text-blue-400 hover:text-blue-300 underline"
-                                            >
-                                                Quản lý Preset
-                                            </button>
-                                        </div>
-                                        <textarea
-                                            id="ai-instructions"
-                                            value={customInstructions}
-                                            onChange={(e) => onCustomInstructionsChange(e.target.value)}
-                                            rows={3}
-                                            placeholder="Ví dụ: Chỉ sử dụng tiếng Anh cho tên thư mục. Giới hạn 2 cấp thư mục."
-                                            className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-y"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label htmlFor="batch-size" className="block text-xs text-gray-400 mb-1">
-                                                Số lượng bookmark/batch
-                                            </label>
-                                            <input
-                                                type="number"
-                                                id="batch-size"
-                                                value={batchSize}
-                                                onChange={(e) => onBatchSizeChange(parseInt(e.target.value, 10))}
-                                                min="1"
-                                                max="50"
-                                                className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label htmlFor="max-retries" className="block text-xs text-gray-400 mb-1">
-                                                Số lần thử lại trên mỗi key
-                                            </label>
-                                            <input
-                                                type="number"
-                                                id="max-retries"
-                                                value={maxRetries}
-                                                onChange={(e) => onMaxRetriesChange(parseInt(e.target.value, 10))}
-                                                min="0"
-                                                max="5"
-                                                className="w-full bg-gray-900/70 border border-gray-600 rounded-md px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs text-gray-400 mb-2">
-                                            Chế độ xử lý
-                                        </label>
-                                        <div className="flex space-x-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => onProcessingModeChange('single')}
-                                                className={`flex-1 py-2 text-sm rounded-md transition-colors ${
-                                                    processingMode === 'single'
-                                                        ? 'bg-blue-500 text-white font-bold'
-                                                        : 'bg-gray-700 hover:bg-gray-600'
-                                                }`}
-                                            >
-                                                Đơn luồng
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => onProcessingModeChange('multi')}
-                                                className={`flex-1 py-2 text-sm rounded-md transition-colors ${
-                                                    processingMode === 'multi'
-                                                        ? 'bg-emerald-500 text-white font-bold'
-                                                        : 'bg-gray-700 hover:bg-gray-600'
-                                                }`}
-                                            >
-                                                Đa luồng
-                                            </button>
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-1">
-                                            {processingMode === 'single'
-                                                ? 'Xử lý tuần tự từng batch một'
-                                                : 'Xử lý song song nhiều batch cùng lúc'
-                                            }
-                                        </p>
-                                    </div>
-                                </div>
-                            </details>
+                            <button
+                                onClick={onOpenAIConfigModal}
+                                className="w-full flex items-center justify-center text-sm bg-gray-800 border border-gray-700 text-gray-300 font-bold py-3 px-4 rounded-lg hover:bg-gray-700 hover:text-white transition-all group"
+                            >
+                                <CogIcon className="w-5 h-5 mr-2 text-gray-500 group-hover:text-sky-400 transition-colors" />
+                                Cấu hình & Chỉ dẫn cho AI
+                            </button>
                         </div>
                     </>
                 );
