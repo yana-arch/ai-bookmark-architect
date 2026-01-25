@@ -389,7 +389,7 @@ export const folderCache = new CachedOperation(
 );
 export const searchCache = new CachedOperation(
     [memorySearchCache, searchSessionCache, searchIndexedDBCache],
-    async () => { throw new Error("Operation not provided for searchCache"); },
+    async () => null, // Return null on cache miss instead of throwing
     10 * 60 * 1000 // Default TTL 10 minutes
 );
 

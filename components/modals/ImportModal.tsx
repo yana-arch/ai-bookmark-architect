@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { Bookmark } from '@/types';
-import ImportPreview from './ImportPreview';
+import ImportPreview from '../features/ImportPreview';
 
 interface ImportModalProps {
     fileName: string;

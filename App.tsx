@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useCallback, useMemo, lazy, Suspense, useEffect } from 'react';
 
 import { AILogoIcon, ChartIcon, UploadIcon, ImportIcon } from './components/ui/Icons';
 import { AppState, Folder, Bookmark, CategorizedBookmark } from './types';
@@ -101,6 +101,11 @@ const App: React.FC = () => {
         onFoldersUpdate: setFolders,
         onNotificationsAdd: (n) => setNotifications(prev => [...prev, n])
     });
+
+    const handleForceStopWrapper = useCallback(() => {
+        handleForceStopRestructuring();
+        setAppState(AppState.ERROR);
+    }, [handleForceStopRestructuring, setAppState]);
 
     const {
         isApiModalOpen, setIsApiModalOpen,
@@ -231,31 +236,46 @@ const App: React.FC = () => {
         return addCounts(folders);
     }, [folders]);
 
-    const filteredBookmarks = useMemo(() => {
-        if (!searchQuery.trim()) {
-            return [];
-        }
+    const [filteredBookmarks, setFilteredBookmarks] = useState<Bookmark[]>([]);
 
-        const bookmarksHash = generateHash(bookmarks);
-        const cacheKey = cacheKeys.searchResults(searchQuery, bookmarksHash);
+    useEffect(() => {
+        let isMounted = true;
+        const performSearch = async () => {
+            if (!searchQuery.trim()) {
+                if (isMounted) setFilteredBookmarks([]);
+                return;
+            }
 
-        // Try to get from cache first
-        const cached = searchCache.get(cacheKey);
-        if (cached) {
-            return cached;
-        }
+            const bookmarksHash = generateHash(bookmarks);
+            const cacheKey = cacheKeys.searchResults(searchQuery, bookmarksHash);
 
-        // Perform search
-        const lowercasedQuery = searchQuery.toLowerCase();
-        const results = bookmarks.filter(bm =>
-            bm.title.toLowerCase().includes(lowercasedQuery) ||
-            bm.url.toLowerCase().includes(lowercasedQuery)
-        );
+            // Try to get from cache first
+            const cached = await searchCache.get(cacheKey);
+            if (cached && isMounted) {
+                setFilteredBookmarks(cached);
+                return;
+            }
 
-        // Cache the results
-        searchCache.set(cacheKey, results, 10 * 60 * 1000); // Cache for 10 minutes
+            // Perform search
+            const lowercasedQuery = searchQuery.toLowerCase();
+            const results = bookmarks.filter(bm =>
+                bm.title.toLowerCase().includes(lowercasedQuery) ||
+                bm.url.toLowerCase().includes(lowercasedQuery)
+            );
 
-        return results;
+            // Cache the results
+            searchCache.set(cacheKey, results, 10 * 60 * 1000); // Cache for 10 minutes
+
+            if (isMounted) {
+                setFilteredBookmarks(results);
+            }
+        };
+
+        performSearch();
+
+        return () => {
+            isMounted = false;
+        };
     }, [searchQuery, bookmarks]);
 
     const selectedFolder = selectedFolderId === 'root' 
@@ -513,7 +533,7 @@ const App: React.FC = () => {
                                     selectedTemplateId={templateSettings.selectedTemplateId}
                                     onStart={() => startRestructuring(false)}
                                     onStop={handleStopRestructuring}
-                                    onForceStop={handleForceStopRestructuring}
+                                    onForceStop={handleForceStopWrapper}
                                     onApply={applyChanges}
                                     onDiscard={discardChanges}
                                     onContinue={continueRestructuring}
