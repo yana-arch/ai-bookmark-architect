@@ -14,6 +14,7 @@ interface UseBookmarkProcessingProps {
     customInstructions: string;
     onFoldersUpdate: (folders: (Folder | Bookmark)[]) => void;
     onNotificationsAdd: (notification: { id: string, message: string, type: 'info' | 'error' | 'success' | 'warning' }) => void;
+    onProcessingComplete?: (hasError: boolean) => void;
 }
 
 export const useBookmarkProcessing = ({
@@ -25,7 +26,8 @@ export const useBookmarkProcessing = ({
     systemPrompt,
     customInstructions,
     onFoldersUpdate,
-    onNotificationsAdd
+    onNotificationsAdd,
+    onProcessingComplete
 }: UseBookmarkProcessingProps) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState({ current: 0, total: 0 });
@@ -149,6 +151,10 @@ export const useBookmarkProcessing = ({
                     addDetailedLog('success', 'Hoàn tất xử lý', `Đã phân loại thành công toàn bộ ${sourceBookmarks.length} bookmarks.`);
                     setLogs(prev => [...prev, '--- HOÀN TẤT QUÁ TRÌNH ---']);
                 }
+
+                if (onProcessingComplete) {
+                    onProcessingComplete(failedBatches > 0);
+                }
             };
 
             const startNextBatch = (specificWorker?: Worker, specificWorkerIndex?: number) => {
@@ -198,11 +204,13 @@ export const useBookmarkProcessing = ({
                 workersRef.current.push(worker);
 
                 worker.onmessage = (e) => {
-                    const { type, data, error, batchIndex } = e.data;
+                    const { type, data, error, batchIndex, log } = e.data;
 
                     if (type === 'log') {
-                        setLogs(prev => [...prev, `[Worker ${batchIndex}] ${data}`]);
-                        addDetailedLog('info', `Worker ${batchIndex}`, data);
+                        const logMsg = log?.message || data || 'No message';
+                        const workerId = batchIndex !== undefined ? batchIndex : 'AI';
+                        setLogs(prev => [...prev, `[Worker ${workerId}] ${logMsg}`]);
+                        addDetailedLog('info', `Worker ${workerId}`, logMsg);
                     } else if (type === 'detailed_log') {
                         // Forward detailed logs from worker
                         addDetailedLog(data.type, data.title, data.content, data.usage);
@@ -211,9 +219,9 @@ export const useBookmarkProcessing = ({
                         
                         activeWorkersRef.current.delete(batchIndex);
                         completedBatches++;
-                        batchResults[batchIndex] = data.categorizedBatch;
+                        batchResults[batchIndex] = data;
 
-                        if (data.usage) {
+                        if (data && data.usage) {
                             setSessionTokenUsage(prev => ({
                                 promptTokens: prev.promptTokens + (data.usage.promptTokens || 0),
                                 completionTokens: prev.completionTokens + (data.usage.completionTokens || 0),

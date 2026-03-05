@@ -23,6 +23,7 @@ import { useAIPlanning } from './hooks/useAIPlanning';
 import { useDuplicates } from './hooks/useDuplicates';
 import { useBrokenLinks } from './hooks/useBrokenLinks';
 import { useImportExport } from './hooks/useImportExport';
+import { useAISettings } from './hooks/useAISettings';
 
 // Lazy load modals for better performance
 const ImportModal = lazy(() => import('./components/modals/ImportModal'));
@@ -58,12 +59,14 @@ const App: React.FC = () => {
     const [isAnalyticsDashboardOpen, setIsAnalyticsDashboardOpen] = useState(false);
     const [isLogModalOpen, setIsLogModalOpen] = useState(false);
     
-    // Settings State
-    const [systemPrompt, setSystemPrompt] = useState<string>(DEFAULT_SYSTEM_PROMPT);
-    const [customInstructions, setCustomInstructions] = useState<string>('');
-    const [batchSize, setBatchSize] = useState(5);
-    const [maxRetries, setMaxRetries] = useState(2);
-    const [processingMode, setProcessingMode] = useState<'single' | 'multi'>('multi');
+    // Settings State - Persisted
+    const {
+        systemPrompt, setSystemPrompt,
+        customInstructions, setCustomInstructions,
+        batchSize, setBatchSize,
+        maxRetries, setMaxRetries,
+        processingMode, setProcessingMode
+    } = useAISettings();
 
     // 3. Logic Hooks
     const { 
@@ -99,7 +102,14 @@ const App: React.FC = () => {
         systemPrompt,
         customInstructions,
         onFoldersUpdate: setFolders,
-        onNotificationsAdd: (n) => setNotifications(prev => [...prev, n])
+        onNotificationsAdd: (n) => setNotifications(prev => [...prev, n]),
+        onProcessingComplete: (hasError) => {
+            if (hasError) {
+                setAppState(AppState.ERROR);
+            } else {
+                setAppState(AppState.REVIEW);
+            }
+        }
     });
 
     const handleForceStopWrapper = useCallback(() => {
@@ -220,6 +230,7 @@ const App: React.FC = () => {
     // 5. View Logic
     const foldersWithCounts = useMemo(() => {
         const addCounts = (items: (Folder | Bookmark)[]): (Folder | Bookmark)[] => {
+            if (!Array.isArray(items)) return [];
             return items.map(item => {
                 if ('url' in item) {
                     return item;

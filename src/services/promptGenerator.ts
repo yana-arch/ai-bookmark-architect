@@ -40,8 +40,8 @@ const generateAIContent = async (
                 headers: {
                     'Authorization': `Bearer ${apiConfig.apiKey}`,
                     'Content-Type': 'application/json',
-                    'HTTP-Referer': window.location.href,
-                    'X-Title': 'AI Bookmark Architect Prompt Gen'
+                    'HTTP-Referer': window.location.href, // Optional. Site URL for rankings on openrouter.ai.
+                    'X-OpenRouter-Title': 'AI Bookmark Architect Prompt Gen', // Optional. Site title for rankings on openrouter.ai.
                 },
                 body: JSON.stringify({
                     model: apiConfig.model,

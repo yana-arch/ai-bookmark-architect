@@ -148,17 +148,19 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             domainKnowledge
         } = data;
 
-        // Use the first active Gemini config
-        const geminiConfig = apiConfigs.find(c => c.provider === 'gemini' && c.status === 'active');
+        // Use the first active API config
+        const availableConfigs = apiConfigs.filter(c => c.status === 'active');
 
-        if (!geminiConfig) {
+        if (availableConfigs.length === 0) {
             self.postMessage({
                 type: 'batch_error',
-                error: 'No active Gemini API key found.',
+                error: 'No active API key found.',
                 batchIndex
             } as WorkerResponse);
             return;
         }
+        
+        const activeConfig = availableConfigs[0];
 
         let attempts = 0;
         let success = false;
@@ -170,7 +172,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 // Log attempt
                 self.postMessage({
                     type: 'log',
-                    log: { message: `Batch ${batchIndex}: Attempt ${attempts}/${maxRetries + 1}` }
+                    log: { message: `Batch ${batchIndex}: Attempt ${attempts}/${maxRetries + 1}` },
+                    batchIndex
                 } as WorkerResponse);
 
                 // Prepare Prompt
@@ -203,29 +206,74 @@ ${treeContext}
 Bookmarks to Process:
 ${bookmarksList}
 
-Respond ONLY with the JSON object as described.`;
+CRITICAL INSTRUCTION: Respond ONLY with a valid JSON object containing a "bookmarks" array.
+The structure must be exactly:
+{
+  "bookmarks": [
+    {
+      "title": "Bookmark Title",
+      "url": "https://example.com",
+      "path": ["TopFolder", "SubFolder"],
+      "tags": ["tag1", "tag2"]
+    }
+  ]
+}
+Do not include any explanation or markdown formatting outside the JSON object.`;
 
-                // Initialize Gemini (Updated for @google/genai SDK)
-                const genAI = new GoogleGenAI({ apiKey: geminiConfig.apiKey });
-        
-                // Call API
-                const result = await genAI.models.generateContent({
-                    model: geminiConfig.model || 'gemini-1.5-flash',
-                    contents: [
-                        {
-                            parts: [
-                                {
-                                    text: fullPrompt
-                                }
-                            ]
+                let responseText: string | undefined;
+
+                if (activeConfig.provider === 'gemini') {
+                    // Initialize Gemini (Updated for @google/genai SDK)
+                    const genAI = new GoogleGenAI({ apiKey: activeConfig.apiKey });
+            
+                    // Call API
+                    const result = await genAI.models.generateContent({
+                        model: activeConfig.model || 'gemini-1.5-flash',
+                        contents: [
+                            {
+                                parts: [
+                                    {
+                                        text: fullPrompt
+                                    }
+                                ]
+                            }
+                        ],
+                        config: {
+                            responseMimeType: 'application/json'
                         }
-                    ],
-                    config: {
-                        responseMimeType: 'application/json'
-                    }
-                });
+                    });
 
-                const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    responseText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                } else {
+                    // OpenRouter or Custom
+                    const endpoint = activeConfig.provider === 'custom' && activeConfig.apiUrl 
+                        ? activeConfig.apiUrl 
+                        : 'https://openrouter.ai/api/v1/chat/completions';
+
+                    const result = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${activeConfig.apiKey}`,
+                            'Content-Type': 'application/json',
+                            'HTTP-Referer': self.location.origin || 'http://localhost', // Optional. Site URL for rankings on openrouter.ai.
+                            'X-OpenRouter-Title': 'AI Bookmark Architect', // Optional. Site title for rankings on openrouter.ai.
+                        },
+                        body: JSON.stringify({
+                            model: activeConfig.model,
+                            messages: [
+                                { role: 'user', content: fullPrompt }
+                            ],
+                            response_format: { type: 'json_object' }
+                        })
+                    });
+
+                    if (!result.ok) {
+                        const errText = await result.text();
+                        throw new Error(`API call failed: ${result.status} - ${errText}`);
+                    }
+                    const data = await result.json();
+                    responseText = data.choices[0].message.content;
+                }
 
                 if (!responseText) {
                     throw new Error('AI returned empty response');
@@ -235,7 +283,12 @@ Respond ONLY with the JSON object as described.`;
                 const categorizedBookmarks = parseAIResponse(responseText);
 
                 if (categorizedBookmarks.length === 0) {
-                    throw new Error('AI returned empty or invalid bookmark list');
+                    console.error("AI Response content was:", responseText);
+                    let errMsg = responseText || 'empty response';
+                    if (errMsg.length > 150) {
+                        errMsg = errMsg.substring(0, 150) + '...';
+                    }
+                    throw new Error(`AI returned invalid format or API error: ${errMsg}`);
                 }
 
                 // Merge back strict IDs from original batch to ensure data integrity

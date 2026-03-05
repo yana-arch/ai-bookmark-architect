@@ -20,7 +20,20 @@ export const useAIPlanning = (
 ) => {
     const [isPlanning, setIsPlanning] = useState(false);
     const [proposedStructure, setProposedStructure] = useState<(Folder | Bookmark)[]>([]);
-    const [planningPrompt, setPlanningPrompt] = useState<string>(DEFAULT_PLANNING_PROMPT);
+    
+    // Persist planning prompt
+    const [planningPrompt, setPlanningPrompt] = useState<string>(() => {
+        return localStorage.getItem('ai_planning_prompt') || DEFAULT_PLANNING_PROMPT;
+    });
+
+    // Save to localStorage whenever it changes
+    const handleSetPlanningPrompt = useCallback((value: string | ((prev: string) => string)) => {
+        setPlanningPrompt(prev => {
+            const newValue = typeof value === 'function' ? value(prev) : value;
+            localStorage.setItem('ai_planning_prompt', newValue);
+            return newValue;
+        });
+    }, []);
 
     const generateStructureSuggestion = async (source: 'tags' | 'domains') => {
         setIsPlanning(true);
@@ -45,6 +58,11 @@ export const useAIPlanning = (
             const userPrompt = `Dựa trên danh sách ${source === 'tags' ? 'tag' : 'link'} sau đây, hãy tạo một cấu trúc thư mục logic:\n\n${inputData}`;
             const currentKey = availableKeys[0]; // Use first active key
             let content = '';
+
+            // Check if model is an embedding model
+            if (currentKey.model && currentKey.model.toLowerCase().includes('embed')) {
+                throw new Error(`Model "${currentKey.model}" là model nhúng (embedding), không hỗ trợ chat/completions. Vui lòng chọn model khác (ví dụ: gemini-2.5-flash, gpt-4o, claude-3...).`);
+            }
 
             if (currentKey.provider === 'gemini') {
                 const ai = new GoogleGenAI({ apiKey: currentKey.apiKey });
@@ -77,8 +95,8 @@ export const useAIPlanning = (
                     headers: {
                         'Authorization': `Bearer ${currentKey.apiKey}`,
                         'Content-Type': 'application/json',
-                        'HTTP-Referer': window.location.href,
-                        'X-Title': 'AI Bookmark Architect'
+                        'HTTP-Referer': window.location.href, // Optional. Site URL for rankings on openrouter.ai.
+                        'X-OpenRouter-Title': 'AI Bookmark Architect', // Optional. Site title for rankings on openrouter.ai.
                     },
                     body: JSON.stringify({
                         model: currentKey.model,
@@ -105,11 +123,26 @@ export const useAIPlanning = (
                 const cleanedContent = content.replace(/```json\s*|\s*```/g, '').trim();
                 const rawParsed = JSON.parse(cleanedContent);
                 parsed = rawParsed.folders || rawParsed;
+                
+                if (!Array.isArray(parsed)) {
+                    throw new Error('AI response is not an array of folders');
+                }
             } catch (e) {
                 // Fallback to regex if JSON is slightly malformed
                 const match = content.match(/\[\s*{[\s\S]*}\s*\]/);
-                if (match) parsed = JSON.parse(match[0]);
-                else throw new Error('Could not parse AI response: ' + content.substring(0, 100));
+                if (match) {
+                    try {
+                        parsed = JSON.parse(match[0]);
+                    } catch (err) {
+                         throw new Error('Could not parse AI response: ' + content.substring(0, 100));
+                    }
+                } else {
+                    throw new Error('Could not parse AI response: ' + content.substring(0, 100));
+                }
+            }
+            
+            if (!Array.isArray(parsed)) {
+                 throw new Error('Valid folder structure not found in AI response.');
             }
 
             // Flatten logic: If AI returned a single root folder that wraps everything, promote its children
@@ -134,6 +167,7 @@ export const useAIPlanning = (
 
 
     const getStructureGuide = useCallback((nodes: any[], path: string[] = []): string[] => {
+        if (!Array.isArray(nodes)) return [];
         let list: string[] = [];
         nodes.forEach(node => {
             if (!('url' in node)) {
@@ -178,7 +212,7 @@ export const useAIPlanning = (
         proposedStructure,
         setProposedStructure,
         planningPrompt,
-        setPlanningPrompt,
+        setPlanningPrompt: handleSetPlanningPrompt,
         generateStructureSuggestion,
         confirmProposedStructure
     };
