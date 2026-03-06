@@ -91,6 +91,9 @@ export const initDB = () => {
                     if (!db.objectStoreNames.contains(SMART_RULES_STORE)) {
                         db.createObjectStore(SMART_RULES_STORE, { keyPath: 'id' });
                     }
+                    if (!db.objectStoreNames.contains(DB_CONNECTIONS_STORE)) {
+                        db.createObjectStore(DB_CONNECTIONS_STORE, { keyPath: 'id' });
+                    }
                 }
                 // DbConnections store is used but wasn't explicitly in the upgrade block in original file,
                 // but since we are refactoring, we should ensure it exists if used.

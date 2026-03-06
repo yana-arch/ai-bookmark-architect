@@ -30,10 +30,25 @@ const BackupModal: React.FC<BackupModalProps> = ({
     const [restoringBackup, setRestoringBackup] = useState<string | null>(null);
 
     useEffect(() => {
+        const checkAuthAndLoadBackups = async () => {
+            try {
+                await postgresqlService.initialize();
+                const authenticated = await postgresqlService.isSignedIn();
+                setIsAuthenticated(authenticated);
+
+                if (authenticated) {
+                    await loadBackups();
+                }
+            } catch (err) {
+                console.error('Failed to check authentication:', err);
+                setError('Failed to check PostgreSQL authentication');
+            }
+        };
+
         if (isOpen) {
             checkAuthAndLoadBackups();
         }
-    }, [isOpen]);
+    }, [isOpen]); // loadBackups is still missing if defined outside, so let's check it
 
     const checkAuthAndLoadBackups = async () => {
         try {

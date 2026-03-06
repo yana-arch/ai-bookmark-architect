@@ -24,34 +24,34 @@ const ImportModal: React.FC<ImportModalProps> = ({
     const [isProcessing, setIsProcessing] = useState(false);
 
     useEffect(() => {
+        const analyzeBookmarks = () => {
+            let duplicateCount = 0;
+            let invalidCount = 0;
+
+            // Create set of existing URLs for duplicate detection
+            const existingUrls = new Set(existingBookmarks.map(bm => bm.url));
+
+            previewBookmarks.forEach(bookmark => {
+                // Check for duplicates
+                if (existingUrls.has(bookmark.url)) {
+                    duplicateCount++;
+                }
+
+                // Check for invalid URLs
+                try {
+                    new URL(bookmark.url);
+                } catch (e) {
+                    invalidCount++;
+                }
+            });
+
+            setDuplicates(duplicateCount);
+            setInvalidUrls(invalidCount);
+        };
+
         // Analyze bookmarks for duplicates and invalid URLs
         analyzeBookmarks();
     }, [previewBookmarks, existingBookmarks]);
-
-    const analyzeBookmarks = () => {
-        let duplicateCount = 0;
-        let invalidCount = 0;
-
-        // Create set of existing URLs for duplicate detection
-        const existingUrls = new Set(existingBookmarks.map(bm => bm.url));
-
-        previewBookmarks.forEach(bookmark => {
-            // Check for duplicates
-            if (existingUrls.has(bookmark.url)) {
-                duplicateCount++;
-            }
-
-            // Check for invalid URLs
-            try {
-                new URL(bookmark.url);
-            } catch (e) {
-                invalidCount++;
-            }
-        });
-
-        setDuplicates(duplicateCount);
-        setInvalidUrls(invalidCount);
-    };
 
     const handlePreview = () => {
         setShowPreview(true);

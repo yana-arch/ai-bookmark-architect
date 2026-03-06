@@ -82,17 +82,20 @@ export const useBookmarkProcessing = ({
 
 
     // Helper to simplify folder structure for AI context (removes IDs and Bookmarks)
-    const simplifyFolderStructure = (folders: (Folder | Bookmark)[]): any[] => {
+    const simplifyFolderStructure = useCallback((folders: (Folder | Bookmark)[]): any[] => {
         return folders
             .filter(item => !('url' in item)) // Filter out bookmarks at this level
             .map(item => {
                 const folder = item as Folder;
                 return {
                     name: folder.name,
+                    // Note: This recursive call works because the function is hoisted or available in closure,
+                    // but with useCallback it might be tricky if we need self-reference.
+                    // Actually, for recursion inside useCallback, it's safer to define a standalone recursive function outside or inside.
                     children: simplifyFolderStructure(folder.children)
                 };
             });
-    };
+    }, []); // No dependencies needed for this pure transformation
 
     const startProcessing = useCallback(async (
         initialProcessed: CategorizedBookmark[], 
@@ -235,9 +238,10 @@ export const useBookmarkProcessing = ({
                         setProgress({ current: currentProgress, total: sourceBookmarks.length });
 
                         // Update folders realtime
+                        const categorizedMap = new Map<string, CategorizedBookmark>([...currentProcessed, ...allResults].map(cb => [cb.url, cb]));
                         const newFolders = arrayToTree(
                             sourceBookmarks.map(bm => {
-                                const categorized = [...currentProcessed, ...allResults].find(cb => cb.url === bm.url);
+                                const categorized = categorizedMap.get(bm.url);
                                 return { ...bm, path: categorized?.path || [], tags: categorized?.tags || [] };
                             }),
                             currentFolders
@@ -277,7 +281,7 @@ export const useBookmarkProcessing = ({
         });
         
         return true;
-    }, [bookmarks, apiConfigs, batchSize, maxRetries, processingMode, systemPrompt, customInstructions, onFoldersUpdate, addDetailedLog]);
+    }, [bookmarks, apiConfigs, batchSize, maxRetries, processingMode, systemPrompt, customInstructions, onFoldersUpdate, addDetailedLog, onProcessingComplete, simplifyFolderStructure]);
 
     const resetProcessingState = useCallback(() => {
         setIsProcessing(false);

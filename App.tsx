@@ -197,9 +197,13 @@ const App: React.FC = () => {
 
     const applyChanges = async () => {
         await perfMonitor.timeAsyncFunction('apply_changes', async () => {
+            const categorizedMap = new Map<string, CategorizedBookmark>(allCategorizedBookmarks.map(cb => [cb.url, cb]));
             const finalBookmarks = bookmarks.map(bm => {
-                const categorized = allCategorizedBookmarks.find(cb => cb.url === bm.url);
-                return { ...bm, ...categorized }; // merge path and tags
+                const categorized = categorizedMap.get(bm.url);
+                if (categorized) {
+                    return { ...bm, path: categorized.path, tags: categorized.tags };
+                }
+                return bm;
             });
             await db.saveBookmarks(finalBookmarks);
             await db.saveFolders(folders);
@@ -250,19 +254,9 @@ const App: React.FC = () => {
 
     useEffect(() => {
         let isMounted = true;
-        const performSearch = async () => {
+        const performSearch = () => {
             if (!searchQuery.trim()) {
                 if (isMounted) setFilteredBookmarks([]);
-                return;
-            }
-
-            const bookmarksHash = generateHash(bookmarks);
-            const cacheKey = cacheKeys.searchResults(searchQuery, bookmarksHash);
-
-            // Try to get from cache first
-            const cached = await searchCache.get(cacheKey);
-            if (cached && isMounted) {
-                setFilteredBookmarks(cached);
                 return;
             }
 
@@ -272,9 +266,6 @@ const App: React.FC = () => {
                 bm.title.toLowerCase().includes(lowercasedQuery) ||
                 bm.url.toLowerCase().includes(lowercasedQuery)
             );
-
-            // Cache the results
-            searchCache.set(cacheKey, results, 10 * 60 * 1000); // Cache for 10 minutes
 
             if (isMounted) {
                 setFilteredBookmarks(results);
