@@ -1,7 +1,7 @@
 
 
 import React, { useState } from 'react';
-import { AppState, BrokenLinkCheckState, type Folder, type Bookmark } from '@/types';
+import { BrokenLinkCheckState, type Folder, type Bookmark } from '@/types';
 import { FolderIcon, ChevronRightIcon, TrashIcon, ImportIcon, ExportIcon, SearchIcon, XIcon, DocumentDuplicateIcon, BrokenLinkIcon } from '../ui/Icons';
 import { formatNumber } from '@/src/utils';
 
@@ -91,7 +91,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     onStartBrokenLinkCheck, brokenLinkCheckState, brokenLinkCheckProgress
 }) => {
     const isCheckingLinks = brokenLinkCheckState === BrokenLinkCheckState.CHECKING;
-    const [showExportMenu, setShowExportMenu] = useState(false);
 
     return (
         <aside className="w-72 bg-[#21252C] p-3 flex-shrink-0 flex flex-col">

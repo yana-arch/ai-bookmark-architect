@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { Folder, Bookmark } from '@/types';
 import { ExportIcon, FolderIcon } from '../ui/Icons';
 
@@ -111,7 +111,7 @@ const ExportModal: React.FC<ExportModalProps> = ({
 
         // Filter by date range
         if (options.dateRange.from || options.dateRange.to) {
-            filteredBookmarks = filteredBookmarks.filter(bm => {
+            filteredBookmarks = filteredBookmarks.filter(_bm => {
                 // Assuming bookmarks have a createdAt or similar date field
                 // For now, we'll skip date filtering as it's not implemented in the data model
                 return true;

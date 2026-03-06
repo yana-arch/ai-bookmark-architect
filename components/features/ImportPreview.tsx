@@ -26,7 +26,7 @@ const ImportPreview: React.FC<ImportPreviewProps> = ({
     const getHostname = (url: string): string => {
         try {
             return new URL(url).hostname;
-        } catch (_e) {
+        } catch {
             return 'invalid_url';
         }
     };

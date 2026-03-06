@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { AppState } from '@/types';
-import type { Bookmark, Folder, ApiConfig, FolderTemplate, SmartClassifyRule } from '@/types';
+import type { Bookmark, Folder, ApiConfig, SmartClassifyRule } from '@/types';
 import { WarningIcon, CogIcon } from '../ui/Icons';
 import { formatNumber } from '@/src/utils';
 
@@ -228,7 +228,7 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                                     const isError = log.toLowerCase().includes('lỗi') || log.toLowerCase().includes('error');
                                     const isSuccess = log.toLowerCase().includes('hoàn tất') || log.toLowerCase().includes('success');
                                     const isProcessing = log.toLowerCase().includes('đang xử lý') || log.toLowerCase().includes('processing');
-                                    const isInfo = !isError && !isSuccess && !isProcessing;
+                                    // const isInfo = !isError && !isSuccess && !isProcessing;
 
                                     let iconColor = 'text-gray-400';
                                     let bgColor = 'bg-gray-800/50';
@@ -286,7 +286,7 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                                     const isError = log.toLowerCase().includes('lỗi') || log.toLowerCase().includes('error');
                                     const isSuccess = log.toLowerCase().includes('hoàn tất') || log.toLowerCase().includes('success');
                                     const isProcessing = log.toLowerCase().includes('đang xử lý') || log.toLowerCase().includes('processing');
-                                    const isInfo = !isError && !isSuccess && !isProcessing;
+                                    // const isInfo = !isError && !isSuccess && !isProcessing;
 
                                     let iconColor = 'text-gray-400';
                                     let bgColor = 'bg-gray-800/50';

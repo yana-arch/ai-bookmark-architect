@@ -10,7 +10,7 @@ import * as db from './db';
 import { searchCache, cacheKeys, generateHash } from './src/cache';
 import { perfMonitor } from './src/performance';
 import { findFolder, getBookmarksInFolder } from './src/utils';
-import { DEFAULT_SYSTEM_PROMPT, DEFAULT_PLANNING_PROMPT } from './src/constants';
+import { DEFAULT_SYSTEM_PROMPT } from './src/constants';
 
 // Hooks
 import { useSmartClassify } from './hooks/useSmartClassify';
@@ -124,7 +124,7 @@ const App: React.FC = () => {
 
     const {
         isInstructionPresetModalOpen, setIsInstructionPresetModalOpen,
-        handleSaveInstructionPreset, handleDeleteInstructionPreset, handleSelectPreset
+        handleSaveInstructionPreset, handleDeleteInstructionPreset
     } = useInstructionPresets(instructionPresets, setInstructionPresets, setCustomInstructions);
 
     const {
@@ -134,7 +134,6 @@ const App: React.FC = () => {
     } = useTemplateManagement(folderTemplates, setFolderTemplates, setSystemPrompt, setNotifications);
 
     const {
-        isPlanning,
         proposedStructure,
         planningPrompt, setPlanningPrompt,
         generateStructureSuggestion,

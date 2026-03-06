@@ -15,7 +15,7 @@ const BookmarkItem: React.FC<{ bookmark: Bookmark }> = ({ bookmark }) => {
             if (!url || url === 'about:blank' || !url.startsWith('http')) return null;
             const domain = new URL(url).hostname;
             return `https://www.google.com/s2/favicons?sz=32&domain_url=${domain}`;
-        } catch (_e) {
+        } catch {
             return null;
         }
     };
