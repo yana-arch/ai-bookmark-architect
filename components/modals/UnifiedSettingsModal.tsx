@@ -16,12 +16,10 @@ import {
     CloudIcon, DatabaseIcon, ShieldCheckIcon, ChipIcon
 } from '../ui/Icons';
 import { postgresqlService } from '../../src/services/postgresqlService';
-import { ARCHITECTURE_STYLES } from '@/src/architectureStyles';
 
 // Sub-components
 import { ProvidersTab } from './settings/ProvidersTab';
 import { IntelligenceTab } from './settings/IntelligenceTab';
-import { ArchitectureTab } from './settings/ArchitectureTab';
 import { TemplatesTab } from './settings/TemplatesTab';
 import { DataTab } from './settings/DataTab';
 import { HealthTab } from './settings/HealthTab';
@@ -98,7 +96,7 @@ interface UnifiedSettingsModalProps {
     initialTab?: TabType;
 }
 
-type TabType = 'providers' | 'intelligence' | 'architecture' | 'templates' | 'data' | 'health' | 'backup' | 'config';
+type TabType = 'providers' | 'intelligence' | 'templates' | 'data' | 'health' | 'backup' | 'config';
 
 const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
     const {
@@ -190,7 +188,6 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
     const navItems: { id: TabType; label: string; icon: React.ReactNode }[] = [
         { id: 'providers', label: 'AI Providers', icon: <TerminalIcon className="w-4 h-4" /> },
         { id: 'intelligence', label: 'Intelligence', icon: <AILogoIcon className="w-4 h-4" /> },
-        { id: 'architecture', label: 'Architecture', icon: <ChipIcon className="w-4 h-4" /> },
         { id: 'templates', label: 'Templates', icon: <LayersIcon className="w-4 h-4" /> },
         { id: 'data', label: 'Data & Export', icon: <DatabaseIcon className="w-4 h-4" /> },
         { id: 'health', label: 'Data Health', icon: <ShieldCheckIcon className="w-4 h-4" /> },
@@ -269,11 +266,6 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
                                 customInstructions={customInstructions}
                                 smartClassifyRules={smartClassifyRules}
                                 onDeleteSmartRule={onDeleteSmartRule}
-                            />
-                        )}
-
-                        {activeTab === 'architecture' && (
-                            <ArchitectureTab 
                                 selectedStyle={selectedArchitectureStyle}
                                 onStyleChange={onArchitectureStyleChange}
                             />
@@ -341,3 +333,4 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
 };
 
 export default UnifiedSettingsModal;
+

@@ -1,6 +1,7 @@
 import React from 'react';
-import type { InstructionPreset, SmartClassifyRule } from '@/types';
-import { TagIcon, LinkIcon, TrashIcon, SparklesIcon, AILogoIcon, LayersIcon } from '../../ui/Icons';
+import type { InstructionPreset, SmartClassifyRule, ArchitectureStyle } from '@/types';
+import { TagIcon, LinkIcon, TrashIcon, SparklesIcon, AILogoIcon, LayersIcon, ChipIcon } from '../../ui/Icons';
+import { ARCHITECTURE_STYLES } from '@/src/architectureStyles';
 
 interface IntelligenceTabProps {
     instructionPresets: InstructionPreset[];
@@ -10,11 +11,16 @@ interface IntelligenceTabProps {
     customInstructions: string;
     smartClassifyRules: SmartClassifyRule[];
     onDeleteSmartRule: (id: string) => void;
+    
+    // Architecture props
+    selectedStyle: ArchitectureStyle;
+    onStyleChange: (styleId: ArchitectureStyle) => void;
 }
 
 export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
     instructionPresets, onCustomInstructionsChange, systemPrompt,
-    onSystemPromptChange, customInstructions, smartClassifyRules, onDeleteSmartRule
+    onSystemPromptChange, customInstructions, smartClassifyRules, onDeleteSmartRule,
+    selectedStyle, onStyleChange
 }) => {
     return (
         <div className="space-y-10 animate-slideIn pb-10">
@@ -24,12 +30,62 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
                 </div>
                 <div>
                     <h2 className="text-xl font-bold text-white tracking-tight uppercase">Intelligence Core</h2>
-                    <p className="text-xs text-gray-500 font-mono">TUNE LLM REASONING & CATEGORIZATION LOGIC</p>
+                    <p className="text-xs text-gray-500 font-mono">TUNE LLM REASONING & TAXONOMY ENGINE</p>
                 </div>
             </header>
 
-            <section className="bg-white/5 border border-white/10 rounded-3xl p-8">
-                <div className="flex items-center justify-between mb-8">
+            {/* Architecture Style Section */}
+            <section>
+                <div className="flex items-center space-x-3 mb-6 px-1">
+                    <ChipIcon className="w-4 h-4 text-blue-400" />
+                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Taxonomy Architecture</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {ARCHITECTURE_STYLES.map((style) => (
+                        <button
+                            key={style.id}
+                            onClick={() => onStyleChange(style.id)}
+                            className={`relative flex flex-col items-start text-left p-5 rounded-2xl border transition-all duration-300 group overflow-hidden ${
+                                selectedStyle === style.id
+                                    ? 'bg-blue-600/10 border-blue-500 ring-2 ring-blue-500/20'
+                                    : 'bg-white/5 border-white/10 hover:border-white/20'
+                            }`}
+                        >
+                            <div className="flex justify-between w-full mb-3">
+                                <h3 className={`font-bold tracking-wider text-[11px] transition-colors uppercase ${
+                                    selectedStyle === style.id ? 'text-blue-400' : 'text-gray-200'
+                                }`}>
+                                    {style.name}
+                                </h3>
+                                <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
+                                    selectedStyle === style.id 
+                                        ? 'border-blue-500 bg-blue-500' 
+                                        : 'border-white/20'
+                                }`}>
+                                    {selectedStyle === style.id && (
+                                        <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <p className="text-[10px] text-gray-500 leading-relaxed line-clamp-2 group-hover:text-gray-400 transition-colors">
+                                {style.longDescription}
+                            </p>
+
+                            {selectedStyle === style.id && (
+                                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent pointer-events-none"></div>
+                            )}
+                        </button>
+                    ))}
+                </div>
+            </section>
+
+            <section className="bg-white/5 border border-white/10 rounded-3xl p-8 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 opacity-[0.02] pointer-events-none">
+                    <AILogoIcon className="w-32 h-32 text-white" />
+                </div>
+
+                <div className="flex items-center justify-between mb-8 relative z-10">
                     <div className="flex items-center space-x-3">
                         <AILogoIcon className="w-5 h-5 text-emerald-400" />
                         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Prompt Engineering</h3>
@@ -47,11 +103,14 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
                     </div>
                 </div>
 
-                <div className="space-y-8">
+                <div className="space-y-8 relative z-10">
                     <div className="flex flex-col space-y-2">
                         <div className="flex justify-between items-end px-1">
-                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Base System Architecture</label>
-                            <span className="text-[9px] text-emerald-500 font-mono">READ-ONLY CORE LOGIC</span>
+                            <div className="flex items-center space-x-2">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Base System Architecture</label>
+                                <span className="text-[9px] bg-white/5 text-gray-600 px-1.5 py-0.5 rounded font-mono">v1.4.0-CORE</span>
+                            </div>
+                            <span className="text-[9px] text-emerald-500 font-mono">INJECTED WITH {ARCHITECTURE_STYLES.find(s => s.id === selectedStyle)?.name} LOGIC</span>
                         </div>
                         <div className="relative group">
                             <textarea 
@@ -130,3 +189,4 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
         </div>
     );
 };
+

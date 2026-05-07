@@ -27,6 +27,7 @@ import { useBrokenLinks } from './hooks/useBrokenLinks';
 import { useImportExport } from './hooks/useImportExport';
 import { useSearch } from './hooks/useSearch';
 import { useFolderStats } from './hooks/useFolderStats';
+import { useAppOrchestration } from './hooks/useAppOrchestration';
 
 const App: React.FC = () => {
     const {
@@ -168,69 +169,27 @@ const App: React.FC = () => {
         setIsGlobalSettingsModalOpen(true);
     };
 
-    // Orchestration Logic
-    const startRestructuring = async (isContinuation = false) => {
-        let initialProcessed: CategorizedBookmark[] = [];
-        let bookmarksToProcessList = bookmarks;
-
-        if (isContinuation) {
-            initialProcessed = allCategorizedBookmarks;
-        } else {
-            // Apply Smart Classify rules
-            const { classified, remaining } = applySmartClassify(bookmarks, [...smartClassifyRules, ...sessionRules]);
-            
-            if (classified.length > 0) {
-                initialProcessed = classified;
-                const reorderedBookmarks = [...classified, ...remaining];
-                setBookmarks(reorderedBookmarks); 
-                bookmarksToProcessList = reorderedBookmarks;
-                 
-                setLogs(prev => [...prev, `Smart Classify: Đã tự động phân loại ${classified.length} bookmark.`]);
-            } else {
-                resetProcessingState();
-                setLogs(['Bắt đầu quá trình tái cấu trúc đa luồng...']);
-            }
-            
-            setAppState(AppState.PROCESSING);
-        }
-
-        startProcessing(initialProcessed, folders, bookmarksToProcessList);
-    };
-
-    const applyChanges = async () => {
-        await perfMonitor.timeAsyncFunction('apply_changes', async () => {
-            const categorizedMap = new Map<string, CategorizedBookmark>(allCategorizedBookmarks.map(cb => [cb.url, cb]));
-            const finalBookmarks = bookmarks.map(bm => {
-                const categorized = categorizedMap.get(bm.url);
-                if (categorized) {
-                    return { ...bm, path: categorized.path, tags: categorized.tags };
-                }
-                return bm;
-            });
-            await db.saveBookmarks(finalBookmarks);
-            await db.saveFolders(folders);
-            setBookmarks(finalBookmarks);
-            setAppState(AppState.STRUCTURED);
-            setSessionRules([]);
-            resetProcessingState();
-            setSelectedFolderId('root');
-        });
-    };
-
-    const discardChanges = () => {
-        setFolders([]);
-        setAppState(AppState.LOADED);
-        setSessionRules([]);
-        resetProcessingState();
-    };
-    
-    const continueRestructuring = () => {
-        startRestructuring(true);
-    };
+    const {
+        startRestructuring,
+        applyChanges,
+        discardChanges,
+        continueRestructuring
+    } = useAppOrchestration({
+        allCategorizedBookmarks,
+        smartClassifyRules,
+        sessionRules,
+        setSessionRules,
+        applySmartClassify,
+        startProcessing,
+        resetProcessingState,
+        setLogs,
+        setSelectedFolderId
+    });
 
     const handleDismissNotification = useCallback((id: string) => {
         setNotifications(prev => prev.filter(n => n.id !== id));
     }, [setNotifications]);
+
 
     // View Logic
     const selectedFolder = selectedFolderId === 'root' 

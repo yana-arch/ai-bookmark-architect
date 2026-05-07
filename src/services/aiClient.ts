@@ -1,45 +1,66 @@
 import type { ApiConfig } from '../../types';
 
+/**
+ * Interface representing a standardized AI response.
+ */
 export interface AIResponse {
+    /** The generated text content, typically a JSON string for this application. */
     text: string;
+    /** The full raw response from the AI provider. */
     raw?: any;
+    /** Optional token usage information. */
+    usage?: {
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+    };
 }
 
+/**
+ * A client for interacting with various AI providers (Gemini, OpenAI, OpenRouter).
+ * Standardizes requests and responses across different API architectures.
+ */
 export class AIClient {
     private config: ApiConfig;
 
+    /**
+     * Initializes the AIClient with a specific configuration.
+     * @param config The API configuration including provider, key, and model.
+     */
     constructor(config: ApiConfig) {
         this.config = config;
     }
 
+    /**
+     * Generates content using the configured AI provider.
+     * @param systemPrompt The system instructions for the AI.
+     * @param userPrompt The user-specific input/bookmarks to process.
+     * @returns A promise resolving to a standardized AIResponse.
+     * @throws Error if the provider is unsupported or the API request fails.
+     */
     async generateContent(systemPrompt: string, userPrompt: string): Promise<AIResponse> {
-        const { provider, apiKey, model, apiUrl } = this.config;
+        const { provider } = this.config;
 
-        if (provider === 'gemini' || provider === 'custom-gemini') {
-            return this.callGemini(systemPrompt, userPrompt);
+        switch (provider) {
+            case 'gemini':
+            case 'custom-gemini':
+                return this.callGemini(systemPrompt, userPrompt);
+            case 'openai':
+            case 'openrouter':
+            case 'custom-openai':
+                return this.callOpenAI(systemPrompt, userPrompt);
+            default:
+                throw new Error(`Unsupported provider: ${provider}`);
         }
-
-        if (provider === 'openai' || provider === 'openrouter' || provider === 'custom-openai') {
-            return this.callOpenAI(systemPrompt, userPrompt);
-        }
-
-        throw new Error(`Unsupported provider: ${provider}`);
     }
 
+    /**
+     * Internal method to call Google Gemini or compatible custom endpoints.
+     */
     private async callGemini(systemPrompt: string, userPrompt: string): Promise<AIResponse> {
         const { apiKey, model, apiUrl, provider } = this.config;
         
-        let endpoint = '';
-        if (provider === 'gemini') {
-            endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model || 'gemini-1.5-flash'}:generateContent?key=${apiKey}`;
-        } else {
-            endpoint = apiUrl || '';
-            if (!endpoint.includes(':generateContent')) {
-                endpoint = endpoint.replace(/\/$/, '') + `/models/${model || 'gemini-1.5-flash'}:generateContent?key=${apiKey}`;
-            } else if (!endpoint.includes('key=')) {
-                endpoint += (endpoint.includes('?') ? '&' : '?') + `key=${apiKey}`;
-            }
-        }
+        let endpoint = this.resolveGeminiEndpoint(provider, model || 'gemini-1.5-flash', apiKey, apiUrl);
 
         const response = await fetch(endpoint, {
             method: 'POST',
@@ -64,24 +85,24 @@ export class AIClient {
         const data = await response.json();
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
         
-        return { text, raw: data };
+        return { 
+            text, 
+            raw: data,
+            usage: data.usageMetadata ? {
+                promptTokens: data.usageMetadata.promptTokenCount || 0,
+                completionTokens: data.usageMetadata.candidatesTokenCount || 0,
+                totalTokens: data.usageMetadata.totalTokenCount || 0
+            } : undefined
+        };
     }
 
+    /**
+     * Internal method to call OpenAI, OpenRouter, or compatible custom endpoints.
+     */
     private async callOpenAI(systemPrompt: string, userPrompt: string): Promise<AIResponse> {
         const { provider, apiKey, model, apiUrl } = this.config;
         
-        let endpoint = '';
-        if (provider === 'openai') {
-            endpoint = 'https://api.openai.com/v1/chat/completions';
-        } else if (provider === 'openrouter') {
-            endpoint = 'https://openrouter.ai/api/v1/chat/completions';
-        } else if (provider === 'custom-openai') {
-            endpoint = apiUrl || 'https://api.openai.com/v1/chat/completions';
-        }
-
-        if (!endpoint) {
-            throw new Error(`Missing endpoint for provider: ${provider}`);
-        }
+        const endpoint = this.resolveOpenAIEndpoint(provider, apiUrl);
 
         const response = await fetch(endpoint, {
             method: 'POST',
@@ -109,6 +130,48 @@ export class AIClient {
         const data = await response.json();
         const text = data.choices?.[0]?.message?.content || '';
         
-        return { text, raw: data };
+        return { 
+            text, 
+            raw: data,
+            usage: data.usage ? {
+                promptTokens: data.usage.prompt_tokens || 0,
+                completionTokens: data.usage.completion_tokens || 0,
+                totalTokens: data.usage.total_tokens || 0
+            } : undefined
+        };
+    }
+
+    /**
+     * Resolves the correct Gemini API endpoint based on configuration.
+     */
+    private resolveGeminiEndpoint(provider: string, model: string, apiKey: string, apiUrl?: string): string {
+        if (provider === 'gemini') {
+            return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        }
+        
+        let endpoint = apiUrl || '';
+        if (!endpoint.includes(':generateContent')) {
+            endpoint = endpoint.replace(/\/$/, '') + `/models/${model}:generateContent?key=${apiKey}`;
+        } else if (!endpoint.includes('key=')) {
+            endpoint += (endpoint.includes('?') ? '&' : '?') + `key=${apiKey}`;
+        }
+        return endpoint;
+    }
+
+    /**
+     * Resolves the correct OpenAI-compatible API endpoint based on configuration.
+     */
+    private resolveOpenAIEndpoint(provider: string, apiUrl?: string): string {
+        switch (provider) {
+            case 'openai':
+                return 'https://api.openai.com/v1/chat/completions';
+            case 'openrouter':
+                return 'https://openrouter.ai/api/v1/chat/completions';
+            case 'custom-openai':
+                return apiUrl || 'https://api.openai.com/v1/chat/completions';
+            default:
+                throw new Error(`Invalid OpenAI provider: ${provider}`);
+        }
     }
 }
+
