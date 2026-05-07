@@ -1,26 +1,24 @@
-
-
 import React, { useState } from 'react';
-import { BrokenLinkCheckState, type Folder, type Bookmark } from '@/types';
-import { FolderIcon, ChevronRightIcon, TrashIcon, ImportIcon, ExportIcon, SearchIcon, XIcon, DocumentDuplicateIcon, BrokenLinkIcon } from '../ui/Icons';
+import { useApp } from '@/src/context/AppContext';
+import { useSearch } from '@/hooks/useSearch';
+import { useFolderStats } from '@/hooks/useFolderStats';
+import { BrokenLinkCheckState, type Folder } from '@/types';
+import { 
+    FolderIcon, ChevronRightIcon, TrashIcon, ImportIcon, 
+    ExportIcon, SearchIcon, XIcon, DocumentDuplicateIcon, BrokenLinkIcon 
+} from '../ui/Icons';
 import { formatNumber } from '@/src/utils/formatUtils';
 
 interface SidebarProps {
-    folders: Folder[];
     selectedFolderId: string | null;
-    totalBookmarks: number;
-    searchQuery: string;
-    duplicateCount: number;
     onSelectFolder: (id: string | null) => void;
-    onClearData: () => void;
-    onImport: () => void;
-    onExport: () => void;
-    onSearchChange: (query: string) => void;
     onOpenDuplicateModal: () => void;
     onStartBrokenLinkCheck: () => void;
     brokenLinkCheckState: BrokenLinkCheckState;
     brokenLinkCheckProgress: { current: number; total: number };
-    onBookmarkMoved: (bookmark: Bookmark, oldPath: string[], newPath: string[]) => void;
+    duplicateCount: number;
+    onImport: () => void;
+    onExport: () => void;
 }
 
 const FolderItem: React.FC<{
@@ -28,8 +26,7 @@ const FolderItem: React.FC<{
     level: number;
     selectedFolderId: string | null;
     onSelectFolder: (id: string | null) => void;
-    onBookmarkMoved: (bookmark: Bookmark, oldPath: string[], newPath: string[]) => void;
-}> = ({ folder, level, selectedFolderId, onSelectFolder, onBookmarkMoved }) => {
+}> = ({ folder, level, selectedFolderId, onSelectFolder }) => {
     const [isOpen, setIsOpen] = useState(true);
     const isSelected = selectedFolderId === folder.id;
 
@@ -39,15 +36,6 @@ const FolderItem: React.FC<{
         <div>
             <div
                 onClick={() => onSelectFolder(folder.id)}
-                onDragOver={(e) => e.preventDefault()} // Allow drop
-                onDrop={(e) => {
-                    e.preventDefault();
-                    const bookmarkData = e.dataTransfer.getData('bookmark');
-                    if (bookmarkData) {
-                        const { bookmark, originalPath } = JSON.parse(bookmarkData);
-                        onBookmarkMoved(bookmark, originalPath, [...(folder.path || []), folder.name]);
-                    }
-                }}
                 className={`flex items-center p-2 rounded-md cursor-pointer transition-colors duration-150 ${
                     isSelected ? 'bg-emerald-500/20 text-emerald-400' : 'hover:bg-gray-700/50'
                 }`}
@@ -84,12 +72,15 @@ const FolderItem: React.FC<{
     );
 };
 
-
 const Sidebar: React.FC<SidebarProps> = ({
-    folders, selectedFolderId, onSelectFolder, onClearData, onImport, onExport,
-    searchQuery, onSearchChange, totalBookmarks, duplicateCount, onOpenDuplicateModal,
-    onStartBrokenLinkCheck, brokenLinkCheckState, brokenLinkCheckProgress
+    selectedFolderId, onSelectFolder, onOpenDuplicateModal,
+    onStartBrokenLinkCheck, brokenLinkCheckState, brokenLinkCheckProgress,
+    duplicateCount, onImport, onExport
 }) => {
+    const { bookmarks, folders, handleClearData } = useApp();
+    const { searchQuery, setSearchQuery } = useSearch(bookmarks);
+    const { foldersWithCounts } = useFolderStats(folders);
+    
     const isCheckingLinks = brokenLinkCheckState === BrokenLinkCheckState.CHECKING;
 
     return (
@@ -112,7 +103,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         <ExportIcon className="w-5 h-5" />
                     </button>
                     <button
-                        onClick={onClearData}
+                        onClick={handleClearData}
                         className="text-gray-400 hover:text-red-500 transition-colors"
                         title="Xóa tất cả dữ liệu"
                     >
@@ -126,12 +117,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                     type="text"
                     placeholder="Tìm kiếm bookmarks..."
                     value={searchQuery}
-                    onChange={(e) => onSearchChange(e.target.value)}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full bg-gray-900/70 border border-gray-600 rounded-md pl-9 pr-8 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 />
                 {searchQuery && (
                     <XIcon 
-                        onClick={() => onSearchChange('')}
+                        onClick={() => setSearchQuery('')}
                         className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 hover:text-white cursor-pointer" 
                     />
                 )}
@@ -145,9 +136,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                 >
                     <FolderIcon className="w-5 h-5 mr-3 text-sky-400 flex-shrink-0" />
                     <span className="truncate font-medium flex-1">Tất cả Bookmarks</span>
-                    <span className="ml-2 text-xs font-mono bg-gray-700 px-1.5 py-0.5 rounded">{formatNumber(totalBookmarks)}</span>
+                    <span className="ml-2 text-xs font-mono bg-gray-700 px-1.5 py-0.5 rounded">{formatNumber(bookmarks.length)}</span>
                 </div>
-                {folders
+                {foldersWithCounts
                     .filter((item): item is Folder => !('url' in item))
                     .map(folder => (
                         <FolderItem

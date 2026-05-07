@@ -1,25 +1,18 @@
-
 import React from 'react';
+import { useApp } from '@/src/context/AppContext';
 import { AppState } from '@/types';
-import type { Bookmark, Folder, ApiConfig, SmartClassifyRule } from '@/types';
+import type { Bookmark, Folder, SmartClassifyRule } from '@/types';
 import { WarningIcon, CogIcon } from '../ui/Icons';
 import { formatNumber } from '@/src/utils/formatUtils';
 
 interface RestructurePanelProps {
-    appState: AppState;
-    progress: { current: number; total: number };
-    logs: string[];
-    errorDetails: string | null;
-    apiConfigs: ApiConfig[];
-    sessionTokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number };
-    hasPartialResults: boolean;
+    // These might stay as props if they are specific to the "instance" of the panel or UI orchestration in App
     onStart: () => void;
     onStop: () => void;
     onForceStop?: () => void;
     onApply: () => void;
     onDiscard: () => void;
     onContinue: () => void;
-    onOpenApiModal: () => void;
     onOpenLogModal: () => void;
     onSuggestStructure: (source: 'tags' | 'domains') => void;
     onConfirmProposedStructure: () => void;
@@ -28,16 +21,26 @@ interface RestructurePanelProps {
     onOpenAIConfigModal: () => void;
     sessionRules: SmartClassifyRule[];
     onSessionRulesChange: (rules: SmartClassifyRule[]) => void;
+    
+    // Processing state from useBookmarkProcessing (could also be in context, but for now passed from App)
+    progress: { current: number; total: number };
+    logs: string[];
+    errorDetails: string | null;
+    sessionTokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number };
+    hasPartialResults: boolean;
 }
 
 const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
     const {
-        appState, progress, logs, errorDetails, onStart, onStop, onForceStop, onApply, onDiscard, onContinue,
-        apiConfigs, onOpenApiModal, onOpenLogModal, sessionTokenUsage,
-        hasPartialResults, onSuggestStructure, onConfirmProposedStructure,
+        onStart, onStop, onForceStop, onApply, onDiscard, onContinue,
+        onOpenLogModal, onSuggestStructure, onConfirmProposedStructure,
         proposedStructure, isGeneratingStructure, onOpenAIConfigModal,
-        sessionRules, onSessionRulesChange
+        sessionRules, onSessionRulesChange,
+        progress, logs, errorDetails, sessionTokenUsage, hasPartialResults
     } = props;
+    
+    const { appState, apiConfigs } = useApp();
+
     const progressPercentage = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
 
     const LogViewerButton = () => (

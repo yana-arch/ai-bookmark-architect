@@ -1,4 +1,4 @@
-import type { ApiConfig } from '../types';
+import type { ApiConfig } from '../../types';
 
 export interface AIResponse {
     text: string;
