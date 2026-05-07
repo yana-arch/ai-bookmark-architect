@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog } from '../types';
-import { arrayToTree } from '../src/utils';
+import { arrayToTree } from '../src/utils/treeUtils';
 import { perfMonitor } from '../src/performance';
 import { saveLog } from '../db';
 
@@ -108,6 +108,8 @@ export const useBookmarkProcessing = ({
             addDetailedLog('error', 'Không tìm thấy API key', 'Không có API key nào được cấu hình hoặc đang hoạt động.');
             return false;
         }
+
+        addDetailedLog('info', 'Khởi tạo xử lý', `Bắt đầu với ${availableKeys.length} API key đang hoạt động: ${availableKeys.map(k => `${k.name} [ID: ${k.id}] (${k.provider})`).join(', ')}`);
 
         await perfMonitor.timeAsyncFunction('start_processing', async () => {
             stopProcessingRef.current = false;

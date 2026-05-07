@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import { Bookmark, Folder, AppState } from '../types';
 import { perfMonitor } from '../src/performance';
-import { normalizeURL, parseHTMLBookmarks, parseCSVBookmarks, exportBookmarksToCSV } from '../src/utils';
+import { normalizeURL } from '../src/utils/urlUtils';
+import { parseHTMLBookmarks, parseCSVBookmarks, exportBookmarksToCSV } from '../src/services/bookmarkParser';
 import * as db from '../db';
 
 export const useImportExport = (

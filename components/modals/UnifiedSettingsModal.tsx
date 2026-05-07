@@ -8,7 +8,8 @@ import type {
     Folder,
     InstructionPreset,
     BackupMetadata,
-    ArchitectureStyle
+    ArchitectureStyle,
+    ApiProvider
 } from '@/types';
 import { 
     CogIcon, XIcon, AILogoIcon, TerminalIcon, LayersIcon, 
@@ -121,7 +122,7 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
     // Internal States for Forms
     const [apiName, setApiName] = useState('');
     const [apiKey, setApiKey] = useState('');
-    const [apiProvider, setApiProvider] = useState<'gemini' | 'openrouter' | 'custom'>('gemini');
+    const [apiProvider, setApiProvider] = useState<ApiProvider>('gemini');
     const [apiModel, setApiModel] = useState('');
     const [apiUrl, setApiUrl] = useState('');
     const [apiEditingId, setApiEditingId] = useState<string | null>(null);
@@ -152,6 +153,15 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
         }
     };
 
+    const handleEditApiConfig = (config: ApiConfig) => {
+        setApiEditingId(config.id);
+        setApiName(config.name);
+        setApiKey(config.apiKey);
+        setApiProvider(config.provider);
+        setApiModel(config.model || '');
+        setApiUrl(config.apiUrl || '');
+    };
+
     const handleAddApiKey = (e: React.FormEvent) => {
         e.preventDefault();
         onSaveApiConfig({
@@ -159,8 +169,8 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
             name: apiName,
             provider: apiProvider,
             apiKey,
-            apiUrl: apiProvider === 'custom' ? apiUrl : undefined,
-            model: apiProvider === 'gemini' ? 'gemini-1.5-flash' : apiModel,
+            apiUrl: apiProvider.includes('custom') ? apiUrl : undefined,
+            model: apiModel || (apiProvider.includes('gemini') ? 'gemini-1.5-flash' : 'gpt-4o'),
             status: 'active'
         });
         resetApiForm();
@@ -246,6 +256,7 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
                                 setApiUrl={setApiUrl}
                                 apiEditingId={apiEditingId}
                                 handleAddApiKey={handleAddApiKey}
+                                onEditApiConfig={handleEditApiConfig}
                             />
                         )}
 

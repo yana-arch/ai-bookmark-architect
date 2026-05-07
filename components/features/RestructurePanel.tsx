@@ -3,7 +3,7 @@ import React from 'react';
 import { AppState } from '@/types';
 import type { Bookmark, Folder, ApiConfig, SmartClassifyRule } from '@/types';
 import { WarningIcon, CogIcon } from '../ui/Icons';
-import { formatNumber } from '@/src/utils';
+import { formatNumber } from '@/src/utils/formatUtils';
 
 interface RestructurePanelProps {
     appState: AppState;

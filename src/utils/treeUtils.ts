@@ -1,0 +1,98 @@
+import type { Bookmark, Folder } from '../../types';
+
+/**
+ * Converts a flat list of bookmarks with paths into a folder tree structure.
+ * @param bookmarks - List of bookmarks with 'path' property
+ * @param existingTree - Existing folder structure to preserve
+ * @returns The new folder tree
+ */
+export const arrayToTree = (bookmarks: (Bookmark & { path?: string[] })[], existingTree: (Folder | Bookmark)[] = []): (Folder | Bookmark)[] => {
+    const root: Folder = { id: 'root', name: 'Thư Mục', children: [], parentId: null };
+    const foldersMap = new Map<string, Folder>();
+    foldersMap.set('root', root);
+
+    // Helper to clone existing tree
+    const cloneTree = (nodes: (Folder | Bookmark)[]): (Folder | Bookmark)[] => {
+        return nodes.filter(n => !('url' in n)).map(n => {
+            const folder = n as Folder;
+            const newFolder = { ...folder, children: cloneTree(folder.children) };
+            foldersMap.set(newFolder.id, newFolder);
+            return newFolder;
+        });
+    };
+
+    const clonedRootChildren = cloneTree(existingTree);
+    root.children = clonedRootChildren;
+
+    const getOrCreateFolder = (path: string[]): Folder => {
+        let currentLevel = root;
+        let currentPath = '';
+
+        for (const folderName of path) {
+            currentPath = currentPath ? `${currentPath}/${folderName}` : folderName;
+            let folder = foldersMap.get(currentPath);
+            
+            if (!folder) {
+                // Try to find by name in current level to avoid creating duplicates if ID is different
+                const existingInLevel = currentLevel.children.find(c => !('url' in c) && (c as Folder).name === folderName) as Folder;
+                if (existingInLevel) {
+                    folder = existingInLevel;
+                } else {
+                    const parentId = currentLevel.id;
+                    folder = { id: currentPath, name: folderName, children: [], parentId };
+                    currentLevel.children.push(folder);
+                }
+                foldersMap.set(currentPath, folder);
+            }
+            currentLevel = folder;
+        }
+        return currentLevel;
+    };
+
+    bookmarks.forEach(bm => {
+        if (bm.path && bm.path.length > 0) {
+            const parentFolder = getOrCreateFolder(bm.path);
+            parentFolder.children.push({ ...bm, parentId: parentFolder.id });
+        } else {
+            root.children.push({ ...bm, parentId: 'root' });
+        }
+    });
+    
+    return root.children;
+};
+
+/**
+ * Finds a folder by ID in the tree
+ */
+export function findFolder(items: (Folder | Bookmark)[], id: string | null): Folder | null {
+    if (id === null) return null;
+    const queue = [...items];
+    while (queue.length > 0) {
+        const item = queue.shift()!;
+        if ('url' in item) continue;
+        const folder = item as Folder;
+        if (folder.id === id) return folder;
+        if (folder.children) {
+            queue.push(...folder.children);
+        }
+    }
+    return null;
+}
+
+/**
+ * Gets all bookmarks within a folder and its subfolders
+ */
+export function getBookmarksInFolder(folder: Folder | null): Bookmark[] {
+    if (!folder) return [];
+    const bookmarks: Bookmark[] = [];
+    const queue: (Folder | Bookmark)[] = [folder];
+    while (queue.length > 0) {
+        const current = queue.shift()!;
+        if ('url' in current) {
+            bookmarks.push(current as Bookmark);
+        } else if (current.children) {
+            queue.push(...current.children);
+        }
+    }
+    return bookmarks;
+}

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Bookmark, Folder, ApiConfig, AppState } from '../types';
-import { normalizeURL } from '../src/utils';
+import { normalizeURL } from '../src/utils/urlUtils';
 import { DEFAULT_PLANNING_PROMPT } from '../src/constants';
 import * as db from '../db';
 import { GoogleGenAI } from '@google/genai';
@@ -20,7 +20,7 @@ export const useAIPlanning = (
 ) => {
     const [isPlanning, setIsPlanning] = useState(false);
     const [proposedStructure, setProposedStructure] = useState<(Folder | Bookmark)[]>([]);
-    
+
     // Persist planning prompt
     const [planningPrompt, setPlanningPrompt] = useState<string>(() => {
         return localStorage.getItem('ai_planning_prompt') || DEFAULT_PLANNING_PROMPT;
@@ -57,6 +57,7 @@ export const useAIPlanning = (
 
             const userPrompt = `Dựa trên danh sách ${source === 'tags' ? 'tag' : 'link'} sau đây, hãy tạo một cấu trúc thư mục logic:\n\n${inputData}`;
             const currentKey = availableKeys[0]; // Use first active key
+            setLogs(prev => [...prev, `Sử dụng cấu hình: ${currentKey.name} (${currentKey.provider})`]);
             let content = '';
 
             // Check if model is an embedding model
@@ -67,7 +68,7 @@ export const useAIPlanning = (
             if (currentKey.provider === 'gemini') {
                 const ai = new GoogleGenAI({ apiKey: currentKey.apiKey });
                 const model = currentKey.model || 'gemini-2.5-flash';
-                
+
                 const result = await ai.models.generateContent({
                     model: model,
                     contents: [
@@ -78,25 +79,63 @@ export const useAIPlanning = (
                         responseMimeType: 'application/json',
                     }
                 });
-                
+
                 const response = result;
-                content = typeof (response as any).text === 'function' 
-                    ? (response as any).text() 
+                content = typeof (response as any).text === 'function'
+                    ? (response as any).text()
                     : (response as any).text || JSON.stringify((response as any));
 
-            } else {
-                // OpenRouter or Custom
-                const endpoint = currentKey.provider === 'custom' && currentKey.apiUrl 
-                    ? currentKey.apiUrl 
-                    : 'https://openrouter.ai/api/v1/chat/completions';
+            } else if (currentKey.provider === 'custom-gemini') {
+                let endpoint = currentKey.apiUrl || '';
+                if (!endpoint) throw new Error('Custom Gemini requires an API URL');
+
+                if (!endpoint.includes(':generateContent')) {
+                    endpoint = endpoint.replace(/\/$/, '') + `/models/${currentKey.model || 'gemini-1.5-flash'}:generateContent`;
+                }
+
+                const result = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-goog-api-key': currentKey.apiKey,
+                        'Authorization': `Bearer ${currentKey.apiKey}`,
+                    },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: userPrompt }] }],
+                        generationConfig: {
+                            responseMimeType: 'application/json'
+                        }
+                    })
+                });
+
+                if (!result.ok) {
+                    const errText = await result.text();
+                    throw new Error(`Custom Gemini call failed: ${result.status} - ${errText}`);
+                }
+                const data = await result.json();
+                content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            } else if (currentKey.provider === 'openai' || currentKey.provider === 'openrouter' || currentKey.provider === 'custom-openai') {
+                let endpoint = '';
+
+                if (currentKey.provider === 'openai') {
+                    endpoint = 'https://api.openai.com/v1/chat/completions';
+                } else if (currentKey.provider === 'openrouter') {
+                    endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+                } else if (currentKey.provider === 'custom-openai') {
+                    endpoint = currentKey.apiUrl || 'https://api.openai.com/v1/chat/completions';
+                }
+
+                if (!endpoint) {
+                    throw new Error(`Endpoint URL is missing for provider: ${currentKey.provider}`);
+                }
 
                 const result = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${currentKey.apiKey}`,
                         'Content-Type': 'application/json',
-                        'HTTP-Referer': window.location.href, // Optional. Site URL for rankings on openrouter.ai.
-                        'X-OpenRouter-Title': 'AI Bookmark Architect', // Optional. Site title for rankings on openrouter.ai.
+                        'HTTP-Referer': window.location.origin,
+                        'X-Title': 'AI Bookmark Architect',
                     },
                     body: JSON.stringify({
                         model: currentKey.model,
@@ -110,12 +149,14 @@ export const useAIPlanning = (
 
                 if (!result.ok) {
                     const errText = await result.text();
-                    throw new Error(`API call failed: ${result.status} - ${errText}`);
+                    throw new Error(`API call failed (${currentKey.provider}): ${result.status} - ${errText}`);
                 }
                 const data = await result.json();
                 content = data.choices[0].message.content;
+            } else {
+                throw new Error(`Provider không được hỗ trợ cho lập kế hoạch: ${currentKey.provider}`);
             }
-            
+
             // Parse response - assuming the AI returns { "folders": [...] } or similar
             let parsed;
             try {
@@ -123,7 +164,7 @@ export const useAIPlanning = (
                 const cleanedContent = content.replace(/```json\s*|\s*```/g, '').trim();
                 const rawParsed = JSON.parse(cleanedContent);
                 parsed = rawParsed.folders || rawParsed;
-                
+
                 if (!Array.isArray(parsed)) {
                     throw new Error('AI response is not an array of folders');
                 }
@@ -134,15 +175,15 @@ export const useAIPlanning = (
                     try {
                         parsed = JSON.parse(match[0]);
                     } catch (err) {
-                         throw new Error('Could not parse AI response: ' + content.substring(0, 100));
+                        throw new Error('Could not parse AI response: ' + content.substring(0, 100));
                     }
                 } else {
                     throw new Error('Could not parse AI response: ' + content.substring(0, 100));
                 }
             }
-            
+
             if (!Array.isArray(parsed)) {
-                 throw new Error('Valid folder structure not found in AI response.');
+                throw new Error('Valid folder structure not found in AI response.');
             }
 
             // Flatten logic: If AI returned a single root folder that wraps everything, promote its children
@@ -184,13 +225,13 @@ export const useAIPlanning = (
     const confirmProposedStructure = async () => {
         setFolders(proposedStructure);
         await db.saveFolders(proposedStructure);
-        
+
         // Feed the confirmed structure into the system prompt as a rigid guide
         const availableFolders = getStructureGuide(proposedStructure);
         const folderGuide = availableFolders.map((folder, index) => `${index + 1}. ${folder}`).join('\n');
-        
+
         const planningGuideline = `\n\n**PLANNED STRUCTURE (Prioritize these folders):**\n${folderGuide}\n\n**STRICT CATEGORIZATION RULES:**\n1. Use the folders listed above whenever possible.\n2. If a bookmark has a tag matching one of these folders, put it there.\n3. Only create a NEW folder if the bookmark absolutely does not fit into any of the planned categories.`;
-        
+
         setSystemPrompt(prev => prev + planningGuideline);
 
         // Apply session rules immediately

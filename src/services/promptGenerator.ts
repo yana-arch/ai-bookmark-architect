@@ -30,37 +30,77 @@ const generateAIContent = async (
                 ? (response as any).text() 
                 : (response as any).text || '';
 
-        } else if (apiConfig.provider === 'openrouter' || apiConfig.provider === 'custom') {
-            const endpoint = apiConfig.provider === 'custom' && apiConfig.apiUrl 
-                ? apiConfig.apiUrl 
-                : 'https://openrouter.ai/api/v1/chat/completions';
+        } else if (apiConfig.provider === 'custom-gemini') {
+            let endpoint = apiConfig.apiUrl || '';
+            if (!endpoint) throw new Error('Custom Gemini requires an API URL');
+
+            if (!endpoint.includes(':generateContent')) {
+                endpoint = endpoint.replace(/\/$/, '') + `/models/${apiConfig.model || 'gemini-1.5-flash'}:generateContent`;
+            }
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-goog-api-key': apiConfig.apiKey,
+                },
+                body: JSON.stringify({
+                    contents: [
+                        { role: 'user', parts: [{ text: `${metaSystemPrompt}\n\n${userPrompt}` }] }
+                    ],
+                    generationConfig: {
+                        responseMimeType: 'application/json'
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`Custom Gemini Error: ${response.status} - ${errText}`);
+            }
+            const data = await response.json();
+            return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+        } else if (apiConfig.provider === 'openai' || apiConfig.provider === 'openrouter' || apiConfig.provider === 'custom-openai') {
+            let endpoint = '';
+            if (apiConfig.provider === 'openai') {
+                endpoint = 'https://api.openai.com/v1/chat/completions';
+            } else if (apiConfig.provider === 'openrouter') {
+                endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+            } else if (apiConfig.provider === 'custom-openai') {
+                endpoint = apiConfig.apiUrl || 'https://api.openai.com/v1/chat/completions';
+            }
+
+            if (!endpoint) throw new Error(`Missing endpoint for provider: ${apiConfig.provider}`);
         
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${apiConfig.apiKey}`,
                     'Content-Type': 'application/json',
-                    'HTTP-Referer': window.location.href, // Optional. Site URL for rankings on openrouter.ai.
-                    'X-OpenRouter-Title': 'AI Bookmark Architect Prompt Gen', // Optional. Site title for rankings on openrouter.ai.
+                    'HTTP-Referer': window.location.origin,
+                    'X-Title': 'AI Bookmark Architect Prompt Gen',
                 },
                 body: JSON.stringify({
                     model: apiConfig.model,
                     messages: [
                         { role: 'system', content: metaSystemPrompt },
                         { role: 'user', content: userPrompt }
-                    ]
+                    ],
+                    response_format: { type: 'json_object' }
                 })
             });
 
             if (!response.ok) {
-                throw new Error(`API Error: ${response.statusText}`);
+                const errorText = await response.text();
+                throw new Error(`API Error (${apiConfig.provider}): ${response.status} - ${errorText}`);
             }
 
             const data = await response.json();
             return data.choices?.[0]?.message?.content?.trim() || '';
         }
     
-        throw new Error('Unsupported provider');
+        throw new Error(`Unsupported provider for prompt generation: ${apiConfig.provider}`);
     } catch (error) {
         console.error('Error generating prompt:', error);
         throw error;

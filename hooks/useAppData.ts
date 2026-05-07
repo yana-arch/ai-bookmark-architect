@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import * as db from '../db';
 import { perfMonitor } from '../src/performance';
 import { backupScheduler } from '../src/services/backupScheduler';
-import { createMockData } from '../src/utils';
+import { createMockData } from '../src/utils/mockUtils';
 import { AppState, Bookmark, Folder, ApiConfig, InstructionPreset, FolderTemplate, UserCorrection } from '../types';
 
 export const useAppData = () => {

@@ -1,7 +1,36 @@
-// Basic test suite for performance optimizations
-
 import { generateHash, cacheStats } from './cache';
 import { perfMonitor } from './performance';
+import { repairJson, parseAIResponse } from './services/aiService';
+import { arrayToTree } from './utils/treeUtils';
+
+// Test core business logic
+export const testCoreLogic = () => {
+    console.group('🧪 Testing Core Business Logic...');
+
+    // 1. Test JSON Repair
+    const brokenJson = '{"a": 1} {"b": 2}';
+    const repaired = repairJson(brokenJson);
+    console.log('✅ JSON Repair (missing comma):', repaired === '{"a": 1},{"b": 2}');
+    
+    const brokenJson2 = '{"a": 1, }';
+    console.log('✅ JSON Repair (trailing comma):', repairJson(brokenJson2) === '{"a": 1 }');
+
+    // 2. Test AI Response Parsing
+    const aiResponse = 'Here is the JSON: ```json {"bookmarks": [{"title": "T", "url": "U"}]} ```';
+    const parsed = parseAIResponse(aiResponse);
+    console.log('✅ AI Response Parsing:', parsed.length === 1 && parsed[0].title === 'T');
+
+    // 3. Test Tree Construction
+    const flatBookmarks = [
+        { id: '1', title: 'B1', url: 'U1', path: ['A', 'B'], parentId: null },
+        { id: '2', title: 'B2', url: 'U2', path: ['A'], parentId: null },
+    ];
+    const tree = arrayToTree(flatBookmarks as any);
+    console.log('✅ Tree Construction (roots):', tree.length === 1 && (tree[0] as any).name === 'A');
+    console.log('✅ Tree Construction (nested):', (tree[0] as any).children.length === 2); // One folder B and one bookmark B2
+
+    console.groupEnd();
+};
 
 // Test cache functionality
 export const testCacheFunctionality = () => {
@@ -99,9 +128,10 @@ export const testSearchPerformance = () => {
 
 // Run all tests
 export const runAllTests = async () => {
-    console.group('🚀 Running Performance Optimization Tests');
+    console.group('🚀 Running Comprehensive Tests');
 
     try {
+        testCoreLogic();
         testCacheFunctionality();
         testPerformanceMonitoring();
         testMemoryUsage();

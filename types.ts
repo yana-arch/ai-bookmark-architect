@@ -51,7 +51,7 @@ export interface InstructionPreset {
 export interface ApiConfig {
   id: string;
   name: string;
-  provider: 'gemini' | 'openrouter' | 'custom';
+  provider: 'gemini' | 'openrouter' | 'openai' | 'custom-gemini' | 'custom-openai';
   apiKey: string;
   model: string;
   apiUrl?: string; // Optional: custom API endpoint

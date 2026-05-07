@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Bookmark, DuplicateStats, AppState, Folder } from '../types';
 import { perfMonitor } from '../src/performance';
-import { normalizeURL, arrayToTree } from '../src/utils';
+import { normalizeURL } from '../src/utils/urlUtils';
+import { arrayToTree } from '../src/utils/treeUtils';
 import * as db from '../db';
 
 export const useDuplicates = (

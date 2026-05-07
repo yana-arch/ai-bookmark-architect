@@ -9,7 +9,7 @@ import FileDropzone from './components/ui/FileDropzone';
 import * as db from './db';
 import { searchCache, cacheKeys, generateHash } from './src/cache';
 import { perfMonitor } from './src/performance';
-import { findFolder, getBookmarksInFolder } from './src/utils';
+import { findFolder, getBookmarksInFolder } from './src/utils/treeUtils';
 import { DEFAULT_SYSTEM_PROMPT } from './src/constants';
 
 // Hooks
