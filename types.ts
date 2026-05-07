@@ -119,6 +119,16 @@ export interface EmptyFolderTree {
   updatedAt: number;
 }
 
+export type ArchitectureStyle = 'taxonomist' | 'librarian' | 'para' | 'custom';
+
+export interface ArchitectureStyleConfig {
+    id: ArchitectureStyle;
+    name: string;
+    description: string;
+    longDescription: string;
+    promptAddition: string;
+}
+
 // Phase 2: Enhanced Features Types
 export interface BackupMetadata {
   id: string;

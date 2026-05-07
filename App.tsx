@@ -121,8 +121,13 @@ const App: React.FC = () => {
 
     const {
         isFolderTemplateModalOpen, setIsFolderTemplateModalOpen,
-        templateSettings, setTemplateSettings,
-        handleSaveFolderTemplate, handleDeleteFolderTemplate, handleApplyFolderTemplate
+        templateSettings,
+        selectedArchitectureStyle,
+        handleArchitectureStyleChange,
+        handleSaveFolderTemplate,
+        handleDeleteFolderTemplate,
+        handleApplyFolderTemplate,
+        handleTemplateSettingsChange
     } = useTemplateManagement(folderTemplates, setFolderTemplates, setSystemPrompt, setNotifications);
 
     const {
@@ -366,6 +371,10 @@ const App: React.FC = () => {
                         brokenLinkCheckProgress={brokenLinkCheckProgress}
                         onStartBrokenLinkCheck={handleStartBrokenLinkCheck}
                         onCleanBrokenLinks={handleCleanBrokenLinks}
+                        
+                        // Architecture
+                        selectedArchitectureStyle={selectedArchitectureStyle}
+                        onArchitectureStyleChange={handleArchitectureStyleChange}
                         
                         // Cloud
                         onUploadCloudData={handleUploadData}

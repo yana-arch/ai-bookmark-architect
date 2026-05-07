@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react';
-import { FolderTemplate, TemplateSettings, ApiConfig } from '../types';
+import { useState, useCallback, useEffect } from 'react';
+import { FolderTemplate, TemplateSettings, ApiConfig, ArchitectureStyle } from '../types';
 import { DEFAULT_SYSTEM_PROMPT } from '../src/constants';
+import { ARCHITECTURE_STYLES } from '../src/architectureStyles';
 import * as db from '../db';
 
 export const useTemplateManagement = (
@@ -16,6 +17,59 @@ export const useTemplateManagement = (
         allowAiFolderCreation: true,
         strictMode: false,
     });
+    const [selectedArchitectureStyle, setSelectedArchitectureStyle] = useState<ArchitectureStyle>('taxonomist');
+
+    const generateSystemPrompt = useCallback((styleId: ArchitectureStyle, templateId: string | null) => {
+        let prompt = DEFAULT_SYSTEM_PROMPT;
+        
+        // Add Architecture Style
+        const style = ARCHITECTURE_STYLES.find(s => s.id === styleId);
+        if (style) {
+            prompt += `\n\n${style.promptAddition}`;
+        }
+        
+        // Add Template if selected
+        if (templateId) {
+            const template = folderTemplates.find(t => t.id === templateId);
+            if (template) {
+                const flattenTemplateFolders = (node: any, path: string[] = []): string[] => {
+                    let folders: string[] = [];
+                    const currentPath = [...path, node.name];
+                    folders.push(currentPath.join(' -> '));
+
+                    if (node.children && node.children.length > 0) {
+                        node.children.forEach((child: any) => {
+                            folders = folders.concat(flattenTemplateFolders(child, currentPath));
+                        });
+                    }
+                    return folders;
+                };
+
+                const availableFolders = template.structure.flatMap(node => flattenTemplateFolders(node));
+                const folderGuide = availableFolders.map((folder, index) => `${index + 1}. ${folder}`).join('\n');
+
+                prompt += `\n\n**TEMPLATE MODE ACTIVATED - STRICT TEMPLATE FOLLOWING:** You MUST use the selected template "${template.name}" as your ONLY categorization framework. The template has created empty folders that you MUST fill with bookmarks.
+
+**AVAILABLE TEMPLATE FOLDERS (You may ONLY use these - NO NEW FOLDERS ALLOWED):**
+${folderGuide}
+
+**STRICT RULES - FOLLOW EXACTLY:**
+1. NEVER create new folders - ONLY use the folders listed above.
+2. For each bookmark, find the SINGLE BEST MATCHING folder from the template structure.
+3. Analyze the bookmark's content and map it directly to the most appropriate template category.
+4. If no perfect match exists, choose the closest related category from the template.
+5. Template purpose: ${template.description}`;
+            }
+        }
+        
+        setSystemPrompt(prompt);
+    }, [folderTemplates, setSystemPrompt]);
+
+    const handleArchitectureStyleChange = useCallback((styleId: ArchitectureStyle) => {
+        setSelectedArchitectureStyle(styleId);
+        generateSystemPrompt(styleId, templateSettings.selectedTemplateId);
+        setNotifications(prev => [...prev, { id: 'style-applied', message: `Đã đổi phong cách kiến trúc sang "${styleId}".`, type: 'info' }]);
+    }, [generateSystemPrompt, templateSettings.selectedTemplateId, setNotifications]);
 
     const handleSaveFolderTemplate = useCallback(async (template: FolderTemplate) => {
         await db.saveFolderTemplate(template);
@@ -42,54 +96,28 @@ export const useTemplateManagement = (
             folderCreationMode: 'template_based'
         }));
 
-        // Update system prompt to use template structure as the FILLED categorization guide
-        const flattenTemplateFolders = (node: any, path: string[] = []): string[] => {
-            let folders: string[] = [];
-            const currentPath = [...path, node.name];
-            folders.push(currentPath.join(' -> '));
-
-            if (node.children && node.children.length > 0) {
-                node.children.forEach((child: any) => {
-                    folders = folders.concat(flattenTemplateFolders(child, currentPath));
-                });
-            }
-            return folders;
-        };
-
-        const availableFolders = template.structure.flatMap(node => flattenTemplateFolders(node));
-        const folderGuide = availableFolders.map((folder, index) => `${index + 1}. ${folder}`).join('\n');
-
-        const newSystemPrompt = `${DEFAULT_SYSTEM_PROMPT}\n\n**TEMPLATE MODE ACTIVATED - STRICT TEMPLATE FOLLOWING:** You MUST use the selected template "${template.name}" as your ONLY categorization framework. The template has created empty folders that you MUST fill with bookmarks.
-
-**AVAILABLE TEMPLATE FOLDERS (You may ONLY use these - NO NEW FOLDERS ALLOWED):**
-${folderGuide}
-
-**STRICT RULES - FOLLOW EXACTLY:**
-1. NEVER create new folders - ONLY use the folders listed above.
-2. For each bookmark, find the SINGLE BEST MATCHING folder from the template structure.
-3. Analyze the bookmark's content and map it directly to the most appropriate template category.
-4. If no perfect match exists, choose the closest related category from the template.
-5. Template purpose: ${template.description}
-
-**CATEGORIZATION EXAMPLES:**
-- React tutorials/docs → Frontend -> React
-- Node.js guides → Backend -> Node.js
-- Git repositories → Công cụ & Tiện ích -> Version Control
-- Python backend code → Backend -> Python`;
-
-        setSystemPrompt(newSystemPrompt);
+        generateSystemPrompt(selectedArchitectureStyle, template.id);
         setNotifications(prev => [...prev, { id: 'template-applied', message: `Đã áp dụng mẫu "${template.name}" làm chỉ dẫn cho AI.`, type: 'info' }]);
-    }, [setSystemPrompt, setNotifications]);
+    }, [generateSystemPrompt, selectedArchitectureStyle, setNotifications]);
 
     const handleTemplateSettingsChange = useCallback((newSettings: Partial<TemplateSettings>) => {
-        setTemplateSettings(prev => ({ ...prev, ...newSettings }));
-    }, []);
+        setTemplateSettings(prev => {
+            const updated = { ...prev, ...newSettings };
+            // If template selection changed, regenerate prompt
+            if (newSettings.selectedTemplateId !== undefined) {
+                generateSystemPrompt(selectedArchitectureStyle, updated.selectedTemplateId);
+            }
+            return updated;
+        });
+    }, [generateSystemPrompt, selectedArchitectureStyle]);
 
     return {
         isFolderTemplateModalOpen,
         setIsFolderTemplateModalOpen,
         templateSettings,
         setTemplateSettings,
+        selectedArchitectureStyle,
+        handleArchitectureStyleChange,
         handleSaveFolderTemplate,
         handleDeleteFolderTemplate,
         handleApplyFolderTemplate,
