@@ -1,6 +1,6 @@
 // AI Worker for multi-threaded bookmark processing
 // This worker handles AI API calls for a single batch of bookmarks
-import { GoogleGenAI } from '@google/genai';
+import { AIClient } from './services/aiClient';
 import type { Bookmark, ApiConfig, UserCorrection, Folder } from '../types';
 import { 
     parseAIResponse, 
@@ -66,6 +66,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         }
         
         const activeConfig = availableConfigs[0];
+        const client = new AIClient(activeConfig);
 
         let attempts = 0;
         let success = false;
@@ -81,9 +82,9 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                     batchIndex
                 } as WorkerResponse);
 
-                // Prepare Prompt using centralized service
-                const fullPrompt = generateCategorizationPrompt({
-                    systemPrompt,
+                // Prepare prompts
+                const userPrompt = generateCategorizationPrompt({
+                    systemPrompt: '', // Passing empty as systemPrompt is handled by client/provider roles
                     userInstructionBlock,
                     currentTree,
                     batch,
@@ -91,89 +92,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                     domainKnowledge
                 });
 
-                let responseText: string | undefined;
-
-                if (activeConfig.provider === 'gemini' || activeConfig.provider === 'custom-gemini') {
-                    let endpoint = '';
-                    if (activeConfig.provider === 'gemini') {
-                        endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${activeConfig.model || 'gemini-1.5-flash'}:generateContent?key=${activeConfig.apiKey}`;
-                    } else {
-                        endpoint = activeConfig.apiUrl || '';
-                        if (!endpoint.includes(':generateContent')) {
-                            endpoint = endpoint.replace(/\/$/, '') + `/models/${activeConfig.model || 'gemini-1.5-flash'}:generateContent?key=${activeConfig.apiKey}`;
-                        } else if (!endpoint.includes('key=')) {
-                            endpoint += (endpoint.includes('?') ? '&' : '?') + `key=${activeConfig.apiKey}`;
-                        }
-                    }
-
-                    const result = await fetch(endpoint, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            contents: [{
-                                parts: [{ text: fullPrompt }]
-                            }],
-                            generationConfig: {
-                                responseMimeType: 'application/json',
-                            }
-                        })
-                    });
-
-                    if (!result.ok) {
-                        const errText = await result.text();
-                        throw new Error(`Gemini call failed (${activeConfig.provider}): ${result.status} - ${errText}`);
-                    }
-                    const data = await result.json();
-                    responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                } else if (activeConfig.provider === 'openai' || activeConfig.provider === 'openrouter' || activeConfig.provider === 'custom-openai') {
-                    let endpoint = '';
-                    if (activeConfig.provider === 'openai') {
-                        endpoint = 'https://api.openai.com/v1/chat/completions';
-                    } else if (activeConfig.provider === 'openrouter') {
-                        endpoint = 'https://openrouter.ai/api/v1/chat/completions';
-                    } else if (activeConfig.provider === 'custom-openai') {
-                        endpoint = activeConfig.apiUrl || 'https://api.openai.com/v1/chat/completions';
-                    }
-
-                    if (!endpoint) {
-                        throw new Error(`Endpoint URL is missing for provider: ${activeConfig.provider}`);
-                    }
-
-                    const response = await fetch(endpoint, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${activeConfig.apiKey}`,
-                            'Content-Type': 'application/json',
-                            'HTTP-Referer': 'https://ai-bookmark-architect.vercel.app', // For OpenRouter
-                            'X-Title': 'AI Bookmark Architect', // For OpenRouter
-                        },
-                        body: JSON.stringify({
-                            model: activeConfig.model,
-                            messages: [
-                                { role: 'system', content: systemPrompt },
-                                { role: 'user', content: generateCategorizationPrompt({
-                                    systemPrompt: '', // Already passed as system role
-                                    userInstructionBlock,
-                                    currentTree,
-                                    batch
-                                }) }
-                            ],
-                            response_format: { type: 'json_object' }
-                        })
-                    });
-
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        throw new Error(`API Error (${activeConfig.provider}): ${response.status} - ${errorText}`);
-                    }
-
-                    const result = await response.json();
-                    responseText = result.choices[0]?.message?.content || '';
-                } else {
-                    throw new Error(`Provider không được hỗ trợ hoặc chưa cấu hình đúng: ${activeConfig.provider}`);
-                }
+                // Execute using unified client
+                const { text: responseText } = await client.generateContent(systemPrompt, userPrompt);
 
                 if (!responseText) {
                     throw new Error('AI returned empty response');
@@ -222,3 +142,4 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         }
     }
 };
+

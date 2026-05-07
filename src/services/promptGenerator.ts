@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { AIClient } from './aiClient';
 import { ApiConfig } from '../../types';
 
 // Helper to pick the best available API config
@@ -13,96 +13,11 @@ const generateAIContent = async (
     apiConfig: ApiConfig
 ): Promise<string> => {
     try {
-        if (apiConfig.provider === 'gemini') {
-            const ai = new GoogleGenAI({ apiKey: apiConfig.apiKey });
-      
-            const result = await ai.models.generateContent({
-                model: apiConfig.model || 'gemini-1.5-flash',
-                contents: [
-                    { role: 'system', parts: [{ text: metaSystemPrompt }] },
-                    { role: 'user', parts: [{ text: userPrompt }] }
-                ]
-            });
-      
-            // Handle the specific response structure of @google/genai v0.1+
-            const response = result;
-            return typeof (response as any).text === 'function' 
-                ? (response as any).text() 
-                : (response as any).text || '';
-
-        } else if (apiConfig.provider === 'custom-gemini') {
-            let endpoint = apiConfig.apiUrl || '';
-            if (!endpoint) throw new Error('Custom Gemini requires an API URL');
-
-            if (!endpoint.includes(':generateContent')) {
-                endpoint = endpoint.replace(/\/$/, '') + `/models/${apiConfig.model || 'gemini-1.5-flash'}:generateContent`;
-            }
-
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-goog-api-key': apiConfig.apiKey,
-                },
-                body: JSON.stringify({
-                    contents: [
-                        { role: 'user', parts: [{ text: `${metaSystemPrompt}\n\n${userPrompt}` }] }
-                    ],
-                    generationConfig: {
-                        responseMimeType: 'application/json'
-                    }
-                })
-            });
-
-            if (!response.ok) {
-                const errText = await response.text();
-                throw new Error(`Custom Gemini Error: ${response.status} - ${errText}`);
-            }
-            const data = await response.json();
-            return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-        } else if (apiConfig.provider === 'openai' || apiConfig.provider === 'openrouter' || apiConfig.provider === 'custom-openai') {
-            let endpoint = '';
-            if (apiConfig.provider === 'openai') {
-                endpoint = 'https://api.openai.com/v1/chat/completions';
-            } else if (apiConfig.provider === 'openrouter') {
-                endpoint = 'https://openrouter.ai/api/v1/chat/completions';
-            } else if (apiConfig.provider === 'custom-openai') {
-                endpoint = apiConfig.apiUrl || 'https://api.openai.com/v1/chat/completions';
-            }
-
-            if (!endpoint) throw new Error(`Missing endpoint for provider: ${apiConfig.provider}`);
-        
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${apiConfig.apiKey}`,
-                    'Content-Type': 'application/json',
-                    'HTTP-Referer': window.location.origin,
-                    'X-Title': 'AI Bookmark Architect Prompt Gen',
-                },
-                body: JSON.stringify({
-                    model: apiConfig.model,
-                    messages: [
-                        { role: 'system', content: metaSystemPrompt },
-                        { role: 'user', content: userPrompt }
-                    ],
-                    response_format: { type: 'json_object' }
-                })
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`API Error (${apiConfig.provider}): ${response.status} - ${errorText}`);
-            }
-
-            const data = await response.json();
-            return data.choices?.[0]?.message?.content?.trim() || '';
-        }
-    
-        throw new Error(`Unsupported provider for prompt generation: ${apiConfig.provider}`);
+        const client = new AIClient(apiConfig);
+        const { text } = await client.generateContent(metaSystemPrompt, userPrompt);
+        return text.trim();
     } catch (error) {
-        console.error('Error generating prompt:', error);
+        console.error('Error generating AI content:', error);
         throw error;
     }
 };
@@ -161,3 +76,4 @@ Example Output: "Analyze the input list to identify clusters related to e-commer
     const userPrompt = `User Intent: "${userIntent}"\n\nGenerate the Planning Instruction:`;
     return generateAIContent(metaSystemPrompt, userPrompt, apiConfig);
 };
+
