@@ -34,12 +34,12 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
     const {
         appState, progress, logs, errorDetails, onStart, onStop, onForceStop, onApply, onDiscard, onContinue,
         apiConfigs, onOpenApiModal, onOpenLogModal, sessionTokenUsage,
-        hasPartialResults, onSuggestStructure, onConfirmProposedStructure, 
+        hasPartialResults, onSuggestStructure, onConfirmProposedStructure,
         proposedStructure, isGeneratingStructure, onOpenAIConfigModal,
         sessionRules, onSessionRulesChange
     } = props;
     const progressPercentage = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
-    
+
     const LogViewerButton = () => (
         <div className="mt-4">
             <button
@@ -55,7 +55,7 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
         <div className="text-xs text-center text-gray-400 mb-4 p-2 bg-gray-900/50 rounded-md border border-gray-700/50">
             <span>Tokens đã sử dụng: </span>
             <span className="font-mono text-emerald-400 font-bold">{formatNumber(sessionTokenUsage.totalTokens)}</span>
-            <br/>
+            <br />
             <span className="text-gray-500"> (Prompt: </span>
             <span className="font-mono text-sky-400">{formatNumber(sessionTokenUsage.promptTokens)}</span>
             <span className="text-gray-500">, Response: </span>
@@ -65,22 +65,22 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
     ) : null;
 
     const renderContent = () => {
-        switch(appState) {
+        switch (appState) {
             case AppState.LOADED:
             case AppState.STRUCTURED:
                 return (
                     <>
                         <h3 className="text-xl font-bold text-white mb-2">Tái cấu trúc bằng AI</h3>
                         <p className="text-sm text-gray-400 mb-6">Sắp xếp lại các bookmarks của bạn vào một cấu trúc thư mục thông minh.</p>
-                        
+
                         <div className="space-y-3 mb-6">
-                            <button 
+                            <button
                                 onClick={onStart}
                                 disabled={apiConfigs.filter(c => c.status === 'active').length === 0}
                                 className="w-full bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-600 transition-all duration-200 shadow-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
                                 {apiConfigs.filter(c => c.status === 'active').length === 0 ? 'Vui lòng thêm API Key' : 'PHÂN LOẠI NHANH (BỎ QUA LẬP KẾ HOẠCH)'}
                             </button>
-                            
+
                             <div className="relative">
                                 <div className="absolute inset-0 flex items-center" aria-hidden="true">
                                     <div className="w-full border-t border-gray-700"></div>
@@ -91,13 +91,13 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                             </div>
 
                             <div className="grid grid-cols-2 gap-2">
-                                <button 
+                                <button
                                     onClick={() => onSuggestStructure('tags')}
                                     disabled={apiConfigs.filter(c => c.status === 'active').length === 0 || isGeneratingStructure}
                                     className="text-[10px] bg-blue-600/20 text-blue-400 border border-blue-600/30 font-bold py-2 px-1 rounded-lg hover:bg-blue-600/30 transition-all disabled:opacity-50">
                                     GỢI Ý THEO TAG
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => onSuggestStructure('domains')}
                                     disabled={apiConfigs.filter(c => c.status === 'active').length === 0 || isGeneratingStructure}
                                     className="text-[10px] bg-purple-600/20 text-purple-400 border border-purple-600/30 font-bold py-2 px-1 rounded-lg hover:bg-purple-600/30 transition-all disabled:opacity-50">
@@ -141,14 +141,14 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                         {nodes.map((node: any) => {
                             const nodePath = [...currentPath, node.name];
                             const nodeRules = sessionRules.filter(r => r.targetPath.join('/') === nodePath.join('/'));
-                            
+
                             return (
                                 <li key={node.id} className="text-xs group">
                                     <div className="flex items-center justify-between">
                                         <div className="flex-1 truncate">
                                             <span className="text-blue-400">📁</span> {node.name}
                                         </div>
-                                        <button 
+                                        <button
                                             onClick={() => handleAddSessionRule(node.name, nodePath)}
                                             className="ml-2 text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-500/40"
                                             title="Gán quy tắc tự động phân loại vào thư mục này"
@@ -176,7 +176,7 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                     <>
                         <h3 className="text-xl font-bold text-white mb-2">Lập kế hoạch cấu trúc</h3>
                         <p className="text-sm text-gray-400 mb-4">Dựa trên dữ liệu của bạn, AI đề xuất cấu trúc sau. Hãy xác nhận để bắt đầu phân loại chi tiết.</p>
-                        
+
                         <div className="bg-gray-900/50 rounded-lg p-4 flex-1 overflow-y-auto mb-6 border border-gray-700/50 shadow-inner">
                             {isGeneratingStructure ? (
                                 <div className="flex flex-col items-center justify-center h-full space-y-3">
@@ -194,13 +194,13 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                         </div>
 
                         <div className="space-y-3 mt-auto">
-                            <button 
+                            <button
                                 onClick={onConfirmProposedStructure}
                                 disabled={proposedStructure.length === 0}
                                 className="w-full bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-600 transition-all shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:scale-100">
                                 XÁC NHẬN CẤU TRÚC NÀY
                             </button>
-                            <button 
+                            <button
                                 onClick={onDiscard}
                                 className="w-full bg-gray-700 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-600 transition-colors">
                                 HỦY & THỬ LẠI
@@ -213,7 +213,7 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                 return (
                     <>
                         <h3 className="text-xl font-bold text-white mb-2">
-                           Đang Xử Lý...
+                            Đang Xử Lý...
                         </h3>
                         <p className="text-sm text-gray-400 mb-6">
                             Đã xử lý {formatNumber(progress.current)} / {formatNumber(progress.total)} bookmarks.
@@ -314,12 +314,12 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                         </div>
                         <LogViewerButton />
                         <div className="space-y-3 mt-4">
-                            <button 
+                            <button
                                 onClick={onApply}
                                 className="w-full bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-600 transition-all duration-200 transform hover:scale-105 shadow-lg">
                                 Áp Dụng Thay Đổi
                             </button>
-                            <button 
+                            <button
                                 onClick={onDiscard}
                                 className="w-full bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors">
                                 Hủy Bỏ
@@ -334,7 +334,7 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                         <TokenUsageDisplay />
                         <div className="bg-red-900/50 border border-red-700 text-red-300 px-4 py-3 rounded-lg relative mb-4" role="alert">
                             <div className="flex">
-                                <WarningIcon className="w-6 h-6 mr-3"/>
+                                <WarningIcon className="w-6 h-6 mr-3" />
                                 <div>
                                     <strong className="font-bold">
                                         {errorDetails?.toLowerCase().includes('dừng') ? 'Thông báo:' : 'Lỗi API hoặc hệ thống:'}
@@ -354,20 +354,20 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                         <LogViewerButton />
                         <div className="space-y-3 mt-4">
                             {hasPartialResults && (
-                                <button 
+                                <button
                                     onClick={onContinue}
                                     className="w-full bg-sky-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-sky-600 transition-colors transform hover:scale-105 shadow-lg">
                                     Tiếp tục xử lí
                                 </button>
                             )}
                             {hasPartialResults && (
-                                <button 
+                                <button
                                     onClick={onApply}
                                     className="w-full bg-emerald-500/80 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-500 transition-colors">
                                     Áp dụng kết quả đã xử lý
                                 </button>
                             )}
-                            <button 
+                            <button
                                 onClick={onDiscard}
                                 className="w-full bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors">
                                 Bắt đầu lại
@@ -377,23 +377,12 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
                 );
         }
     };
-    
+
     return (
         <aside className="w-96 bg-[#21252C] p-6 flex-shrink-0 flex flex-col border-l border-gray-700/50">
             <div className="flex-1 flex flex-col min-h-0">
                 {renderContent()}
             </div>
-            {(appState === AppState.LOADED || appState === AppState.STRUCTURED || appState === AppState.ERROR) && (
-                <div className="mt-auto pt-6 border-t border-gray-700/50">
-                    <button 
-                        onClick={onOpenApiModal} 
-                        className="w-full flex items-center justify-center text-sm bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors"
-                    >
-                        <CogIcon className="w-5 h-5 mr-2" />
-                        Quản lý API Keys
-                    </button>
-                </div>
-            )}
         </aside>
     );
 };

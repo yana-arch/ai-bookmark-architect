@@ -26,18 +26,10 @@ import { useImportExport } from './hooks/useImportExport';
 import { useAISettings } from './hooks/useAISettings';
 
 // Lazy load modals for better performance
-const ImportModal = lazy(() => import('./components/modals/ImportModal'));
-const ExportModal = lazy(() => import('./components/modals/ExportModal'));
-const ApiConfigModal = lazy(() => import('./components/modals/ApiConfigModal'));
-const LogModal = lazy(() => import('./components/modals/LogModal'));
-const DuplicateModal = lazy(() => import('./components/modals/DuplicateModal'));
-const BrokenLinkModal = lazy(() => import('./components/modals/BrokenLinkModal'));
-const InstructionPresetModal = lazy(() => import('./components/modals/InstructionPresetModal'));
-const FolderTemplateModal = lazy(() => import('./components/modals/FolderTemplateModal'));
-const AnalyticsDashboard = lazy(() => import('./components/features/AnalyticsDashboard'));
-const KeyInputModal = lazy(() => import('./components/modals/KeyInputModal'));
 const NotificationToast = lazy(() => import('./components/ui/NotificationToast'));
-const GlobalSettingsModal = lazy(() => import('./components/modals/GlobalSettingsModal'));
+const UnifiedSettingsModal = lazy(() => import('./components/modals/UnifiedSettingsModal'));
+const LogModal = lazy(() => import('./components/modals/LogModal'));
+const AnalyticsDashboard = lazy(() => import('./components/features/AnalyticsDashboard'));
 
 const App: React.FC = () => {
     // 1. Core Data
@@ -161,11 +153,17 @@ const App: React.FC = () => {
         isKeyInputModalOpen, setIsKeyInputModalOpen,
         keyInputMode, setKeyInputMode,
         handleImportClick, processImport, handleExportBookmarks, handleUploadData, handleImportData,
-        handleFileLoaded
+        handleFileLoaded, importFile, handleFileSelect
     } = useImportExport(bookmarks, folders, setBookmarks, setFolders, setAppState, setNotifications);
 
     const [isGlobalSettingsModalOpen, setIsGlobalSettingsModalOpen] = useState(false);
+    const [settingsTab, setSettingsTab] = useState<'providers' | 'intelligence' | 'templates' | 'data' | 'health' | 'backup' | 'config'>('providers');
     const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
+
+    const openSettings = (tab: typeof settingsTab = 'providers') => {
+        setSettingsTab(tab);
+        setIsGlobalSettingsModalOpen(true);
+    };
 
     // 4. Orchestration Logic
     const startRestructuring = async (isContinuation = false) => {
@@ -308,48 +306,70 @@ const App: React.FC = () => {
     return (
         <div className="flex h-screen w-full bg-[#1E2127] text-gray-300 font-sans">
             <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="text-white">Đang tải...</div></div>}>
-                {showImportModal && (
-                    <ImportModal
-                        fileName={importFileName}
-                        previewBookmarks={previewBookmarks}
-                        existingBookmarks={bookmarks}
-                        onImport={processImport}
-                        onCancel={() => {
-                            setShowImportModal(false);
-                            setImportFileName('');
-                            setPreviewBookmarks([]);
-                        }}
-                    />
-                )}
                 {isGlobalSettingsModalOpen && (
-                    <GlobalSettingsModal
+                    <UnifiedSettingsModal
                         isOpen={isGlobalSettingsModalOpen}
                         onClose={() => setIsGlobalSettingsModalOpen(false)}
+                        initialTab={settingsTab}
+                        
+                        // AI & Providers
+                        apiConfigs={apiConfigs}
+                        onSaveApiConfig={handleSaveApiConfig}
+                        onDeleteApiConfig={handleDeleteApiConfig}
+                        onToggleApiConfigStatus={handleToggleApiConfigStatus}
+                        
+                        // Intelligence
                         systemPrompt={systemPrompt}
                         onSystemPromptChange={setSystemPrompt}
                         planningPrompt={planningPrompt}
                         onPlanningPromptChange={setPlanningPrompt}
                         customInstructions={customInstructions}
                         onCustomInstructionsChange={setCustomInstructions}
+                        instructionPresets={instructionPresets}
+                        onSaveInstructionPreset={handleSaveInstructionPreset}
+                        onDeleteInstructionPreset={handleDeleteInstructionPreset}
+                        smartClassifyRules={smartClassifyRules}
+                        onSaveSmartRule={handleSaveSmartRule}
+                        onDeleteSmartRule={handleDeleteSmartRule}
+                        
+                        // Templates
+                        folderTemplates={folderTemplates}
+                        onSaveFolderTemplate={handleSaveFolderTemplate}
+                        onDeleteFolderTemplate={handleDeleteFolderTemplate}
+                        onApplyFolderTemplate={handleApplyFolderTemplate}
+                        selectedTemplateId={templateSettings.selectedTemplateId}
+                        onSelectedTemplateChange={(id) => setTemplateSettings(prev => ({ ...prev, selectedTemplateId: id }))}
+                        
+                        // Performance
                         batchSize={batchSize}
                         onBatchSizeChange={setBatchSize}
                         maxRetries={maxRetries}
                         onMaxRetriesChange={setMaxRetries}
                         processingMode={processingMode}
                         onProcessingModeChange={setProcessingMode}
-                        folderTemplates={folderTemplates}
-                        selectedTemplateId={templateSettings.selectedTemplateId}
-                        onSelectedTemplateChange={(id) => setTemplateSettings(prev => ({ ...prev, selectedTemplateId: id }))}
-                        onOpenFolderTemplateModal={() => setIsFolderTemplateModalOpen(true)}
-                        onOpenInstructionPresetModal={() => setIsInstructionPresetModalOpen(true)}
-                        onApplyFolderTemplate={handleApplyFolderTemplate}
-                        smartClassifyRules={smartClassifyRules}
-                        onSaveSmartRule={handleSaveSmartRule}
-                        onDeleteSmartRule={handleDeleteSmartRule}
-                        apiConfigs={apiConfigs}
-                        onSaveApiConfig={handleSaveApiConfig}
-                        onDeleteApiConfig={handleDeleteApiConfig}
-                        onToggleApiConfigStatus={handleToggleApiConfigStatus}
+                        
+                        // Data Management
+                        bookmarks={bookmarks}
+                        folders={folders}
+                        onImport={processImport}
+                        onExport={handleExportBookmarks}
+                        onClearData={handleClearData}
+                        importFile={importFile}
+                        previewBookmarks={previewBookmarks}
+                        onFileSelect={handleFileSelect}
+                        
+                        // Health
+                        duplicateStats={duplicateStats}
+                        onCleanDuplicates={handleCleanDuplicates}
+                        brokenLinks={brokenLinks}
+                        brokenLinkCheckState={brokenLinkCheckState}
+                        brokenLinkCheckProgress={brokenLinkCheckProgress}
+                        onStartBrokenLinkCheck={handleStartBrokenLinkCheck}
+                        onCleanBrokenLinks={handleCleanBrokenLinks}
+                        
+                        // Cloud
+                        onUploadCloudData={handleUploadData}
+                        onImportCloudData={handleImportData}
                     />
                 )}
                 {isLogModalOpen && (
@@ -358,69 +378,11 @@ const App: React.FC = () => {
                         onClose={() => setIsLogModalOpen(false)}
                     />
                 )}
-                {isDuplicateModalOpen && (
-                    <DuplicateModal
-                        stats={duplicateStats}
-                        onClose={() => setIsDuplicateModalOpen(false)}
-                        onClean={handleCleanDuplicates}
-                    />
-                )}
-                {isBrokenLinkModalOpen && (
-                    <BrokenLinkModal
-                        brokenLinks={brokenLinks}
-                        onClose={() => setIsBrokenLinkModalOpen(false)}
-                        onClean={handleCleanBrokenLinks}
-                    />
-                )}
-                {isInstructionPresetModalOpen && (
-                    <InstructionPresetModal
-                        isOpen={isInstructionPresetModalOpen}
-                        onClose={() => setIsInstructionPresetModalOpen(false)}
-                        onSave={handleSaveInstructionPreset}
-                        onDelete={handleDeleteInstructionPreset}
-                        presets={instructionPresets}
-                    />
-                )}
-                {isFolderTemplateModalOpen && (
-                    <FolderTemplateModal
-                        isOpen={isFolderTemplateModalOpen}
-                        onClose={() => setIsFolderTemplateModalOpen(false)}
-                        templates={folderTemplates}
-                        onSaveTemplate={handleSaveFolderTemplate}
-                        onDeleteTemplate={handleDeleteFolderTemplate}
-                        onApplyFolderTemplate={handleApplyFolderTemplate}
-                        apiConfigs={apiConfigs}
-                    />
-                )}
-                {isExportModalOpen && (
-                    <ExportModal
-                        folders={folders}
-                        bookmarks={bookmarks}
-                        onExport={handleExportBookmarks}
-                        onCancel={() => setIsExportModalOpen(false)}
-                    />
-                )}
                 {isAnalyticsDashboardOpen && (
                     <AnalyticsDashboard
                         bookmarks={bookmarks}
                         folders={folders}
                         onClose={() => setIsAnalyticsDashboardOpen(false)}
-                    />
-                )}
-                {isKeyInputModalOpen && (
-                    <KeyInputModal
-                        isOpen={isKeyInputModalOpen}
-                        onClose={() => setIsKeyInputModalOpen(false)}
-                        mode={keyInputMode}
-                        onSubmit={async (key) => {
-                            if (keyInputMode === 'upload') {
-                                // Handle upload
-                                await handleUploadData(key);
-                            } else {
-                                // Handle import
-                                await handleImportData(key);
-                            }
-                        }}
                     />
                 )}
 
@@ -447,13 +409,13 @@ const App: React.FC = () => {
                         selectedFolderId={selectedFolderId}
                         onSelectFolder={setSelectedFolderId}
                         onClearData={handleClearData}
-                        onImport={handleImportClick}
-                        onExport={() => setIsExportModalOpen(true)}
+                        onImport={() => openSettings('data')}
+                        onExport={() => openSettings('data')}
                         searchQuery={searchQuery}
                         onSearchChange={setSearchQuery}
                         totalBookmarks={bookmarks.length}
                         duplicateCount={duplicateStats.count}
-                        onOpenDuplicateModal={() => setIsDuplicateModalOpen(true)}
+                        onOpenDuplicateModal={() => openSettings('health')}
                         onStartBrokenLinkCheck={handleStartBrokenLinkCheck}
                         brokenLinkCheckState={brokenLinkCheckState}
                         brokenLinkCheckProgress={brokenLinkCheckProgress}
@@ -467,20 +429,14 @@ const App: React.FC = () => {
                             </h1>
                             <div className="flex items-center space-x-2">
                                 <button
-                                    onClick={() => {
-                                        setKeyInputMode('upload');
-                                        setIsKeyInputModalOpen(true);
-                                    }}
+                                    onClick={() => openSettings('backup')}
                                     className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
                                     title="Upload dữ liệu"
                                 >
                                     <UploadIcon className="w-4 h-4" />
                                 </button>
                                 <button
-                                    onClick={() => {
-                                        setKeyInputMode('import');
-                                        setIsKeyInputModalOpen(true);
-                                    }}
+                                    onClick={() => openSettings('data')}
                                     className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-md transition-colors"
                                     title="Import dữ liệu"
                                 >
@@ -534,10 +490,10 @@ const App: React.FC = () => {
                                     onApply={applyChanges}
                                     onDiscard={discardChanges}
                                     onContinue={continueRestructuring}
-                                    onOpenApiModal={() => setIsGlobalSettingsModalOpen(true)}
+                                    onOpenApiModal={() => openSettings('providers')}
                                     onOpenLogModal={() => setIsLogModalOpen(true)}
-                                    onOpenInstructionPresetModal={() => setIsInstructionPresetModalOpen(true)}
-                                    onOpenFolderTemplateModal={() => setIsFolderTemplateModalOpen(true)}
+                                    onOpenInstructionPresetModal={() => openSettings('intelligence')}
+                                    onOpenFolderTemplateModal={() => openSettings('templates')}
                                     onCustomInstructionsChange={setCustomInstructions}
                                     onBatchSizeChange={setBatchSize}
                                     onMaxRetriesChange={setMaxRetries}

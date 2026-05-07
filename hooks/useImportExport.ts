@@ -18,6 +18,7 @@ export const useImportExport = (
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [isKeyInputModalOpen, setIsKeyInputModalOpen] = useState(false);
     const [keyInputMode, setKeyInputMode] = useState<'upload' | 'import'>('upload');
+    const [importFile, setImportFile] = useState<File | null>(null);
 
     const handleFileLoaded = useCallback(async (fileName: string, loadedBookmarks: Bookmark[]) => {
         setImportFileName(fileName);
@@ -25,37 +26,53 @@ export const useImportExport = (
         setShowImportModal(true);
     }, []);
 
+    const handleFileSelect = useCallback((file: File | null) => {
+        if (!file) {
+            setImportFile(null);
+            setImportFileName('');
+            setPreviewBookmarks([]);
+            return;
+        }
+
+        setImportFile(file);
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const content = event.target?.result as string;
+            if (content) {
+                try {
+                    let parsedBookmarks: Bookmark[] = [];
+                    if (file.name.endsWith('.html')) {
+                        parsedBookmarks = parseHTMLBookmarks(content);
+                    } else if (file.name.endsWith('.csv')) {
+                        parsedBookmarks = parseCSVBookmarks(content);
+                    } else if (file.name.endsWith('.json')) {
+                        parsedBookmarks = JSON.parse(content);
+                    }
+                    setImportFileName(file.name);
+                    setPreviewBookmarks(parsedBookmarks);
+                } catch (error: any) {
+                    alert(`Lỗi khi đọc file: ${error.message}`);
+                    setImportFile(null);
+                }
+            }
+        };
+        reader.readAsText(file);
+    }, []);
+
     const handleImportClick = useCallback(() => {
         // Create a hidden file input to trigger file selection
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = '.html,.csv';
+        input.accept = '.html,.csv,.json';
         input.multiple = false;
         input.onchange = (e) => {
             const file = (e.target as HTMLInputElement).files?.[0];
             if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const content = event.target?.result as string;
-                    if (content) {
-                        try {
-                            let parsedBookmarks: Bookmark[] = [];
-                            if (file.name.endsWith('.html')) {
-                                parsedBookmarks = parseHTMLBookmarks(content);
-                            } else if (file.name.endsWith('.csv')) {
-                                parsedBookmarks = parseCSVBookmarks(content);
-                            }
-                            handleFileLoaded(file.name, parsedBookmarks);
-                        } catch (error: any) {
-                            alert(`Lỗi khi đọc file: ${error.message}`);
-                        }
-                    }
-                };
-                reader.readAsText(file);
+                handleFileSelect(file);
             }
         };
         input.click();
-    }, [handleFileLoaded]);
+    }, [handleFileSelect]);
 
     const processImport = useCallback(async (mode: 'merge' | 'overwrite') => {
         if (previewBookmarks.length === 0) return;
@@ -329,6 +346,8 @@ ${bookmarksHtml}</DL><p>`;
         handleExportBookmarks,
         handleUploadData,
         handleImportData,
-        handleFileLoaded
+        handleFileLoaded,
+        importFile,
+        handleFileSelect
     };
 };
