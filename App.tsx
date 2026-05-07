@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, lazy, Suspense, useEffect } from 'react';
 
-import { AILogoIcon, ChartIcon, UploadIcon, ImportIcon } from './components/ui/Icons';
+import { AILogoIcon, ChartIcon, UploadIcon, ImportIcon, EllipsisVerticalIcon, CogIcon } from './components/ui/Icons';
 import { AppState, Folder, Bookmark, CategorizedBookmark } from './types';
 import Sidebar from './components/layout/Sidebar';
 import BookmarkList from './components/features/BookmarkList';
@@ -37,7 +37,7 @@ const FolderTemplateModal = lazy(() => import('./components/modals/FolderTemplat
 const AnalyticsDashboard = lazy(() => import('./components/features/AnalyticsDashboard'));
 const KeyInputModal = lazy(() => import('./components/modals/KeyInputModal'));
 const NotificationToast = lazy(() => import('./components/ui/NotificationToast'));
-const AIConfigSettingsModal = lazy(() => import('./components/modals/AIConfigSettingsModal'));
+const GlobalSettingsModal = lazy(() => import('./components/modals/GlobalSettingsModal'));
 
 const App: React.FC = () => {
     // 1. Core Data
@@ -164,7 +164,8 @@ const App: React.FC = () => {
         handleFileLoaded
     } = useImportExport(bookmarks, folders, setBookmarks, setFolders, setAppState, setNotifications);
 
-    const [isAIConfigModalOpen, setIsAIConfigModalOpen] = useState(false);
+    const [isGlobalSettingsModalOpen, setIsGlobalSettingsModalOpen] = useState(false);
+    const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
 
     // 4. Orchestration Logic
     const startRestructuring = async (isContinuation = false) => {
@@ -320,9 +321,31 @@ const App: React.FC = () => {
                         }}
                     />
                 )}
-                {isApiModalOpen && (
-                    <ApiConfigModal
-                        onClose={() => setIsApiModalOpen(false)}
+                {isGlobalSettingsModalOpen && (
+                    <GlobalSettingsModal
+                        isOpen={isGlobalSettingsModalOpen}
+                        onClose={() => setIsGlobalSettingsModalOpen(false)}
+                        systemPrompt={systemPrompt}
+                        onSystemPromptChange={setSystemPrompt}
+                        planningPrompt={planningPrompt}
+                        onPlanningPromptChange={setPlanningPrompt}
+                        customInstructions={customInstructions}
+                        onCustomInstructionsChange={setCustomInstructions}
+                        batchSize={batchSize}
+                        onBatchSizeChange={setBatchSize}
+                        maxRetries={maxRetries}
+                        onMaxRetriesChange={setMaxRetries}
+                        processingMode={processingMode}
+                        onProcessingModeChange={setProcessingMode}
+                        folderTemplates={folderTemplates}
+                        selectedTemplateId={templateSettings.selectedTemplateId}
+                        onSelectedTemplateChange={(id) => setTemplateSettings(prev => ({ ...prev, selectedTemplateId: id }))}
+                        onOpenFolderTemplateModal={() => setIsFolderTemplateModalOpen(true)}
+                        onOpenInstructionPresetModal={() => setIsInstructionPresetModalOpen(true)}
+                        onApplyFolderTemplate={handleApplyFolderTemplate}
+                        smartClassifyRules={smartClassifyRules}
+                        onSaveSmartRule={handleSaveSmartRule}
+                        onDeleteSmartRule={handleDeleteSmartRule}
                         apiConfigs={apiConfigs}
                         onSaveApiConfig={handleSaveApiConfig}
                         onDeleteApiConfig={handleDeleteApiConfig}
@@ -400,34 +423,7 @@ const App: React.FC = () => {
                         }}
                     />
                 )}
-                {isAIConfigModalOpen && (
-                    <AIConfigSettingsModal
-                        isOpen={isAIConfigModalOpen}
-                        onClose={() => setIsAIConfigModalOpen(false)}
-                        systemPrompt={systemPrompt}
-                        onSystemPromptChange={setSystemPrompt}
-                        planningPrompt={planningPrompt}
-                        onPlanningPromptChange={setPlanningPrompt}
-                        customInstructions={customInstructions}
-                        onCustomInstructionsChange={setCustomInstructions}
-                        batchSize={batchSize}
-                        onBatchSizeChange={setBatchSize}
-                        maxRetries={maxRetries}
-                        onMaxRetriesChange={setMaxRetries}
-                        processingMode={processingMode}
-                        onProcessingModeChange={setProcessingMode}
-                        folderTemplates={folderTemplates}
-                        selectedTemplateId={templateSettings.selectedTemplateId}
-                        onSelectedTemplateChange={(id) => setTemplateSettings(prev => ({ ...prev, selectedTemplateId: id }))}
-                        onOpenFolderTemplateModal={() => setIsFolderTemplateModalOpen(true)}
-                        onOpenInstructionPresetModal={() => setIsInstructionPresetModalOpen(true)}
-                        onApplyFolderTemplate={handleApplyFolderTemplate}
-                        smartClassifyRules={smartClassifyRules}
-                        onSaveSmartRule={handleSaveSmartRule}
-                        onDeleteSmartRule={handleDeleteSmartRule}
-                        apiConfigs={apiConfigs}
-                    />
-                )}
+
 
             </Suspense>
             <div className="fixed bottom-4 right-4 z-50 space-y-2">
@@ -538,7 +534,7 @@ const App: React.FC = () => {
                                     onApply={applyChanges}
                                     onDiscard={discardChanges}
                                     onContinue={continueRestructuring}
-                                    onOpenApiModal={() => setIsApiModalOpen(true)}
+                                    onOpenApiModal={() => setIsGlobalSettingsModalOpen(true)}
                                     onOpenLogModal={() => setIsLogModalOpen(true)}
                                     onOpenInstructionPresetModal={() => setIsInstructionPresetModalOpen(true)}
                                     onOpenFolderTemplateModal={() => setIsFolderTemplateModalOpen(true)}
@@ -560,7 +556,7 @@ const App: React.FC = () => {
                                     isGeneratingStructure={isGeneratingStructure}
                                     planningPrompt={planningPrompt}
                                     onPlanningPromptChange={setPlanningPrompt}
-                                    onOpenAIConfigModal={() => setIsAIConfigModalOpen(true)}
+                                    onOpenAIConfigModal={() => setIsGlobalSettingsModalOpen(true)}
                                     sessionRules={sessionRules}
                                     onSessionRulesChange={setSessionRules}
                                 />

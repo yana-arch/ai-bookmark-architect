@@ -95,32 +95,6 @@ export const initDB = () => {
                         db.createObjectStore(DB_CONNECTIONS_STORE, { keyPath: 'id' });
                     }
                 }
-                // DbConnections store is used but wasn't explicitly in the upgrade block in original file,
-                // but since we are refactoring, we should ensure it exists if used.
-                // However, I will strictly follow the original logic where possible.
-                // Looking at original file, saveDbConnection calls initDB.
-                // The original file didn't seem to create 'dbConnections' in upgrade().
-                // This might be a bug in the original code or it relies on dynamic creation?
-                // IDB requires stores to be created in upgrade.
-                // Checking original file line 397: const DB_CONNECTIONS_STORE = 'dbConnections';
-                // But it's not in the upgrade function.
-                // I will add it here to fix the potential bug, safely checking version.
-                if (!db.objectStoreNames.contains(DB_CONNECTIONS_STORE)) {
-                    // Since we can only upgrade in version change, and we are at 9.
-                    // Ideally we should bump to 10, but I'll add it to the check for safety
-                    // assuming the user might want to fix this.
-                    // For now, I will NOT change the version number to avoid side effects
-                    // but I will add the check inside the latest version block or a new one if requested.
-                    // To be safe and identical to original behavior (even if buggy), I will strictly copy the logic.
-                    // WAIT: If the original code works, maybe it was added in an earlier version that I missed?
-                    // No, I read the whole file. It seems missing.
-                    // I will add it to the version 9 block or a new version 10 block if I were fixing bugs.
-                    // Since the instruction is "Review code quality", I will add it to version 9 block
-                    // as a fix for the missing store if it doesn't exist.
-                    if (!db.objectStoreNames.contains('dbConnections')) {
-                        db.createObjectStore('dbConnections', { keyPath: 'id' });
-                    }
-                }
             },
         });
     }

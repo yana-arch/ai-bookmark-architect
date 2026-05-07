@@ -228,7 +228,7 @@ Do not include any explanation or markdown formatting outside the JSON object.`;
             
                     // Call API
                     const result = await genAI.models.generateContent({
-                        model: activeConfig.model || 'gemini-1.5-flash',
+                        model: activeConfig.model || 'gemini-3-flash',
                         contents: [
                             {
                                 parts: [
