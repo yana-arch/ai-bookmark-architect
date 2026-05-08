@@ -1,4 +1,4 @@
-import type { Bookmark, Folder } from '../../types';
+import type { Bookmark, Folder, FolderStructureNode } from '../../types';
 
 /**
  * Converts a flat list of bookmarks with paths into a folder tree structure.
@@ -96,3 +96,43 @@ export function getBookmarksInFolder(folder: Folder | null): Bookmark[] {
     }
     return bookmarks;
 }
+
+/**
+ * Converts a FolderStructureNode structure to a Folder tree
+ */
+export const convertStructureToTree = (structure: FolderStructureNode[]): (Folder | Bookmark)[] => {
+    if (!structure || structure.length === 0) return [];
+    
+    const result: Folder[] = [];
+    const stack: { node: FolderStructureNode; parent: Folder | null }[] = 
+        structure.map(n => ({ node: n, parent: null }));
+    
+    const folderMap = new Map<string, Folder>();
+    
+    while (stack.length > 0) {
+        const { node, parent } = stack.pop()!;
+        
+        const folder: Folder = {
+            id: node.id,
+            name: node.name,
+            children: [],
+            parentId: parent ? parent.id : null
+        };
+        
+        folderMap.set(folder.id, folder);
+        
+        if (parent) {
+            parent.children.push(folder);
+        } else {
+            result.push(folder);
+        }
+        
+        if (node.children && node.children.length > 0) {
+            for (let i = node.children.length - 1; i >= 0; i--) {
+                stack.push({ node: node.children[i], parent: folder });
+            }
+        }
+    }
+    
+    return result;
+};

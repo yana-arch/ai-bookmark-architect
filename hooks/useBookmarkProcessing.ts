@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog } from '../types';
 import { arrayToTree } from '../src/utils/treeUtils';
 import { perfMonitor } from '../src/performance';
@@ -16,6 +16,24 @@ interface UseBookmarkProcessingProps {
     onNotificationsAdd: (notification: { id: string, message: string, type: 'info' | 'error' | 'success' | 'warning' }) => void;
     onProcessingComplete?: (hasError: boolean) => void;
 }
+
+// Helper to simplify folder structure for AI context (removes IDs and Bookmarks)
+interface SimplifiedFolder {
+    name: string;
+    children: SimplifiedFolder[];
+}
+
+const simplifyFolderStructure = (folders: (Folder | Bookmark)[]): SimplifiedFolder[] => {
+    return folders
+        .filter(item => !('url' in item)) // Filter out bookmarks
+        .map(item => {
+            const folder = item as Folder;
+            return {
+                name: folder.name,
+                children: simplifyFolderStructure(folder.children)
+            };
+        });
+};
 
 export const useBookmarkProcessing = ({
     bookmarks,
@@ -41,7 +59,14 @@ export const useBookmarkProcessing = ({
     const activeWorkersRef = useRef<Set<number>>(new Set());
     const stopProcessingRef = useRef(false);
 
-    // Helper to add logs
+    // Cleanup workers on unmount
+    useEffect(() => {
+        return () => {
+            workersRef.current.forEach(worker => worker.terminate());
+            workersRef.current = [];
+        };
+    }, []);
+
     const addDetailedLog = useCallback(async (type: DetailedLog['type'], title: string, content: string | object, usage?: DetailedLog['usage']) => {
         const newLog: DetailedLog = {
             id: `log-${Date.now()}-${Math.random()}`,
@@ -59,7 +84,11 @@ export const useBookmarkProcessing = ({
         }
         
         if (type === 'error' || (type === 'info' && title.includes('Hoàn tất'))) {
-            onNotificationsAdd({ id: newLog.id, message: `${newLog.title}: ${typeof newLog.content === 'string' ? newLog.content.substring(0, 100) : ''}...`, type: newLog.type === 'error' ? 'error' : 'success' });
+            onNotificationsAdd({ 
+                id: newLog.id, 
+                message: `${newLog.title}: ${typeof newLog.content === 'string' ? newLog.content.substring(0, 100) : ''}...`, 
+                type: newLog.type === 'error' ? 'error' : 'success' 
+            });
         }
     }, [onNotificationsAdd]);
 
@@ -80,23 +109,6 @@ export const useBookmarkProcessing = ({
         setIsProcessing(false);
     }, [addDetailedLog]);
 
-
-    // Helper to simplify folder structure for AI context (removes IDs and Bookmarks)
-    const simplifyFolderStructure = useCallback((folders: (Folder | Bookmark)[]): any[] => {
-        return folders
-            .filter(item => !('url' in item)) // Filter out bookmarks at this level
-            .map(item => {
-                const folder = item as Folder;
-                return {
-                    name: folder.name,
-                    // Note: This recursive call works because the function is hoisted or available in closure,
-                    // but with useCallback it might be tricky if we need self-reference.
-                    // Actually, for recursion inside useCallback, it's safer to define a standalone recursive function outside or inside.
-                    children: simplifyFolderStructure(folder.children)
-                };
-            });
-    }, []); // No dependencies needed for this pure transformation
-
     const startProcessing = useCallback(async (
         initialProcessed: CategorizedBookmark[], 
         currentFolders: (Folder | Bookmark)[],
@@ -104,18 +116,18 @@ export const useBookmarkProcessing = ({
     ) => {
         const availableKeys = apiConfigs.filter(c => c.status === 'active');
         if (availableKeys.length === 0) {
-            setErrorDetails('Không có API key nào đang hoạt động. Vui lòng thêm hoặc kích hoạt một key hợp lệ.');
-            addDetailedLog('error', 'Không tìm thấy API key', 'Không có API key nào được cấu hình hoặc đang hoạt động.');
+            const errorMsg = 'Không có API key nào đang hoạt động. Vui lòng thêm hoặc kích hoạt một key hợp lệ.';
+            setErrorDetails(errorMsg);
+            addDetailedLog('error', 'Không tìm thấy API key', errorMsg);
             return false;
         }
 
         addDetailedLog('info', 'Khởi tạo xử lý', `Bắt đầu với ${availableKeys.length} API key đang hoạt động: ${availableKeys.map(k => `${k.name} [ID: ${k.id}] (${k.provider})`).join(', ')}`);
 
-        await perfMonitor.timeAsyncFunction('start_processing', async () => {
+        return await perfMonitor.timeAsyncFunction('start_processing', async () => {
             stopProcessingRef.current = false;
             setIsProcessing(true);
             
-            // Note: processedBookmarks state update is async, so we use a local variable for logic
             const currentProcessed = [...initialProcessed];
             setProcessedBookmarks(currentProcessed);
             
@@ -134,16 +146,14 @@ export const useBookmarkProcessing = ({
                 ? `\n\nUSER'S CUSTOM INSTRUCTIONS (Follow these strictly):\n- ${customInstructions.trim().replace(/\n/g, '\n- ')}`
                 : '';
 
-            // Prepare the simplified tree once
             const currentTree = simplifyFolderStructure(currentFolders);
 
             const finalizeProcessing = (allNewResults: CategorizedBookmark[]) => {
                 setIsProcessing(false);
-                // Update processed bookmarks state one last time
                 setProcessedBookmarks(prev => {
-                    // Avoid duplicates if needed, but logic implies appending
-                    // Actually, let's just use what we have tracked
-                    return [...currentProcessed, ...allNewResults]; 
+                    const existingUrls = new Set(prev.map(b => b.url));
+                    const newUnique = allNewResults.filter(b => !existingUrls.has(b.url));
+                    return [...prev, ...newUnique];
                 });
                 
                 workersRef.current.forEach(w => w.terminate());
@@ -162,25 +172,12 @@ export const useBookmarkProcessing = ({
                 }
             };
 
-            const startNextBatch = (specificWorker?: Worker, specificWorkerIndex?: number) => {
-                if (stopProcessingRef.current) return;
-                if (nextBatchToStart >= totalBatches) return;
+            const startNextBatch = (worker: Worker) => {
+                if (stopProcessingRef.current || nextBatchToStart >= totalBatches) return;
 
                 const batchIndex = nextBatchToStart++;
-                // If specific worker provided (reusing), use it. Otherwise assign round-robin (initial)
-                // Actually round robin logic needs care. simpler:
-                // If specific worker provided, use it. If not (initial loop), push to array.
-                
-                let worker: Worker;
-                
-                if (specificWorker) {
-                    worker = specificWorker;
-                } else {
-                    // Should not happen in this logic flow
-                    return;
-                }
-
                 activeWorkersRef.current.add(batchIndex);
+                
                 const start = batchIndex * BATCH_SIZE;
                 const end = Math.min(start + BATCH_SIZE, bookmarksToProcess.length);
                 const batch = bookmarksToProcess.slice(start, end);
@@ -192,98 +189,94 @@ export const useBookmarkProcessing = ({
                     data: {
                         batch,
                         batchIndex,
-                        systemPrompt, // Pass raw system prompt
-                        userInstructionBlock, // Pass user instructions separately
+                        systemPrompt,
+                        userInstructionBlock,
                         apiConfigs: availableKeys,
                         maxRetries,
-                        currentTree // Pass the current folder structure
+                        currentTree
                     }
                 });
             };
 
             // Initialize workers
-            for (let i = 0; i < MAX_CONCURRENT_WORKERS; i++) {
-                if (nextBatchToStart >= totalBatches) break;
-
+            for (let i = 0; i < Math.min(MAX_CONCURRENT_WORKERS, totalBatches); i++) {
                 const worker = new Worker(new URL('../src/aiWorker.ts', import.meta.url), { type: 'module' });
                 workersRef.current.push(worker);
 
                 worker.onmessage = (e) => {
                     const { type, data, error, batchIndex, log } = e.data;
 
-                    if (type === 'log') {
-                        const logMsg = log?.message || data || 'No message';
-                        const workerId = batchIndex !== undefined ? batchIndex : 'AI';
-                        setLogs(prev => [...prev, `[Worker ${workerId}] ${logMsg}`]);
-                        addDetailedLog('info', `Worker ${workerId}`, logMsg);
-                    } else if (type === 'detailed_log') {
-                        // Forward detailed logs from worker
-                        addDetailedLog(data.type, data.title, data.content, data.usage);
-                    } else if (type === 'batch_result') {
-                        // Graceful stop: Process the result, but don't start new batches
-                        
-                        activeWorkersRef.current.delete(batchIndex);
-                        completedBatches++;
-                        batchResults[batchIndex] = data;
+                    switch (type) {
+                        case 'log':
+                            const logMsg = log?.message || data || 'No message';
+                            const workerId = batchIndex !== undefined ? batchIndex : 'AI';
+                            setLogs(prev => [...prev, `[Worker ${workerId}] ${logMsg}`]);
+                            addDetailedLog('info', `Worker ${workerId}`, logMsg);
+                            break;
 
-                        if (data && data.usage) {
-                            setSessionTokenUsage(prev => ({
-                                promptTokens: prev.promptTokens + (data.usage.promptTokens || 0),
-                                completionTokens: prev.completionTokens + (data.usage.completionTokens || 0),
-                                totalTokens: prev.totalTokens + (data.usage.totalTokens || 0)
-                            }));
-                        }
+                        case 'detailed_log':
+                            addDetailedLog(data.type, data.title, data.content, data.usage);
+                            break;
 
-                        // Update progress
-                        const allResults = Object.values(batchResults).flat();
-                        const currentProgress = currentProcessed.length + allResults.length;
-                        setProgress({ current: currentProgress, total: sourceBookmarks.length });
+                        case 'batch_result':
+                            activeWorkersRef.current.delete(batchIndex);
+                            completedBatches++;
+                            batchResults[batchIndex] = data;
 
-                        // Update folders realtime
-                        const categorizedMap = new Map<string, CategorizedBookmark>([...currentProcessed, ...allResults].map(cb => [cb.url, cb]));
-                        const newFolders = arrayToTree(
-                            sourceBookmarks.map(bm => {
-                                const categorized = categorizedMap.get(bm.url);
-                                return { ...bm, path: categorized?.path || [], tags: categorized?.tags || [] };
-                            }),
-                            currentFolders
-                        );
-                        onFoldersUpdate(newFolders);
+                            if (data?.usage) {
+                                setSessionTokenUsage(prev => ({
+                                    promptTokens: prev.promptTokens + (data.usage.promptTokens || 0),
+                                    completionTokens: prev.completionTokens + (data.usage.completionTokens || 0),
+                                    totalTokens: prev.totalTokens + (data.usage.totalTokens || 0)
+                                }));
+                            }
 
-                        // Check completion OR Graceful Stop completion
-                        const isFinished = completedBatches + failedBatches >= totalBatches;
-                        const isGracefulStopFinished = stopProcessingRef.current && activeWorkersRef.current.size === 0;
+                            const allResults = Object.values(batchResults).flat();
+                            setProgress({ 
+                                current: currentProcessed.length + allResults.length, 
+                                total: sourceBookmarks.length 
+                            });
 
-                        if (isFinished || isGracefulStopFinished) {
-                            finalizeProcessing(allResults);
-                        } else {
-                            // Reuse this worker for next batch (startNextBatch handles stopProcessingRef check)
-                            startNextBatch(worker);
-                        }
-                    } else if (type === 'batch_error') {
-                        activeWorkersRef.current.delete(batchIndex);
-                        failedBatches++;
-                        setLogs(prev => [...prev, `[Worker] Batch ${batchIndex} thất bại: ${error}`]);
-                        addDetailedLog('error', `Batch ${batchIndex} Failed`, error);
-                        
-                        const isFinished = completedBatches + failedBatches >= totalBatches;
-                        const isGracefulStopFinished = stopProcessingRef.current && activeWorkersRef.current.size === 0;
+                            const categorizedMap = new Map<string, CategorizedBookmark>(
+                                [...currentProcessed, ...allResults].map(cb => [cb.url, cb])
+                            );
+                            
+                            const newFolders = arrayToTree(
+                                sourceBookmarks.map(bm => {
+                                    const categorized = categorizedMap.get(bm.url);
+                                    return { ...bm, path: categorized?.path || [], tags: categorized?.tags || [] };
+                                }),
+                                currentFolders
+                            );
+                            onFoldersUpdate(newFolders);
 
-                        if (isFinished || isGracefulStopFinished) {
-                            finalizeProcessing(Object.values(batchResults).flat());
-                        } else {
-                            startNextBatch(worker);
-                        }
+                            if (completedBatches + failedBatches >= totalBatches || (stopProcessingRef.current && activeWorkersRef.current.size === 0)) {
+                                finalizeProcessing(allResults);
+                            } else {
+                                startNextBatch(worker);
+                            }
+                            break;
+
+                        case 'batch_error':
+                            activeWorkersRef.current.delete(batchIndex);
+                            failedBatches++;
+                            setLogs(prev => [...prev, `[Worker] Batch ${batchIndex} thất bại: ${error}`]);
+                            addDetailedLog('error', `Batch ${batchIndex} Failed`, error);
+                            
+                            if (completedBatches + failedBatches >= totalBatches || (stopProcessingRef.current && activeWorkersRef.current.size === 0)) {
+                                finalizeProcessing(Object.values(batchResults).flat());
+                            } else {
+                                startNextBatch(worker);
+                            }
+                            break;
                     }
                 };
 
-                // Start first task for this worker
                 startNextBatch(worker);
             }
+            return true;
         });
-        
-        return true;
-    }, [bookmarks, apiConfigs, batchSize, maxRetries, processingMode, systemPrompt, customInstructions, onFoldersUpdate, addDetailedLog, onProcessingComplete, simplifyFolderStructure]);
+    }, [bookmarks, apiConfigs, batchSize, maxRetries, processingMode, systemPrompt, customInstructions, onFoldersUpdate, addDetailedLog, onProcessingComplete]);
 
     const resetProcessingState = useCallback(() => {
         setIsProcessing(false);
@@ -315,3 +308,4 @@ export const useBookmarkProcessing = ({
         addDetailedLog
     };
 };
+

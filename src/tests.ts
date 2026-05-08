@@ -1,7 +1,8 @@
-import { generateHash, cacheStats } from './cache';
+import { generateHash, cacheStats, CachedOperation, MemoryCache } from './cache';
 import { perfMonitor } from './performance';
 import { repairJson, parseAIResponse } from './services/aiService';
 import { arrayToTree } from './utils/treeUtils';
+import { getApiConfigs, saveApiConfig, deleteApiConfig } from './db';
 
 // Test core business logic
 export const testCoreLogic = () => {
@@ -33,8 +34,8 @@ export const testCoreLogic = () => {
 };
 
 // Test cache functionality
-export const testCacheFunctionality = () => {
-    console.log('🧪 Testing Cache Functionality...');
+export const testCacheFunctionality = async () => {
+    console.group('🧪 Testing Cache Functionality...');
 
     // Test hash generation
     const testData = { bookmarks: [{ id: '1', title: 'Test', url: 'http://test.com' }] };
@@ -44,18 +45,65 @@ export const testCacheFunctionality = () => {
 
     console.log('✅ Hash generation:', hash1 === hash2, hash1 !== hash3);
 
-    // Test cache stats
-    cacheStats.reset();
-    console.log('✅ Cache stats reset:', cacheStats.hits === 0 && cacheStats.misses === 0);
+    // Test async CachedOperation
+    let opCount = 0;
+    const mockOp = async () => {
+        opCount++;
+        return `result-${opCount}`;
+    };
 
-    console.log('✅ Cache tests passed');
+    const memoryCache = new MemoryCache<string>(10);
+    const cachedOp = new CachedOperation<string>([memoryCache], mockOp);
+    
+    cacheStats.reset();
+    
+    const res1 = await cachedOp.get('test-key');
+    console.log('✅ Cache get (miss):', res1 === 'result-1' && cacheStats.misses === 1);
+    
+    const res2 = await cachedOp.get('test-key');
+    console.log('✅ Cache get (hit):', res2 === 'result-1' && cacheStats.hits === 1);
+    
+    await cachedOp.delete('test-key');
+    const res3 = await cachedOp.get('test-key');
+    console.log('✅ Cache delete & retry:', res3 === 'result-2' && cacheStats.misses === 2);
+
+    console.groupEnd();
+};
+
+// Test BaseStore (via API Configs)
+export const testBaseStore = async () => {
+    console.group('🧪 Testing BaseStore...');
+    
+    try {
+        const initial = await getApiConfigs();
+        const testId = `test-config-${Date.now()}`;
+        
+        await saveApiConfig({
+            id: testId,
+            name: 'Test Config',
+            provider: 'gemini',
+            apiKey: 'test-key',
+            model: 'gemini-pro',
+            status: 'inactive'
+        });
+        
+        const afterAdd = await getApiConfigs();
+        console.log('✅ BaseStore add/put:', afterAdd.length === initial.length + 1);
+        
+        await deleteApiConfig(testId);
+        const afterDelete = await getApiConfigs();
+        console.log('✅ BaseStore delete:', afterDelete.length === initial.length);
+    } catch (e) {
+        console.error('❌ BaseStore test failed:', e);
+    }
+    
+    console.groupEnd();
 };
 
 // Test performance monitoring
 export const testPerformanceMonitoring = () => {
     console.log('🧪 Testing Performance Monitoring...');
 
-    // Test function timing
     const testFunction = () => {
         let sum = 0;
         for (let i = 0; i < 1000; i++) {
@@ -67,7 +115,6 @@ export const testPerformanceMonitoring = () => {
     const result = perfMonitor.timeFunction('test_function', testFunction);
     console.log('✅ Function timing result:', result === 499500);
 
-    // Test async function timing
     const testAsyncFunction = async () => {
         await new Promise(resolve => setTimeout(resolve, 10));
         return 'async_result';
@@ -78,7 +125,6 @@ export const testPerformanceMonitoring = () => {
             console.log('✅ Async function timing result:', result === 'async_result');
         });
 
-    // Test metrics summary
     const summary = perfMonitor.getMetricsSummary();
     console.log('✅ Metrics summary generated:', Object.keys(summary).length > 0);
 
@@ -92,17 +138,15 @@ export const testMemoryUsage = () => {
     const memory = perfMonitor.getMemoryUsage();
     if (memory) {
         console.log('✅ Memory usage:', memory);
-        console.log('✅ Memory tracking available');
     } else {
         console.log('⚠️ Memory tracking not available in this browser');
     }
 };
 
-// Test search performance with caching
+// Test search performance
 export const testSearchPerformance = () => {
     console.log('🧪 Testing Search Performance...');
 
-    // Create test bookmarks
     const testBookmarks = [
         { id: '1', title: 'React Documentation', url: 'https://react.dev' },
         { id: '2', title: 'Vue.js Guide', url: 'https://vuejs.org' },
@@ -110,7 +154,6 @@ export const testSearchPerformance = () => {
         { id: '4', title: 'JavaScript MDN', url: 'https://developer.mozilla.org' },
     ];
 
-    // Test search function
     const searchBookmarks = (query: string) => {
         return testBookmarks.filter(bm =>
             bm.title.toLowerCase().includes(query.toLowerCase()) ||
@@ -118,7 +161,6 @@ export const testSearchPerformance = () => {
         );
     };
 
-    // Time search operations
     perfMonitor.timeFunction('search_react', () => searchBookmarks('react'));
     perfMonitor.timeFunction('search_vue', () => searchBookmarks('vue'));
     perfMonitor.timeFunction('search_js', () => searchBookmarks('javascript'));
@@ -132,13 +174,13 @@ export const runAllTests = async () => {
 
     try {
         testCoreLogic();
-        testCacheFunctionality();
+        await testCacheFunctionality();
+        await testBaseStore();
         testPerformanceMonitoring();
         testMemoryUsage();
         testSearchPerformance();
 
-        // Wait a bit for async tests
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 500));
 
         console.log('🎉 All tests completed successfully!');
         console.log('📊 Final Performance Report:');
@@ -153,6 +195,5 @@ export const runAllTests = async () => {
 
 // Auto-run tests in development
 if (typeof import.meta !== 'undefined' && (import.meta as any).env?.DEV) {
-    // Run tests after a short delay to ensure everything is loaded
-    setTimeout(runAllTests, 1000);
+    setTimeout(runAllTests, 1500);
 }

@@ -11,6 +11,57 @@ import type {
     SmartClassifyRule, DbConnection
 } from '../../types';
 
+/**
+ * Generic BaseStore for standard IndexedDB operations
+ */
+export class BaseStore<T> {
+    constructor(protected storeName: string) {}
+
+    async getAll(): Promise<T[]> {
+        const db = await initDB();
+        return db.getAll(this.storeName);
+    }
+
+    async get(id: string): Promise<T | undefined> {
+        const db = await initDB();
+        return db.get(this.storeName, id);
+    }
+
+    async put(item: T): Promise<void> {
+        const db = await initDB();
+        await db.put(this.storeName, item);
+    }
+
+    async add(item: T): Promise<void> {
+        const db = await initDB();
+        await db.add(this.storeName, item);
+    }
+
+    async delete(id: string): Promise<void> {
+        const db = await initDB();
+        await db.delete(this.storeName, id);
+    }
+
+    async clear(): Promise<void> {
+        const db = await initDB();
+        await db.clear(this.storeName);
+    }
+}
+
+// Instantiate stores
+export const bookmarkStore = new BaseStore<Bookmark>(BOOKMARKS_STORE);
+export const apiConfigStore = new BaseStore<ApiConfig>(API_CONFIGS_STORE);
+export const instructionPresetStore = new BaseStore<InstructionPreset>(INSTRUCTION_PRESETS_STORE);
+export const folderTemplateStore = new BaseStore<FolderTemplate>(FOLDER_TEMPLATES_STORE);
+export const emptyFolderTreeStore = new BaseStore<EmptyFolderTree>(EMPTY_FOLDER_TREES_STORE);
+export const logStore = new BaseStore<DetailedLog>(LOGS_STORE);
+export const userCorrectionStore = new BaseStore<UserCorrection>(USER_CORRECTIONS_STORE);
+export const backupMetadataStore = new BaseStore<BackupMetadata>(BACKUPS_STORE);
+export const smartRuleStore = new BaseStore<SmartClassifyRule>(SMART_RULES_STORE);
+export const dbConnectionStore = new BaseStore<DbConnection>(DB_CONNECTIONS_STORE);
+export const oauthTokenStore = new BaseStore<OAuthToken>(OAUTH_TOKENS_STORE);
+
+// Custom logic for Bookmarks (Batching)
 export const saveBookmarks = async (bookmarks: Bookmark[]): Promise<void> => {
     const db = await initDB();
     const tx = db.transaction(BOOKMARKS_STORE, 'readwrite');
@@ -24,11 +75,9 @@ export const saveBookmarks = async (bookmarks: Bookmark[]): Promise<void> => {
     await tx.done;
 };
 
-export const getBookmarks = async (): Promise<Bookmark[]> => {
-    const db = await initDB();
-    return db.getAll(BOOKMARKS_STORE);
-};
+export const getBookmarks = () => bookmarkStore.getAll();
 
+// Custom logic for Folders (Single entry with fixed key)
 export const saveFolders = async (folders: (Folder | Bookmark)[]): Promise<void> => {
     const db = await initDB();
     await db.put(FOLDERS_STORE, folders, 'folderTree');
@@ -41,157 +90,58 @@ export const getFolders = async (): Promise<(Folder | Bookmark)[] | undefined> =
 
 export const clearAllData = async (): Promise<void> => {
     const db = await initDB();
-    const tx = db.transaction([
+    // Note: Do NOT add DB_CONNECTIONS_STORE here to preserve connection configs during clear.
+    const stores = [
         BOOKMARKS_STORE, FOLDERS_STORE, API_CONFIGS_STORE, INSTRUCTION_PRESETS_STORE,
         FOLDER_TEMPLATES_STORE, EMPTY_FOLDER_TREES_STORE, LOGS_STORE, USER_CORRECTIONS_STORE,
         BACKUPS_STORE, SYNC_STATUS_STORE, ANALYTICS_STORE, OAUTH_TOKENS_STORE, SMART_RULES_STORE
-    ], 'readwrite');
+    ];
     
-    // We also need to clear DB_CONNECTIONS_STORE but it might not be in the transaction if not added above.
-    // The original code didn't clear DB_CONNECTIONS_STORE in clearAllData.
-    // I will stick to original logic.
-    
-    await tx.objectStore(BOOKMARKS_STORE).clear();
-    await tx.objectStore(FOLDERS_STORE).clear();
-    await tx.objectStore(API_CONFIGS_STORE).clear();
-    await tx.objectStore(INSTRUCTION_PRESETS_STORE).clear();
-    await tx.objectStore(FOLDER_TEMPLATES_STORE).clear();
-    await tx.objectStore(EMPTY_FOLDER_TREES_STORE).clear();
-    await tx.objectStore(LOGS_STORE).clear();
-    await tx.objectStore(USER_CORRECTIONS_STORE).clear();
-    await tx.objectStore(BACKUPS_STORE).clear();
-    await tx.objectStore(SYNC_STATUS_STORE).clear();
-    await tx.objectStore(ANALYTICS_STORE).clear();
-    await tx.objectStore(OAUTH_TOKENS_STORE).clear();
-    await tx.objectStore(SMART_RULES_STORE).clear();
+    const tx = db.transaction(stores, 'readwrite');
+    await Promise.all(stores.map(s => tx.objectStore(s).clear()));
     await tx.done;
 };
 
-export const saveApiConfig = async (config: ApiConfig): Promise<void> => {
-    const db = await initDB();
-    await db.put(API_CONFIGS_STORE, config);
-};
+// API Configs
+export const saveApiConfig = (config: ApiConfig) => apiConfigStore.put(config);
+export const getApiConfigs = () => apiConfigStore.getAll();
+export const deleteApiConfig = (id: string) => apiConfigStore.delete(id);
 
-export const getApiConfigs = async (): Promise<ApiConfig[]> => {
-    const db = await initDB();
-    return db.getAll(API_CONFIGS_STORE);
-};
+// Instruction Presets
+export const saveInstructionPreset = (preset: InstructionPreset) => instructionPresetStore.put(preset);
+export const getInstructionPresets = () => instructionPresetStore.getAll();
+export const getInstructionPreset = (id: string) => instructionPresetStore.get(id);
+export const deleteInstructionPreset = (id: string) => instructionPresetStore.delete(id);
 
-export const deleteApiConfig = async (id: string): Promise<void> => {
-    const db = await initDB();
-    await db.delete(API_CONFIGS_STORE, id);
-};
+// Folder Templates
+export const saveFolderTemplate = (template: FolderTemplate) => folderTemplateStore.put(template);
+export const getFolderTemplates = () => folderTemplateStore.getAll();
+export const getFolderTemplate = (id: string) => folderTemplateStore.get(id);
+export const deleteFolderTemplate = (id: string) => folderTemplateStore.delete(id);
 
-export const saveInstructionPreset = async (preset: InstructionPreset): Promise<void> => {
-    const db = await initDB();
-    await db.put(INSTRUCTION_PRESETS_STORE, preset);
-};
+// Empty Folder Trees
+export const saveEmptyFolderTree = (tree: EmptyFolderTree) => emptyFolderTreeStore.put(tree);
+export const getEmptyFolderTrees = () => emptyFolderTreeStore.getAll();
+export const getEmptyFolderTree = (id: string) => emptyFolderTreeStore.get(id);
+export const deleteEmptyFolderTree = (id: string) => emptyFolderTreeStore.delete(id);
 
-export const getInstructionPresets = async (): Promise<InstructionPreset[]> => {
-    const db = await initDB();
-    return db.getAll(INSTRUCTION_PRESETS_STORE);
-};
+// Logs
+export const saveLog = (log: DetailedLog) => logStore.add(log);
+export const getLogs = () => logStore.getAll();
+export const clearLogs = () => logStore.clear();
 
-export const getInstructionPreset = async (id: string): Promise<InstructionPreset | undefined> => {
-    const db = await initDB();
-    return db.get(INSTRUCTION_PRESETS_STORE, id);
-};
+// User Corrections
+export const saveUserCorrection = (correction: UserCorrection) => userCorrectionStore.add(correction);
+export const getUserCorrections = () => userCorrectionStore.getAll();
+export const clearUserCorrections = () => userCorrectionStore.clear();
 
-export const deleteInstructionPreset = async (id: string): Promise<void> => {
-    const db = await initDB();
-    await db.delete(INSTRUCTION_PRESETS_STORE, id);
-};
+// Backups
+export const saveBackupMetadata = (backup: BackupMetadata) => backupMetadataStore.put(backup);
+export const getBackupMetadata = (id: string) => backupMetadataStore.get(id);
+export const getAllBackupMetadata = () => backupMetadataStore.getAll();
+export const deleteBackupMetadata = (id: string) => backupMetadataStore.delete(id);
 
-export const saveFolderTemplate = async (template: FolderTemplate): Promise<void> => {
-    const db = await initDB();
-    await db.put(FOLDER_TEMPLATES_STORE, template);
-};
-
-export const getFolderTemplates = async (): Promise<FolderTemplate[]> => {
-    const db = await initDB();
-    return db.getAll(FOLDER_TEMPLATES_STORE);
-};
-
-export const getFolderTemplate = async (id: string): Promise<FolderTemplate | undefined> => {
-    const db = await initDB();
-    return db.get(FOLDER_TEMPLATES_STORE, id);
-};
-
-export const deleteFolderTemplate = async (id: string): Promise<void> => {
-    const db = await initDB();
-    await db.delete(FOLDER_TEMPLATES_STORE, id);
-};
-
-export const saveEmptyFolderTree = async (tree: EmptyFolderTree): Promise<void> => {
-    const db = await initDB();
-    await db.put(EMPTY_FOLDER_TREES_STORE, tree);
-};
-
-export const getEmptyFolderTrees = async (): Promise<EmptyFolderTree[]> => {
-    const db = await initDB();
-    return db.getAll(EMPTY_FOLDER_TREES_STORE);
-};
-
-export const getEmptyFolderTree = async (id: string): Promise<EmptyFolderTree | undefined> => {
-    const db = await initDB();
-    return db.get(EMPTY_FOLDER_TREES_STORE, id);
-};
-
-export const deleteEmptyFolderTree = async (id: string): Promise<void> => {
-    const db = await initDB();
-    await db.delete(EMPTY_FOLDER_TREES_STORE, id);
-};
-
-export const saveLog = async (log: DetailedLog): Promise<void> => {
-    const db = await initDB();
-    await db.add(LOGS_STORE, log);
-};
-
-export const getLogs = async (): Promise<DetailedLog[]> => {
-    const db = await initDB();
-    return db.getAll(LOGS_STORE);
-};
-
-export const clearLogs = async (): Promise<void> => {
-    const db = await initDB();
-    await db.clear(LOGS_STORE);
-};
-
-export const saveUserCorrection = async (correction: UserCorrection): Promise<void> => {
-    const db = await initDB();
-    await db.add(USER_CORRECTIONS_STORE, correction);
-};
-
-export const getUserCorrections = async (): Promise<UserCorrection[]> => {
-    const db = await initDB();
-    return db.getAll(USER_CORRECTIONS_STORE);
-};
-
-export const clearUserCorrections = async (): Promise<void> => {
-    const db = await initDB();
-    await db.clear(USER_CORRECTIONS_STORE);
-};
-
-export const saveBackupMetadata = async (backup: BackupMetadata): Promise<void> => {
-    const db = await initDB();
-    await db.put(BACKUPS_STORE, backup);
-};
-
-export const getBackupMetadata = async (id: string): Promise<BackupMetadata | undefined> => {
-    const db = await initDB();
-    return db.get(BACKUPS_STORE, id);
-};
-
-export const getAllBackupMetadata = async (): Promise<BackupMetadata[]> => {
-    const db = await initDB();
-    return db.getAll(BACKUPS_STORE);
-};
-
-export const deleteBackupMetadata = async (id: string): Promise<void> => {
-    const db = await initDB();
-    await db.delete(BACKUPS_STORE, id);
-};
-
+// Sync Status (Single entry)
 export const saveSyncStatus = async (status: SyncStatus): Promise<void> => {
     const db = await initDB();
     await db.put(SYNC_STATUS_STORE, status, 'syncStatus');
@@ -202,6 +152,7 @@ export const getSyncStatus = async (): Promise<SyncStatus | undefined> => {
     return db.get(SYNC_STATUS_STORE, 'syncStatus');
 };
 
+// Analytics (Single entry)
 export const saveAnalyticsData = async (analytics: AnalyticsData): Promise<void> => {
     const db = await initDB();
     await db.put(ANALYTICS_STORE, analytics, 'analyticsData');
@@ -212,87 +163,19 @@ export const getAnalyticsData = async (): Promise<AnalyticsData | undefined> => 
     return db.get(ANALYTICS_STORE, 'analyticsData');
 };
 
-export const saveOAuthToken = async (token: OAuthToken): Promise<void> => {
-    const db = await initDB();
-    await db.put(OAUTH_TOKENS_STORE, token);
-};
+// OAuth Tokens
+export const saveOAuthToken = (token: OAuthToken) => oauthTokenStore.put(token);
+export const getOAuthToken = (id: string) => oauthTokenStore.get(id);
+export const getAllOAuthTokens = () => oauthTokenStore.getAll();
+export const deleteOAuthToken = (id: string) => oauthTokenStore.delete(id);
 
-export const getOAuthToken = async (id: string): Promise<OAuthToken | undefined> => {
-    const db = await initDB();
-    return db.get(OAUTH_TOKENS_STORE, id);
-};
+// Smart Rules
+export const saveSmartClassifyRule = (rule: SmartClassifyRule) => smartRuleStore.put(rule);
+export const getSmartClassifyRules = () => smartRuleStore.getAll();
+export const deleteSmartClassifyRule = (id: string) => smartRuleStore.delete(id);
 
-export const getAllOAuthTokens = async (): Promise<OAuthToken[]> => {
-    const db = await initDB();
-    return db.getAll(OAUTH_TOKENS_STORE);
-};
-
-export const deleteOAuthToken = async (id: string): Promise<void> => {
-    const db = await initDB();
-    await db.delete(OAUTH_TOKENS_STORE, id);
-};
-
-export const saveSmartClassifyRule = async (rule: SmartClassifyRule): Promise<void> => {
-    const db = await initDB();
-    await db.put(SMART_RULES_STORE, rule);
-};
-
-export const getSmartClassifyRules = async (): Promise<SmartClassifyRule[]> => {
-    const db = await initDB();
-    return db.getAll(SMART_RULES_STORE);
-};
-
-export const deleteSmartClassifyRule = async (id: string): Promise<void> => {
-    const db = await initDB();
-    await db.delete(SMART_RULES_STORE, id);
-};
-
-// DbConnection CRUD
-export const saveDbConnection = async (connection: DbConnection): Promise<void> => {
-    const db = await initDB();
-    await db.put(DB_CONNECTIONS_STORE, connection);
-};
-
-export const getDbConnections = async (): Promise<DbConnection[]> => {
-    const db = await initDB();
-    return db.getAll(DB_CONNECTIONS_STORE);
-};
-
-export const getDbConnection = async (id: string): Promise<DbConnection | undefined> => {
-    const db = await initDB();
-    return db.get(DB_CONNECTIONS_STORE, id);
-};
-
-export const deleteDbConnection = async (id: string): Promise<void> => {
-    const db = await initDB();
-    await db.delete(DB_CONNECTIONS_STORE, id);
-};
-
-export const convertStructureToTree = (structure: FolderTemplate['structure']): (Folder | Bookmark)[] => {
-    if (!structure || structure.length === 0) return [];
-    const result: Folder[] = [];
-    const stack: { node: FolderTemplate['structure'][0]; parent: Folder | null }[] = 
-        structure.map(n => ({ node: n, parent: null }));
-    const folderMap = new Map<string, Folder>();
-    while (stack.length > 0) {
-        const { node, parent } = stack.pop()!;
-        const folder: Folder = {
-            id: node.id,
-            name: node.name,
-            children: [],
-            parentId: parent ? parent.id : null
-        };
-        folderMap.set(folder.id, folder);
-        if (parent) {
-            parent.children.push(folder);
-        } else {
-            result.push(folder);
-        }
-        if (node.children && node.children.length > 0) {
-            for (let i = node.children.length - 1; i >= 0; i--) {
-                stack.push({ node: node.children[i], parent: folder });
-            }
-        }
-    }
-    return result;
-};
+// DB Connections
+export const saveDbConnection = (connection: DbConnection) => dbConnectionStore.put(connection);
+export const getDbConnections = () => dbConnectionStore.getAll();
+export const getDbConnection = (id: string) => dbConnectionStore.get(id);
+export const deleteDbConnection = (id: string) => dbConnectionStore.delete(id);

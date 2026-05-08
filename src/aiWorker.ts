@@ -53,7 +53,6 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             domainKnowledge
         } = data;
 
-        // Use the first active API config
         const availableConfigs = apiConfigs.filter(c => c.status === 'active');
 
         if (availableConfigs.length === 0) {
@@ -65,26 +64,26 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             return;
         }
         
-        const activeConfig = availableConfigs[0];
-        const client = new AIClient(activeConfig);
-
+        // Randomly pick an initial config for load balancing
+        let currentConfigIndex = Math.floor(Math.random() * availableConfigs.length);
         let attempts = 0;
         let success = false;
 
         while (attempts <= maxRetries && !success) {
+            const activeConfig = availableConfigs[currentConfigIndex];
+            const client = new AIClient(activeConfig);
+            
             try {
                 attempts++;
         
-                // Log attempt
                 self.postMessage({
                     type: 'log',
                     log: { message: `Batch ${batchIndex}: Attempt ${attempts}/${maxRetries + 1} using [${activeConfig.name}] (${activeConfig.provider})` },
                     batchIndex
                 } as WorkerResponse);
 
-                // Prepare prompts
                 const userPrompt = generateCategorizationPrompt({
-                    systemPrompt: '', // Passing empty as systemPrompt is handled by client/provider roles
+                    systemPrompt: '',
                     userInstructionBlock,
                     currentTree,
                     batch,
@@ -92,14 +91,12 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                     domainKnowledge
                 });
 
-                // Execute using unified client
                 const { text: responseText } = await client.generateContent(systemPrompt, userPrompt);
 
                 if (!responseText) {
                     throw new Error('AI returned empty response');
                 }
 
-                // Parse Result using centralized service
                 const categorizedBookmarks = parseAIResponse(responseText);
 
                 if (categorizedBookmarks.length === 0) {
@@ -110,7 +107,6 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                     throw new Error(`AI returned invalid format or API error: ${errMsg}`);
                 }
 
-                // Merge back strict IDs from original batch
                 const finalBookmarks = categorizedBookmarks.map(cbm => {
                     const original = batch.find(b => b.url === cbm.url);
                     return {
@@ -128,7 +124,11 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 } as WorkerResponse);
 
             } catch (error: any) {
-                console.error(`Batch ${batchIndex} attempt ${attempts} failed:`, error);
+                console.error(`Batch ${batchIndex} attempt ${attempts} failed with [${activeConfig.name}]:`, error);
+                
+                // Failover to next config
+                currentConfigIndex = (currentConfigIndex + 1) % availableConfigs.length;
+
                 if (attempts > maxRetries) {
                     self.postMessage({
                         type: 'batch_error',
@@ -136,7 +136,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                         batchIndex
                     } as WorkerResponse);
                 } else {
-                    await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempts)));
+                    // Exponential backoff
+                    await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempts - 1)));
                 }
             }
         }

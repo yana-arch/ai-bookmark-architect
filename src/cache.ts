@@ -7,7 +7,16 @@ interface CacheEntry<T> {
     key?: string; // Optional key for IndexedDB
 }
 
-class MemoryCache<T> {
+interface ICache<T> {
+    set(key: string, data: T, ttl?: number): Promise<void>;
+    get(key: string): Promise<T | null>;
+    has(key: string): Promise<boolean>;
+    delete(key: string): Promise<void>;
+    clear(): Promise<void>;
+    cleanup?(): Promise<void>;
+}
+
+class MemoryCache<T> implements ICache<T> {
     private cache = new Map<string, CacheEntry<T>>();
     private maxSize: number;
 
@@ -15,16 +24,14 @@ class MemoryCache<T> {
         this.maxSize = maxSize;
     }
 
-    set(key: string, data: T, ttl = 5 * 60 * 1000): void { // Default 5 minutes TTL
-        // Clean up expired entries if cache is getting full
+    async set(key: string, data: T, ttl = 5 * 60 * 1000): Promise<void> {
         if (this.cache.size >= this.maxSize) {
-            this.cleanup();
+            await this.cleanup();
         }
 
-        // If still at max size after cleanup, remove oldest entry
         if (this.cache.size >= this.maxSize) {
             const firstKey = this.cache.keys().next().value;
-            this.cache.delete(firstKey);
+            if (firstKey) this.cache.delete(firstKey);
         }
 
         this.cache.set(key, {
@@ -34,11 +41,10 @@ class MemoryCache<T> {
         });
     }
 
-    get(key: string): T | null {
+    async get(key: string): Promise<T | null> {
         const entry = this.cache.get(key);
         if (!entry) return null;
 
-        // Check if entry has expired
         if (Date.now() - entry.timestamp > entry.ttl) {
             this.cache.delete(key);
             return null;
@@ -47,27 +53,19 @@ class MemoryCache<T> {
         return entry.data;
     }
 
-    has(key: string): boolean {
-        const entry = this.cache.get(key);
-        if (!entry) return false;
-
-        if (Date.now() - entry.timestamp > entry.ttl) {
-            this.cache.delete(key);
-            return false;
-        }
-
-        return true;
+    async has(key: string): Promise<boolean> {
+        return (await this.get(key)) !== null;
     }
 
-    delete(key: string): void {
+    async delete(key: string): Promise<void> {
         this.cache.delete(key);
     }
 
-    clear(): void {
+    async clear(): Promise<void> {
         this.cache.clear();
     }
 
-    cleanup(): void {
+    async cleanup(): Promise<void> {
         const now = Date.now();
         for (const [key, entry] of this.cache.entries()) {
             if (now - entry.timestamp > entry.ttl) {
@@ -77,12 +75,11 @@ class MemoryCache<T> {
     }
 
     size(): number {
-        this.cleanup(); // Clean up before returning size
         return this.cache.size;
     }
 }
 
-class SessionStorageCache<T> {
+class SessionStorageCache<T> implements ICache<T> {
     private prefix: string;
 
     constructor(prefix: string) {
@@ -93,7 +90,7 @@ class SessionStorageCache<T> {
         return this.prefix + key;
     }
 
-    set(key: string, data: T, ttl = 5 * 60 * 1000): void {
+    async set(key: string, data: T, ttl = 5 * 60 * 1000): Promise<void> {
         const entry: CacheEntry<T> = {
             data,
             timestamp: Date.now(),
@@ -106,7 +103,7 @@ class SessionStorageCache<T> {
         }
     }
 
-    get(key: string): T | null {
+    async get(key: string): Promise<T | null> {
         try {
             const item = sessionStorage.getItem(this.getKey(key));
             if (!item) return null;
@@ -123,15 +120,15 @@ class SessionStorageCache<T> {
         }
     }
 
-    has(key: string): boolean {
-        return this.get(key) !== null;
+    async has(key: string): Promise<boolean> {
+        return (await this.get(key)) !== null;
     }
 
-    delete(key: string): void {
+    async delete(key: string): Promise<void> {
         sessionStorage.removeItem(this.getKey(key));
     }
 
-    clear(): void {
+    async clear(): Promise<void> {
         for (let i = 0; i < sessionStorage.length; i++) {
             const key = sessionStorage.key(i);
             if (key && key.startsWith(this.prefix)) {
@@ -141,7 +138,7 @@ class SessionStorageCache<T> {
     }
 }
 
-class IndexedDBCache<T> {
+class IndexedDBCache<T> implements ICache<T> {
     private dbName: string;
     private storeName: string;
     private db: IDBDatabase | null = null;
@@ -159,7 +156,9 @@ class IndexedDBCache<T> {
 
             request.onupgradeneeded = (event) => {
                 const db = (event.target as IDBOpenDBRequest).result;
-                db.createObjectStore(this.storeName, { keyPath: 'key' });
+                if (!db.objectStoreNames.contains(this.storeName)) {
+                    db.createObjectStore(this.storeName, { keyPath: 'key' });
+                }
             };
 
             request.onsuccess = (event) => {
@@ -174,12 +173,12 @@ class IndexedDBCache<T> {
         });
     }
 
-    async set(key: string, data: T, ttl = 24 * 60 * 60 * 1000): Promise<void> { // Default 24 hours TTL
+    async set(key: string, data: T, ttl = 24 * 60 * 60 * 1000): Promise<void> {
         const db = await this.openDB();
         const transaction = db.transaction([this.storeName], 'readwrite');
         const store = transaction.objectStore(this.storeName);
         const entry: CacheEntry<T> = {
-            key, // IndexedDB requires a keyPath
+            key,
             data,
             timestamp: Date.now(),
             ttl
@@ -206,7 +205,7 @@ class IndexedDBCache<T> {
                 }
 
                 if (Date.now() - entry.timestamp > entry.ttl) {
-                    this.delete(key); // Delete expired entry
+                    this.delete(key);
                     resolve(null);
                 } else {
                     resolve(entry.data);
@@ -267,14 +266,13 @@ class IndexedDBCache<T> {
     }
 }
 
-// CachedOperation class for managing multiple cache layers
 class CachedOperation<T> {
-    private caches: (MemoryCache<T> | SessionStorageCache<T> | IndexedDBCache<T>)[];
+    private caches: ICache<T>[];
     private operation: () => Promise<T>;
     private defaultTtl: number;
 
     constructor(
-        caches: (MemoryCache<T> | SessionStorageCache<T> | IndexedDBCache<T>)[],
+        caches: ICache<T>[],
         operation: () => Promise<T>,
         defaultTtl: number = 5 * 60 * 1000
     ) {
@@ -285,49 +283,58 @@ class CachedOperation<T> {
 
     async get(key: string, ttl?: number): Promise<T> {
         const cacheTtl = ttl || this.defaultTtl;
+        const missedCaches: ICache<T>[] = [];
 
-        // Try caches in order (memory -> session -> indexeddb)
         for (const cache of this.caches) {
-            const cached = cache.get(key);
+            const cached = await cache.get(key);
             if (cached !== null) {
+                cacheStats.hits++;
+                // Backfill dữ liệu vào các layer cache nhanh hơn đã bị miss
+                for (const missed of missedCaches) {
+                    missed.set(key, cached, cacheTtl).catch(console.error);
+                }
                 return cached;
             }
+            missedCaches.push(cache);
         }
 
-        // Execute operation and cache result
+        cacheStats.misses++;
         const result = await this.operation();
 
-        // Store in all caches
         for (const cache of this.caches) {
-            cache.set(key, result, cacheTtl);
+            await cache.set(key, result, cacheTtl);
         }
 
         return result;
     }
 
-    set(key: string, value: T, ttl?: number): void {
+    async set(key: string, value: T, ttl?: number): Promise<void> {
         const cacheTtl = ttl || this.defaultTtl;
         for (const cache of this.caches) {
-            cache.set(key, value, cacheTtl);
+            await cache.set(key, value, cacheTtl);
         }
     }
 
-    has(key: string): boolean {
-        return this.caches.some(cache => cache.has(key));
+    async has(key: string): Promise<boolean> {
+        for (const cache of this.caches) {
+            if (await cache.has(key)) return true;
+        }
+        return false;
     }
 
-    delete(key: string): void {
+    async delete(key: string): Promise<void> {
         for (const cache of this.caches) {
-            cache.delete(key);
+            await cache.delete(key);
         }
     }
 
-    clear(): void {
+    async clear(): Promise<void> {
         for (const cache of this.caches) {
-            cache.clear();
+            await cache.clear();
         }
     }
 }
+
 
 // Cache key utilities
 export const cacheKeys = {
