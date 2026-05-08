@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { useApp } from '@/src/context/AppContext';
+import { useAppDataContext } from '@/src/context/AppContext';
 import { useSearch } from '@/hooks/useSearch';
 import { useFolderStats } from '@/hooks/useFolderStats';
 import { BrokenLinkCheckState, type Folder } from '@/types';
-import { 
-    FolderIcon, ChevronRightIcon, TrashIcon, ImportIcon, 
-    ExportIcon, SearchIcon, XIcon, DocumentDuplicateIcon, BrokenLinkIcon 
+import {
+    FolderIcon, ChevronRightIcon, TrashIcon,
+    SearchIcon, XIcon, DocumentDuplicateIcon, BrokenLinkIcon,
+    SettingsIcon
 } from '../ui/Icons';
 import { formatNumber } from '@/src/utils/formatUtils';
 
@@ -36,9 +37,8 @@ const FolderItem: React.FC<{
         <div>
             <div
                 onClick={() => onSelectFolder(folder.id)}
-                className={`flex items-center p-2 rounded-md cursor-pointer transition-colors duration-150 ${
-                    isSelected ? 'bg-emerald-500/20 text-emerald-400' : 'hover:bg-gray-700/50'
-                }`}
+                className={`flex items-center p-2 rounded-md cursor-pointer transition-colors duration-150 ${isSelected ? 'bg-emerald-500/20 text-emerald-400' : 'hover:bg-gray-700/50'
+                    }`}
                 style={{ paddingLeft: `${level * 1.5 + 0.5}rem` }}
             >
                 <ChevronRightIcon
@@ -77,10 +77,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     onStartBrokenLinkCheck, brokenLinkCheckState, brokenLinkCheckProgress,
     duplicateCount, onImport, onExport
 }) => {
-    const { bookmarks, folders, handleClearData } = useApp();
+    const { bookmarks, folders, handleClearData } = useAppDataContext();
     const { searchQuery, setSearchQuery } = useSearch(bookmarks);
     const { foldersWithCounts } = useFolderStats(folders);
-    
+
     const isCheckingLinks = brokenLinkCheckState === BrokenLinkCheckState.CHECKING;
 
     return (
@@ -91,16 +91,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <button
                         onClick={onImport}
                         className="text-gray-400 hover:text-sky-400 transition-colors"
-                        title="Nhập bookmarks"
+                        title="Cấu hình"
                     >
-                        <ImportIcon className="w-5 h-5" />
-                    </button>
-                    <button
-                        onClick={onExport}
-                        className="text-gray-400 hover:text-emerald-400 transition-colors"
-                        title="Xuất bookmarks"
-                    >
-                        <ExportIcon className="w-5 h-5" />
+                        <SettingsIcon className="w-5 h-5" />
                     </button>
                     <button
                         onClick={handleClearData}
@@ -121,18 +114,17 @@ const Sidebar: React.FC<SidebarProps> = ({
                     className="w-full bg-gray-900/70 border border-gray-600 rounded-md pl-9 pr-8 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 />
                 {searchQuery && (
-                    <XIcon 
+                    <XIcon
                         onClick={() => setSearchQuery('')}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 hover:text-white cursor-pointer" 
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 hover:text-white cursor-pointer"
                     />
                 )}
             </div>
             <nav className="flex-1 space-y-1 overflow-y-auto pr-1">
                 <div
                     onClick={() => onSelectFolder('root')}
-                    className={`flex items-center p-2 rounded-md cursor-pointer transition-colors duration-150 ${
-                        selectedFolderId === 'root' ? 'bg-emerald-500/20 text-emerald-400' : 'hover:bg-gray-700/50'
-                    }`}
+                    className={`flex items-center p-2 rounded-md cursor-pointer transition-colors duration-150 ${selectedFolderId === 'root' ? 'bg-emerald-500/20 text-emerald-400' : 'hover:bg-gray-700/50'
+                        }`}
                 >
                     <FolderIcon className="w-5 h-5 mr-3 text-sky-400 flex-shrink-0" />
                     <span className="truncate font-medium flex-1">Tất cả Bookmarks</span>
@@ -152,7 +144,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             </nav>
             <div className="mt-auto pt-3 border-t border-gray-700/50 space-y-2">
                 {duplicateCount > 0 && (
-                    <button 
+                    <button
                         onClick={onOpenDuplicateModal}
                         title="Xem và dọn dẹp bookmark trùng lặp."
                         className="w-full flex items-center justify-center text-sm bg-yellow-600/20 text-yellow-300 font-bold py-2 px-3 rounded-lg hover:bg-yellow-600/30 transition-colors"
@@ -177,4 +169,4 @@ const Sidebar: React.FC<SidebarProps> = ({
     );
 };
 
-export default Sidebar;
+export default React.memo(Sidebar);

@@ -23,7 +23,7 @@ export interface Bookmark {
 }
 
 export interface Folder {
-  id:string;
+  id: string;
   name: string;
   children: (Folder | Bookmark)[];
   parentId: string | null;
@@ -36,6 +36,8 @@ export type CategorizedBookmark = Bookmark & {
 };
 
 export type ApiKeyStatus = 'active' | 'inactive' | 'error';
+
+export type ApiProvider = 'gemini' | 'openrouter' | 'openai' | 'custom-gemini' | 'custom-openai';
 
 export interface InstructionPreset {
   id: string;
@@ -109,6 +111,23 @@ export interface UserCorrection {
   correctedPath: string[];
   timestamp: number;
   reason?: string; // Optional: why the user corrected it
+}
+
+export interface Notification {
+  id: string;
+  message: string;
+  type: 'info' | 'error' | 'success' | 'warning';
+  duration?: number;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
+}
+
+export interface ExportOptions {
+  format: 'html' | 'csv' | 'json' | 'md';
+  selectedFolders?: string[];
+  selectedTags?: string[];
 }
 
 export interface EmptyFolderTree {

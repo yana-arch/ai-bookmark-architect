@@ -11,14 +11,22 @@ export const arrayToTree = (bookmarks: (Bookmark & { path?: string[] })[], exist
     const foldersMap = new Map<string, Folder>();
     foldersMap.set('root', root);
 
-    // Helper to clone existing tree
-    const cloneTree = (nodes: (Folder | Bookmark)[]): (Folder | Bookmark)[] => {
-        return nodes.filter(n => !('url' in n)).map(n => {
-            const folder = n as Folder;
-            const newFolder = { ...folder, children: cloneTree(folder.children) };
-            foldersMap.set(newFolder.id, newFolder);
-            return newFolder;
-        });
+    const updatedUrls = new Set(bookmarks.map(bm => bm.url));
+
+    // Helper to clone existing tree and remove bookmarks that are being updated
+    const cloneTree = (nodes: (Folder | Bookmark)[], currentPath: string[] = []): (Folder | Bookmark)[] => {
+        return nodes
+            .filter(n => !('url' in n) || !updatedUrls.has((n as Bookmark).url))
+            .map(n => {
+                if ('url' in n) return { ...n }; // Preserve existing bookmark that's not being updated
+                
+                const folder = n as Folder;
+                const path = [...currentPath, folder.name];
+                const pathKey = JSON.stringify(path);
+                const newFolder = { ...folder, children: [...cloneTree(folder.children, path)] };
+                foldersMap.set(pathKey, newFolder);
+                return newFolder;
+            });
     };
 
     const clonedRootChildren = cloneTree(existingTree);
@@ -26,11 +34,12 @@ export const arrayToTree = (bookmarks: (Bookmark & { path?: string[] })[], exist
 
     const getOrCreateFolder = (path: string[]): Folder => {
         let currentLevel = root;
-        let currentPath = '';
+        let currentPath: string[] = [];
 
         for (const folderName of path) {
-            currentPath = currentPath ? `${currentPath}/${folderName}` : folderName;
-            let folder = foldersMap.get(currentPath);
+            currentPath.push(folderName);
+            const pathKey = JSON.stringify(currentPath);
+            let folder = foldersMap.get(pathKey);
             
             if (!folder) {
                 // Try to find by name in current level to avoid creating duplicates if ID is different
@@ -39,10 +48,11 @@ export const arrayToTree = (bookmarks: (Bookmark & { path?: string[] })[], exist
                     folder = existingInLevel;
                 } else {
                     const parentId = currentLevel.id;
-                    folder = { id: currentPath, name: folderName, children: [], parentId };
-                    currentLevel.children.push(folder);
+                    const folderId = `folder-${Math.random().toString(36).substring(2, 11)}`;
+                    folder = { id: folderId, name: folderName, children: [], parentId };
+                    currentLevel.children = [...currentLevel.children, folder];
                 }
-                foldersMap.set(currentPath, folder);
+                foldersMap.set(pathKey, folder);
             }
             currentLevel = folder;
         }
@@ -52,9 +62,9 @@ export const arrayToTree = (bookmarks: (Bookmark & { path?: string[] })[], exist
     bookmarks.forEach(bm => {
         if (bm.path && bm.path.length > 0) {
             const parentFolder = getOrCreateFolder(bm.path);
-            parentFolder.children.push({ ...bm, parentId: parentFolder.id });
+            parentFolder.children = [...parentFolder.children, { ...bm, parentId: parentFolder.id }];
         } else {
-            root.children.push({ ...bm, parentId: 'root' });
+            root.children = [...root.children, { ...bm, parentId: 'root' }];
         }
     });
     
@@ -135,4 +145,39 @@ export const convertStructureToTree = (structure: FolderStructureNode[]): (Folde
     }
     
     return result;
+};
+/**
+ * Recursively removes folders that contain no bookmarks and no non-empty subfolders.
+ * Uses an immutable approach and returns the original array if no changes were made to prevent infinite loops.
+ */
+export const removeEmptyFolders = (items: (Folder | Bookmark)[]): (Folder | Bookmark)[] => {
+    let changed = false;
+    
+    const result = items.reduce<(Folder | Bookmark)[]>((acc, item) => {
+        if ('url' in item) {
+            acc.push(item);
+            return acc;
+        }
+        
+        const folder = item as Folder;
+        const cleanedChildren = folder.children ? removeEmptyFolders(folder.children) : [];
+        
+        if (cleanedChildren.length > 0) {
+            // Check if children changed by reference
+            if (cleanedChildren !== folder.children) {
+                changed = true;
+                acc.push({ ...folder, children: cleanedChildren });
+            } else {
+                acc.push(folder);
+            }
+        } else {
+            // Folder is now empty and was removed
+            changed = true;
+        }
+        
+        return acc;
+    }, []);
+
+    // Return original array reference if no items were removed or modified
+    return (changed || result.length !== items.length) ? result : items;
 };

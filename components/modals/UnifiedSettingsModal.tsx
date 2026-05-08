@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import type { 
-    FolderTemplate, 
-    ApiConfig, 
-    SmartClassifyRule, 
-    ApiKeyStatus, 
-    Bookmark, 
+import type {
+    FolderTemplate,
+    ApiConfig,
+    SmartClassifyRule,
+    ApiKeyStatus,
+    Bookmark,
     Folder,
     InstructionPreset,
     BackupMetadata,
     ArchitectureStyle,
-    ApiProvider
+    ApiProvider,
+    DuplicateStats,
+    ExportOptions,
+    Notification
 } from '@/types';
-import { 
-    CogIcon, XIcon, AILogoIcon, TerminalIcon, LayersIcon, 
+import {
+    CogIcon, XIcon, AILogoIcon, TerminalIcon, LayersIcon,
     CloudIcon, DatabaseIcon, ShieldCheckIcon, ChipIcon
 } from '../ui/Icons';
 import { postgresqlService } from '../../src/services/postgresqlService';
@@ -29,13 +32,13 @@ import { ConfigTab } from './settings/ConfigTab';
 interface UnifiedSettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
-    
+
     // AI & Providers
     apiConfigs: ApiConfig[];
-    onSaveApiConfig: (config: ApiConfig) => void;
-    onDeleteApiConfig: (id: string) => void;
-    onToggleApiConfigStatus: (id: string, status: ApiKeyStatus) => void;
-    
+    onSaveApiConfig: (config: ApiConfig) => Promise<void> | void;
+    onDeleteApiConfig: (id: string) => Promise<void> | void;
+    onToggleApiConfigStatus: (id: string, status: ApiKeyStatus) => Promise<void> | void;
+
     // Intelligence (Prompts & Rules)
     systemPrompt: string;
     onSystemPromptChange: (prompt: string) => void;
@@ -44,51 +47,54 @@ interface UnifiedSettingsModalProps {
     customInstructions: string;
     onCustomInstructionsChange: (instructions: string) => void;
     instructionPresets: InstructionPreset[];
-    onSaveInstructionPreset: (preset: InstructionPreset) => void;
-    onDeleteInstructionPreset: (id: string) => void;
+    onSaveInstructionPreset: (preset: InstructionPreset) => Promise<void> | void;
+    onDeleteInstructionPreset: (id: string) => Promise<void> | void;
     smartClassifyRules: SmartClassifyRule[];
-    onSaveSmartRule: (rule: SmartClassifyRule) => void;
-    onDeleteSmartRule: (id: string) => void;
-    
+    onSaveSmartRule: (rule: SmartClassifyRule) => Promise<void> | void;
+    onDeleteSmartRule: (id: string) => Promise<void> | void;
+
     // Architecture
     selectedArchitectureStyle: ArchitectureStyle;
     onArchitectureStyleChange: (styleId: ArchitectureStyle) => void;
-    
+
     // Templates
     folderTemplates: FolderTemplate[];
-    onSaveFolderTemplate: (template: FolderTemplate) => void;
-    onDeleteFolderTemplate: (id: string) => void;
-    onApplyFolderTemplate: (template: FolderTemplate) => void;
+    onSaveFolderTemplate: (template: FolderTemplate) => Promise<void> | void;
+    onDeleteFolderTemplate: (id: string) => Promise<void> | void;
+    onApplyFolderTemplate: (template: FolderTemplate) => Promise<void> | void;
     selectedTemplateId: string | null;
     onSelectedTemplateChange: (id: string | null) => void;
-    
+
     // Performance & Config
     batchSize: number;
     onBatchSizeChange: (size: number) => void;
     maxRetries: number;
     onMaxRetriesChange: (retries: number) => void;
-    processingMode: 'single' | 'multi';
-    onProcessingModeChange: (mode: 'single' | 'multi') => void;
-    
+    processingMode: 'parallel' | 'sequential';
+    onProcessingModeChange: (mode: 'parallel' | 'sequential') => void;
+    autoCleanupEmptyFolders?: boolean;
+    onAutoCleanupChange?: (cleanup: boolean) => void;
+    onCleanupEmptyFolders?: () => void;
+
     // Data Management
     bookmarks: Bookmark[];
-    folders: Folder[];
+    folders: (Folder | Bookmark)[];
     onImport: (mode: 'merge' | 'overwrite') => void;
-    onExport: (options: any) => void;
+    onExport: (options: ExportOptions) => void;
     onClearData: () => void;
     importFile: File | null;
     previewBookmarks: Bookmark[];
     onFileSelect: (file: File | null) => void;
-    
+
     // Maintenance (Health)
-    duplicateStats: { count: number; size: number };
+    duplicateStats: DuplicateStats;
     onCleanDuplicates: () => void;
-    brokenLinks: any[];
+    brokenLinks: Bookmark[];
     brokenLinkCheckState: 'idle' | 'checking' | 'completed' | 'error';
     brokenLinkCheckProgress: number;
     onStartBrokenLinkCheck: () => void;
     onCleanBrokenLinks: () => void;
-    
+
     // Cloud & Backup
     onRestoreSuccess?: () => void;
     onUploadCloudData?: (key: string) => Promise<void>;
@@ -104,10 +110,11 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
         apiConfigs, onSaveApiConfig, onDeleteApiConfig, onToggleApiConfigStatus,
         systemPrompt, onSystemPromptChange, planningPrompt, onPlanningPromptChange,
         customInstructions, onCustomInstructionsChange, instructionPresets,
-        smartClassifyRules, onDeleteSmartRule,
+        smartClassifyRules, onSaveSmartRule, onDeleteSmartRule,
         selectedArchitectureStyle, onArchitectureStyleChange,
         folderTemplates, onApplyFolderTemplate,
         batchSize, onBatchSizeChange, maxRetries, onMaxRetriesChange, processingMode, onProcessingModeChange,
+        autoCleanupEmptyFolders, onAutoCleanupChange,
         bookmarks, folders, onImport, onExport, onClearData,
         duplicateStats, onCleanDuplicates, brokenLinkCheckState, brokenLinkCheckProgress, onStartBrokenLinkCheck,
         onUploadCloudData, onImportCloudData,
@@ -116,7 +123,7 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
     } = props;
 
     const [activeTab, setActiveTab] = useState<TabType>(initialTab);
-    
+
     // Internal States for Forms
     const [apiName, setApiName] = useState('');
     const [apiKey, setApiKey] = useState('');
@@ -124,6 +131,12 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
     const [apiModel, setApiModel] = useState('');
     const [apiUrl, setApiUrl] = useState('');
     const [apiEditingId, setApiEditingId] = useState<string | null>(null);
+
+    // Intelligence state
+    const [isAddingRule, setIsAddingRule] = useState(false);
+    const [newRulePattern, setNewRulePattern] = useState('');
+    const [newRuleType, setNewRuleType] = useState<'tag' | 'link'>('tag');
+    const [newRulePath, setNewRulePath] = useState('');
 
     // Backup state
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -204,17 +217,16 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
                         <CogIcon className="w-6 h-6 text-emerald-400 mr-3" />
                         <h2 className="text-lg font-bold text-white tracking-tight">Settings</h2>
                     </div>
-                    
+
                     <nav className="flex-1 space-y-1">
                         {navItems.map(item => (
                             <button
                                 key={item.id}
                                 onClick={() => setActiveTab(item.id)}
-                                className={`w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
-                                    activeTab === item.id 
-                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]' 
-                                    : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
-                                }`}
+                                className={`w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${activeTab === item.id
+                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+                                        : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+                                    }`}
                             >
                                 <span className="mr-3">{item.icon}</span>
                                 {item.label}
@@ -222,7 +234,7 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
                         ))}
                     </nav>
 
-                    <button 
+                    <button
                         onClick={onClose}
                         className="mt-auto flex items-center px-4 py-3 rounded-xl text-sm font-medium text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-all border border-transparent hover:border-red-500/20"
                     >
@@ -234,9 +246,9 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
                 {/* Content */}
                 <div className="flex-1 flex flex-col bg-transparent overflow-hidden">
                     <div className="flex-1 p-8 overflow-y-auto custom-scrollbar">
-                        
+
                         {activeTab === 'providers' && (
-                            <ProvidersTab 
+                            <ProvidersTab
                                 apiConfigs={apiConfigs}
                                 onSaveApiConfig={onSaveApiConfig}
                                 onDeleteApiConfig={onDeleteApiConfig}
@@ -258,28 +270,37 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
                         )}
 
                         {activeTab === 'intelligence' && (
-                            <IntelligenceTab 
+                            <IntelligenceTab
                                 instructionPresets={instructionPresets}
                                 onCustomInstructionsChange={onCustomInstructionsChange}
                                 systemPrompt={systemPrompt}
                                 onSystemPromptChange={onSystemPromptChange}
                                 customInstructions={customInstructions}
                                 smartClassifyRules={smartClassifyRules}
+                                onSaveSmartRule={onSaveSmartRule}
                                 onDeleteSmartRule={onDeleteSmartRule}
                                 selectedStyle={selectedArchitectureStyle}
                                 onStyleChange={onArchitectureStyleChange}
+                                isAddingRule={isAddingRule}
+                                setIsAddingRule={setIsAddingRule}
+                                newRulePattern={newRulePattern}
+                                setNewRulePattern={setNewRulePattern}
+                                newRuleType={newRuleType}
+                                setNewRuleType={setNewRuleType}
+                                newRulePath={newRulePath}
+                                setNewRulePath={setNewRulePath}
                             />
                         )}
 
                         {activeTab === 'templates' && (
-                            <TemplatesTab 
+                            <TemplatesTab
                                 folderTemplates={folderTemplates}
                                 onApplyFolderTemplate={onApplyFolderTemplate}
                             />
                         )}
 
                         {activeTab === 'health' && (
-                            <HealthTab 
+                            <HealthTab
                                 duplicateStats={duplicateStats}
                                 onCleanDuplicates={onCleanDuplicates}
                                 brokenLinkCheckState={brokenLinkCheckState}
@@ -289,7 +310,7 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
                         )}
 
                         {activeTab === 'backup' && (
-                            <BackupTab 
+                            <BackupTab
                                 isAuthenticated={isAuthenticated}
                                 showKeyInput={showKeyInput}
                                 setShowKeyInput={setShowKeyInput}
@@ -302,19 +323,22 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
                         )}
 
                         {activeTab === 'config' && (
-                            <ConfigTab 
+                            <ConfigTab
                                 batchSize={batchSize}
                                 onBatchSizeChange={onBatchSizeChange}
                                 maxRetries={maxRetries}
                                 onMaxRetriesChange={onMaxRetriesChange}
                                 processingMode={processingMode}
                                 onProcessingModeChange={onProcessingModeChange}
+                                autoCleanupEmptyFolders={autoCleanupEmptyFolders}
+                                onAutoCleanupChange={onAutoCleanupChange}
                                 onClearData={onClearData}
+                                onCleanupEmptyFolders={props.onCleanupEmptyFolders}
                             />
                         )}
 
                         {activeTab === 'data' && (
-                            <DataTab 
+                            <DataTab
                                 bookmarks={bookmarks}
                                 folders={folders}
                                 onExport={onExport}

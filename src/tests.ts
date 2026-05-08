@@ -1,8 +1,9 @@
 import { generateHash, cacheStats, CachedOperation, MemoryCache } from './cache';
 import { perfMonitor } from './performance';
 import { repairJson, parseAIResponse } from './services/aiService';
-import { arrayToTree } from './utils/treeUtils';
-import { getApiConfigs, saveApiConfig, deleteApiConfig } from './db';
+import { arrayToTree, removeEmptyFolders } from './utils/treeUtils';
+import { getApiConfigs, saveApiConfig, deleteApiConfig } from '../db';
+import type { Bookmark, Folder, CategorizedBookmark } from '../types';
 
 // Test core business logic
 export const testCoreLogic = () => {
@@ -22,13 +23,23 @@ export const testCoreLogic = () => {
     console.log('✅ AI Response Parsing:', parsed.length === 1 && parsed[0].title === 'T');
 
     // 3. Test Tree Construction
-    const flatBookmarks = [
-        { id: '1', title: 'B1', url: 'U1', path: ['A', 'B'], parentId: null },
-        { id: '2', title: 'B2', url: 'U2', path: ['A'], parentId: null },
+    const flatBookmarks: CategorizedBookmark[] = [
+        { id: '1', title: 'B1', url: 'U1', path: ['A', 'B'], parentId: null, tags: [] },
+        { id: '2', title: 'B2', url: 'U2', path: ['A'], parentId: null, tags: [] },
     ];
-    const tree = arrayToTree(flatBookmarks as any);
-    console.log('✅ Tree Construction (roots):', tree.length === 1 && (tree[0] as any).name === 'A');
-    console.log('✅ Tree Construction (nested):', (tree[0] as any).children.length === 2); // One folder B and one bookmark B2
+    const tree = arrayToTree(flatBookmarks);
+    console.log('✅ Tree Construction (roots):', tree.length === 1 && (tree[0] as Folder).name === 'A');
+    console.log('✅ Tree Construction (nested):', (tree[0] as Folder).children.length === 2); // One folder B and one bookmark B2
+    
+    // 4. Test Empty Folder Removal
+    const treeWithEmptyFolders: (Folder | Bookmark)[] = [
+        { id: 'f1', name: 'Non-Empty', children: [{ id: 'b1', title: 'B1', url: 'U1', tags: [], parentId: 'f1' }], parentId: 'root' },
+        { id: 'f2', name: 'Empty', children: [], parentId: 'root' },
+        { id: 'f3', name: 'Nested Empty', children: [{ id: 'f4', name: 'Inner Empty', children: [], parentId: 'f3' }], parentId: 'root' },
+    ];
+    const cleanedTree = removeEmptyFolders(treeWithEmptyFolders);
+    console.log('✅ Empty Folder Removal (root empty):', cleanedTree.length === 1 && (cleanedTree[0] as Folder).name === 'Non-Empty');
+    console.log('✅ Empty Folder Removal (nested empty):', !cleanedTree.some((f) => (f as Folder).name === 'Nested Empty'));
 
     console.groupEnd();
 };

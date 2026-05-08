@@ -1,8 +1,9 @@
 import React from 'react';
 import { CopyIcon, LinkIcon } from '../../ui/Icons';
+import type { DuplicateStats } from '@/types';
 
 interface HealthTabProps {
-    duplicateStats: { count: number; size: number };
+    duplicateStats: DuplicateStats;
     onCleanDuplicates: () => void;
     brokenLinkCheckState: 'idle' | 'checking' | 'completed' | 'error';
     brokenLinkCheckProgress: number;

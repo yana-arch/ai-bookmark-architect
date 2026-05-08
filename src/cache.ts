@@ -16,7 +16,7 @@ interface ICache<T> {
     cleanup?(): Promise<void>;
 }
 
-class MemoryCache<T> implements ICache<T> {
+export class MemoryCache<T> implements ICache<T> {
     private cache = new Map<string, CacheEntry<T>>();
     private maxSize: number;
 
@@ -266,7 +266,7 @@ class IndexedDBCache<T> implements ICache<T> {
     }
 }
 
-class CachedOperation<T> {
+export class CachedOperation<T> {
     private caches: ICache<T>[];
     private operation: () => Promise<T>;
     private defaultTtl: number;

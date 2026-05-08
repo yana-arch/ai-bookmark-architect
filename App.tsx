@@ -16,11 +16,7 @@ import { DEFAULT_SYSTEM_PROMPT } from './src/constants';
 import { useApp } from './src/context/AppContext';
 
 // Hooks
-import { useSmartClassify } from './hooks/useSmartClassify';
 import { useBookmarkProcessing } from './hooks/useBookmarkProcessing';
-import { useApiConfig } from './hooks/useApiConfig';
-import { useInstructionPresets } from './hooks/useInstructionPresets';
-import { useTemplateManagement } from './hooks/useTemplateManagement';
 import { useAIPlanning } from './hooks/useAIPlanning';
 import { useDuplicates } from './hooks/useDuplicates';
 import { useBrokenLinks } from './hooks/useBrokenLinks';
@@ -47,7 +43,14 @@ const App: React.FC = () => {
         customInstructions, setCustomInstructions,
         batchSize, setBatchSize,
         maxRetries, setMaxRetries,
-        processingMode, setProcessingMode
+        processingMode, setProcessingMode,
+        autoCleanupEmptyFolders, setAutoCleanupEmptyFolders,
+
+        // Smart Classify
+        smartClassifyRules, 
+        sessionRules, setSessionRules, 
+        handleSaveSmartRule, handleDeleteSmartRule, 
+        applySmartClassify 
     } = useApp();
 
     // UI Local State
@@ -56,15 +59,15 @@ const App: React.FC = () => {
     const [isLogModalOpen, setIsLogModalOpen] = useState(false);
     
     // Logic Hooks (These still need the context values or can be moved to context too)
-    // For now, let's keep them here but consume context values
-    const { 
-        smartClassifyRules, 
-        sessionRules, 
-        setSessionRules, 
-        saveRule: handleSaveSmartRule, 
-        deleteRule: handleDeleteSmartRule, 
-        applySmartClassify 
-    } = useSmartClassify();
+
+    const handleNotificationsAdd = useCallback((n: any) => setNotifications(prev => [...prev, n]), [setNotifications]);
+    const handleProcessingComplete = useCallback((hasError: boolean) => {
+        if (hasError) {
+            setAppState(AppState.ERROR);
+        } else {
+            setAppState(AppState.REVIEW);
+        }
+    }, [setAppState]);
 
     const {
         isProcessing: isGeneratingStructure,
@@ -83,6 +86,7 @@ const App: React.FC = () => {
         setProcessedBookmarks: setAllCategorizedBookmarks,
     } = useBookmarkProcessing({
         bookmarks,
+        folders,
         apiConfigs,
         batchSize,
         maxRetries,
@@ -90,14 +94,9 @@ const App: React.FC = () => {
         systemPrompt,
         customInstructions,
         onFoldersUpdate: setFolders,
-        onNotificationsAdd: (n) => setNotifications(prev => [...prev, n]),
-        onProcessingComplete: (hasError) => {
-            if (hasError) {
-                setAppState(AppState.ERROR);
-            } else {
-                setAppState(AppState.REVIEW);
-            }
-        }
+        onNotificationsAdd: handleNotificationsAdd,
+        onProcessingComplete: handleProcessingComplete,
+        autoCleanupEmptyFolders
     });
 
     const handleForceStopWrapper = useCallback(() => {
@@ -107,15 +106,9 @@ const App: React.FC = () => {
 
     const {
         isApiModalOpen, setIsApiModalOpen,
-        handleSaveApiConfig, handleDeleteApiConfig, handleToggleApiConfigStatus
-    } = useApiConfig(apiConfigs, setApiConfigs);
-
-    const {
+        handleSaveApiConfig, handleDeleteApiConfig, handleToggleApiConfigStatus,
         isInstructionPresetModalOpen, setIsInstructionPresetModalOpen,
-        handleSaveInstructionPreset, handleDeleteInstructionPreset
-    } = useInstructionPresets(instructionPresets, setInstructionPresets, setCustomInstructions);
-
-    const {
+        handleSaveInstructionPreset, handleDeleteInstructionPreset,
         isFolderTemplateModalOpen, setIsFolderTemplateModalOpen,
         templateSettings,
         setTemplateSettings,
@@ -125,7 +118,7 @@ const App: React.FC = () => {
         handleDeleteFolderTemplate,
         handleApplyFolderTemplate,
         handleTemplateSettingsChange
-    } = useTemplateManagement(folderTemplates, setFolderTemplates, setSystemPrompt, setNotifications);
+    } = useApp();
 
     const {
         proposedStructure,
@@ -173,13 +166,10 @@ const App: React.FC = () => {
         startRestructuring,
         applyChanges,
         discardChanges,
-        continueRestructuring
+        continueRestructuring,
+        restructureMissingBookmarks
     } = useAppOrchestration({
         allCategorizedBookmarks,
-        smartClassifyRules,
-        sessionRules,
-        setSessionRules,
-        applySmartClassify,
         startProcessing,
         resetProcessingState,
         setLogs,
@@ -222,18 +212,6 @@ const App: React.FC = () => {
                 isGlobalSettingsModalOpen={isGlobalSettingsModalOpen}
                 setIsGlobalSettingsModalOpen={setIsGlobalSettingsModalOpen}
                 settingsTab={settingsTab}
-                handleSaveApiConfig={handleSaveApiConfig}
-                handleDeleteApiConfig={handleDeleteApiConfig}
-                handleToggleApiConfigStatus={handleToggleApiConfigStatus}
-                handleSaveInstructionPreset={handleSaveInstructionPreset}
-                handleDeleteInstructionPreset={handleDeleteInstructionPreset}
-                handleSaveSmartRule={handleSaveSmartRule}
-                handleDeleteSmartRule={handleDeleteSmartRule}
-                handleSaveFolderTemplate={handleSaveFolderTemplate}
-                handleDeleteFolderTemplate={handleDeleteFolderTemplate}
-                handleApplyFolderTemplate={handleApplyFolderTemplate}
-                templateSettings={templateSettings}
-                setTemplateSettings={setTemplateSettings}
                 processImport={processImport}
                 handleExportBookmarks={handleExportBookmarks}
                 importFile={importFile}
@@ -246,8 +224,6 @@ const App: React.FC = () => {
                 brokenLinkCheckProgress={brokenLinkCheckProgress}
                 handleStartBrokenLinkCheck={handleStartBrokenLinkCheck}
                 handleCleanBrokenLinks={handleCleanBrokenLinks}
-                selectedArchitectureStyle={selectedArchitectureStyle}
-                handleArchitectureStyleChange={handleArchitectureStyleChange}
                 handleUploadData={handleUploadData}
                 handleImportData={handleImportData}
                 isLogModalOpen={isLogModalOpen}
@@ -255,6 +231,8 @@ const App: React.FC = () => {
                 detailedLogs={detailedLogs}
                 isAnalyticsDashboardOpen={isAnalyticsDashboardOpen}
                 setIsAnalyticsDashboardOpen={setIsAnalyticsDashboardOpen}
+                planningPrompt={planningPrompt}
+                onPlanningPromptChange={setPlanningPrompt}
             />
             
             <div className="fixed bottom-4 right-4 z-50 space-y-2">
@@ -310,11 +288,12 @@ const App: React.FC = () => {
                                     onContinue={continueRestructuring}
                                     onOpenLogModal={() => setIsLogModalOpen(true)}
                                     onSuggestStructure={handleSuggestStructure}
-                                    onConfirmProposedStructure={handleConfirmProposedStructure}
-                                    proposedStructure={proposedStructure}
-                                    isGeneratingStructure={isGeneratingStructure}
-                                    onOpenAIConfigModal={() => openSettings('providers')}
-                                    sessionRules={sessionRules}
+                    onConfirmProposedStructure={handleConfirmProposedStructure}
+                    proposedStructure={proposedStructure}
+                    isGeneratingStructure={isGeneratingStructure}
+                    onOpenAIConfigModal={() => openSettings('providers')}
+                    onRestructureMissing={restructureMissingBookmarks}
+                    sessionRules={sessionRules}
                                     onSessionRulesChange={setSessionRules}
                                     progress={{
                                         current: allCategorizedBookmarks.length > 0 ? allCategorizedBookmarks.length : progress.current,

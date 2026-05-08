@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { InstructionPreset, SmartClassifyRule, ArchitectureStyle } from '@/types';
-import { TagIcon, LinkIcon, TrashIcon, SparklesIcon, AILogoIcon, LayersIcon, ChipIcon } from '../../ui/Icons';
+import { TagIcon, LinkIcon, TrashIcon, SparklesIcon, AILogoIcon, LayersIcon, ChipIcon, XIcon } from '../../ui/Icons';
 import { ARCHITECTURE_STYLES } from '@/src/architectureStyles';
 
 interface IntelligenceTabProps {
@@ -10,18 +10,49 @@ interface IntelligenceTabProps {
     onSystemPromptChange: (prompt: string) => void;
     customInstructions: string;
     smartClassifyRules: SmartClassifyRule[];
-    onDeleteSmartRule: (id: string) => void;
+    onSaveSmartRule: (rule: SmartClassifyRule) => Promise<void> | void;
+    onDeleteSmartRule: (id: string) => Promise<void> | void;
     
     // Architecture props
     selectedStyle: ArchitectureStyle;
     onStyleChange: (styleId: ArchitectureStyle) => void;
+
+    // Lifted state for rule creation
+    isAddingRule: boolean;
+    setIsAddingRule: (isAdding: boolean) => void;
+    newRulePattern: string;
+    setNewRulePattern: (pattern: string) => void;
+    newRuleType: 'tag' | 'link';
+    setNewRuleType: (type: 'tag' | 'link') => void;
+    newRulePath: string;
+    setNewRulePath: (path: string) => void;
 }
 
 export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
     instructionPresets, onCustomInstructionsChange, systemPrompt,
-    onSystemPromptChange, customInstructions, smartClassifyRules, onDeleteSmartRule,
-    selectedStyle, onStyleChange
+    onSystemPromptChange, customInstructions, smartClassifyRules, onSaveSmartRule, onDeleteSmartRule,
+    selectedStyle, onStyleChange,
+    isAddingRule, setIsAddingRule, newRulePattern, setNewRulePattern, newRuleType, setNewRuleType, newRulePath, setNewRulePath
 }) => {
+    const handleAddRule = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newRulePattern || !newRulePath) return;
+
+        await onSaveSmartRule({
+            id: typeof crypto !== 'undefined' ? crypto.randomUUID() : `rule-${Date.now()}`,
+            name: newRulePattern,
+            type: newRuleType,
+            pattern: newRulePattern,
+            targetPath: newRulePath.split(/[\/\\]|>|→/).map(s => s.trim()).filter(Boolean),
+            enabled: true,
+            createdAt: Date.now()
+        });
+
+        setIsAddingRule(false);
+        setNewRulePattern('');
+        setNewRulePath('');
+    };
+
     return (
         <div className="space-y-10 animate-slideIn pb-10">
             <header className="flex items-center space-x-3 mb-6">
@@ -94,7 +125,7 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
                         {instructionPresets.map(preset => (
                             <button 
                                 key={preset.id}
-                                onClick={() => onCustomInstructionsChange(preset.instructions)}
+                                onClick={() => onCustomInstructionsChange(preset.customInstructions)}
                                 className="px-3 py-1.5 hover:bg-white/10 text-[10px] font-black text-gray-500 hover:text-white rounded-lg transition-all uppercase tracking-tighter"
                             >
                                 {preset.name}
@@ -146,11 +177,75 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
                             Pre-AI Filter
                         </div>
                     </div>
-                    <button className="text-[10px] font-black text-emerald-400 hover:text-emerald-300 uppercase tracking-widest transition-colors flex items-center">
-                        <span className="mr-1.5 text-lg leading-none">+</span>
-                        Create Rule
+                    <button 
+                        onClick={() => setIsAddingRule(!isAddingRule)}
+                        className={`text-[10px] font-black uppercase tracking-widest transition-all flex items-center px-4 py-2 rounded-xl border ${
+                            isAddingRule 
+                            ? 'bg-red-500/10 border-red-500/20 text-red-400' 
+                            : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20'
+                        }`}
+                    >
+                        {isAddingRule ? (
+                            <>
+                                <XIcon className="w-3 h-3 mr-2" />
+                                Cancel
+                            </>
+                        ) : (
+                            <>
+                                <span className="mr-1.5 text-lg leading-none">+</span>
+                                Create Rule
+                            </>
+                        )}
                     </button>
                 </div>
+
+                {isAddingRule && (
+                    <form onSubmit={handleAddRule} className="mb-8 p-6 bg-white/5 border border-emerald-500/20 rounded-3xl space-y-6 animate-fadeIn">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Match Pattern (Tag or URL)</label>
+                                <input 
+                                    type="text" value={newRulePattern} onChange={e => setNewRulePattern(e.target.value)}
+                                    className="w-full bg-[#121418] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all"
+                                    placeholder="e.g. 'programming' or 'github.com'"
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Rule Logic Type</label>
+                                <div className="flex bg-black/40 p-1 rounded-xl border border-white/5">
+                                    {(['tag', 'link'] as const).map(t => (
+                                        <button
+                                            key={t} type="button" onClick={() => setNewRuleType(t)}
+                                            className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all uppercase tracking-tighter ${
+                                                newRuleType === t ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300'
+                                            }`}
+                                        >
+                                            {t === 'tag' ? 'Tag Match' : 'URL Substring'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Target Folder Path (Separate by /, &gt;, or →)</label>
+                            <input 
+                                type="text" value={newRulePath} onChange={e => setNewRulePath(e.target.value)}
+                                className="w-full bg-[#121418] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all"
+                                placeholder="e.g. 'Development > Web > Frontend'"
+                                required
+                            />
+                        </div>
+                        <div className="flex justify-end pt-2">
+                            <button 
+                                type="submit"
+                                className="px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-black rounded-xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] uppercase tracking-widest active:scale-95"
+                            >
+                                Activate Deterministic Rule
+                            </button>
+                        </div>
+                    </form>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {smartClassifyRules.map(rule => (
@@ -179,7 +274,7 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
                             <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500/30"></div>
                         </div>
                     ))}
-                    {smartClassifyRules.length === 0 && (
+                    {smartClassifyRules.length === 0 && !isAddingRule && (
                         <div className="col-span-2 text-center py-10 border-2 border-dashed border-white/5 rounded-3xl">
                             <p className="text-gray-500 text-sm italic">No mapping rules defined. AI will handle all categorization.</p>
                         </div>
@@ -189,4 +284,5 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
         </div>
     );
 };
+
 

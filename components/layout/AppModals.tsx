@@ -1,5 +1,20 @@
 import React, { Suspense, lazy } from 'react';
 import { useApp } from '../../src/context/AppContext';
+import { removeEmptyFolders } from '../../src/utils/treeUtils';
+import type {
+    ApiConfig,
+    ApiKeyStatus,
+    InstructionPreset,
+    SmartClassifyRule,
+    FolderTemplate,
+    TemplateSettings,
+    ArchitectureStyle,
+    DetailedLog,
+    Notification,
+    DuplicateStats,
+    ExportOptions,
+    Bookmark
+} from '../../types';
 
 const UnifiedSettingsModal = lazy(() => import('../modals/UnifiedSettingsModal'));
 const LogModal = lazy(() => import('../modals/LogModal'));
@@ -8,61 +23,70 @@ const AnalyticsDashboard = lazy(() => import('../features/AnalyticsDashboard'));
 interface AppModalsProps {
     isGlobalSettingsModalOpen: boolean;
     setIsGlobalSettingsModalOpen: (open: boolean) => void;
-    settingsTab: any;
-    
+    settingsTab: 'providers' | 'intelligence' | 'templates' | 'data' | 'health' | 'backup' | 'config';
+
     // Logic for other modals that might not be in AppContext yet or specific to App UI
     isLogModalOpen: boolean;
     setIsLogModalOpen: (open: boolean) => void;
-    detailedLogs: any[];
+    detailedLogs: DetailedLog[];
     isAnalyticsDashboardOpen: boolean;
     setIsAnalyticsDashboardOpen: (open: boolean) => void;
 
-    // Callbacks that might be specific to App orchestration
-    handleSaveApiConfig: any;
-    handleDeleteApiConfig: any;
-    handleToggleApiConfigStatus: any;
-    handleSaveInstructionPreset: any;
-    handleDeleteInstructionPreset: any;
-    handleSaveSmartRule: any;
-    handleDeleteSmartRule: any;
-    handleSaveFolderTemplate: any;
-    handleDeleteFolderTemplate: any;
-    handleApplyFolderTemplate: any;
-    templateSettings: any;
-    setTemplateSettings: any;
-    processImport: any;
-    handleExportBookmarks: any;
-    importFile: any;
-    previewBookmarks: any;
-    handleFileSelect: any;
-    duplicateStats: any;
-    handleCleanDuplicates: any;
-    brokenLinks: any;
-    brokenLinkCheckState: any;
-    brokenLinkCheckProgress: any;
-    handleStartBrokenLinkCheck: any;
-    handleCleanBrokenLinks: any;
-    selectedArchitectureStyle: any;
-    handleArchitectureStyleChange: any;
-    handleUploadData: any;
-    handleImportData: any;
+    // Callbacks that are specific to App orchestration or not yet in context
+    processImport: (mode: 'merge' | 'overwrite') => void;
+    handleExportBookmarks: (options: ExportOptions) => void;
+    importFile: File | null;
+    previewBookmarks: Bookmark[];
+    handleFileSelect: (file: File | null) => void;
+    duplicateStats: DuplicateStats;
+    handleCleanDuplicates: () => void;
+    brokenLinks: Bookmark[];
+
+    brokenLinkCheckState: 'idle' | 'checking' | 'completed' | 'error';
+    brokenLinkCheckProgress: number;
+    handleStartBrokenLinkCheck: () => void;
+    handleCleanBrokenLinks: () => void;
+    handleUploadData: (key: string) => Promise<void>;
+    handleImportData: (key: string) => Promise<void>;
+    planningPrompt?: string;
+    onPlanningPromptChange?: (prompt: string) => void;
 }
 
 const AppModals: React.FC<AppModalsProps> = (props) => {
     const {
         bookmarks,
-        folders,
+        folders, setFolders,
         apiConfigs,
         instructionPresets,
         folderTemplates,
         systemPrompt, setSystemPrompt,
-        planningPrompt, // Not in context yet, but let's assume it's passed or in another context
         customInstructions, setCustomInstructions,
         batchSize, setBatchSize,
         maxRetries, setMaxRetries,
         processingMode, setProcessingMode,
-        handleClearData
+        autoCleanupEmptyFolders, setAutoCleanupEmptyFolders,
+        smartClassifyRules,
+        handleClearData,
+        handleSaveApiConfig,
+        handleDeleteApiConfig,
+        handleToggleApiConfigStatus,
+        handleSaveInstructionPreset,
+        handleDeleteInstructionPreset,
+        handleSaveSmartRule,
+        handleDeleteSmartRule,
+        handleSaveFolderTemplate,
+        handleDeleteFolderTemplate,
+        handleApplyFolderTemplate,
+        templateSettings,
+        setTemplateSettings,
+        selectedArchitectureStyle,
+        handleArchitectureStyleChange
     } = useApp();
+
+    const handleManualCleanup = () => {
+        const cleaned = removeEmptyFolders(folders);
+        setFolders(cleaned);
+    };
 
     return (
         <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="text-white">Đang tải...</div></div>}>
@@ -71,35 +95,35 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     isOpen={props.isGlobalSettingsModalOpen}
                     onClose={() => props.setIsGlobalSettingsModalOpen(false)}
                     initialTab={props.settingsTab}
-                    
+
                     // AI & Providers
                     apiConfigs={apiConfigs}
-                    onSaveApiConfig={props.handleSaveApiConfig}
-                    onDeleteApiConfig={props.handleDeleteApiConfig}
-                    onToggleApiConfigStatus={props.handleToggleApiConfigStatus}
-                    
+                    onSaveApiConfig={handleSaveApiConfig}
+                    onDeleteApiConfig={handleDeleteApiConfig}
+                    onToggleApiConfigStatus={handleToggleApiConfigStatus}
+
                     // Intelligence
                     systemPrompt={systemPrompt}
                     onSystemPromptChange={setSystemPrompt}
-                    planningPrompt={props.planningPrompt || ''} // Fallback if not provided
-                    onPlanningPromptChange={() => {}} // Placeholder or pass from props
+                    planningPrompt={props.planningPrompt || ''}
+                    onPlanningPromptChange={props.onPlanningPromptChange || (() => { })}
                     customInstructions={customInstructions}
                     onCustomInstructionsChange={setCustomInstructions}
                     instructionPresets={instructionPresets}
-                    onSaveInstructionPreset={props.handleSaveInstructionPreset}
-                    onDeleteInstructionPreset={props.handleDeleteInstructionPreset}
-                    smartClassifyRules={[]} // smartClassifyRules not in context yet
-                    onSaveSmartRule={props.handleSaveSmartRule}
-                    onDeleteSmartRule={props.handleDeleteSmartRule}
-                    
+                    onSaveInstructionPreset={handleSaveInstructionPreset}
+                    onDeleteInstructionPreset={handleDeleteInstructionPreset}
+                    smartClassifyRules={smartClassifyRules}
+                    onSaveSmartRule={handleSaveSmartRule}
+                    onDeleteSmartRule={handleDeleteSmartRule}
+
                     // Templates
                     folderTemplates={folderTemplates}
-                    onSaveFolderTemplate={props.handleSaveFolderTemplate}
-                    onDeleteFolderTemplate={props.handleDeleteFolderTemplate}
-                    onApplyFolderTemplate={props.handleApplyFolderTemplate}
-                    selectedTemplateId={props.templateSettings.selectedTemplateId}
-                    onSelectedTemplateChange={(id) => props.setTemplateSettings((prev: any) => ({ ...prev, selectedTemplateId: id }))}
-                    
+                    onSaveFolderTemplate={handleSaveFolderTemplate}
+                    onDeleteFolderTemplate={handleDeleteFolderTemplate}
+                    onApplyFolderTemplate={handleApplyFolderTemplate}
+                    selectedTemplateId={templateSettings.selectedTemplateId}
+                    onSelectedTemplateChange={(id) => setTemplateSettings((prev: TemplateSettings) => ({ ...prev, selectedTemplateId: id }))}
+
                     // Performance
                     batchSize={batchSize}
                     onBatchSizeChange={setBatchSize}
@@ -107,7 +131,10 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     onMaxRetriesChange={setMaxRetries}
                     processingMode={processingMode}
                     onProcessingModeChange={setProcessingMode}
-                    
+                    autoCleanupEmptyFolders={autoCleanupEmptyFolders}
+                    onAutoCleanupChange={setAutoCleanupEmptyFolders}
+                    onCleanupEmptyFolders={handleManualCleanup}
+
                     // Data Management
                     bookmarks={bookmarks}
                     folders={folders}
@@ -117,7 +144,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     importFile={props.importFile}
                     previewBookmarks={props.previewBookmarks}
                     onFileSelect={props.handleFileSelect}
-                    
+
                     // Health
                     duplicateStats={props.duplicateStats}
                     onCleanDuplicates={props.handleCleanDuplicates}
@@ -126,11 +153,11 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     brokenLinkCheckProgress={props.brokenLinkCheckProgress}
                     onStartBrokenLinkCheck={props.handleStartBrokenLinkCheck}
                     onCleanBrokenLinks={props.handleCleanBrokenLinks}
-                    
+
                     // Architecture
-                    selectedArchitectureStyle={props.selectedArchitectureStyle}
-                    onArchitectureStyleChange={props.handleArchitectureStyleChange}
-                    
+                    selectedArchitectureStyle={selectedArchitectureStyle}
+                    onArchitectureStyleChange={handleArchitectureStyleChange}
+
                     // Cloud
                     onUploadCloudData={props.handleUploadData}
                     onImportCloudData={props.handleImportData}

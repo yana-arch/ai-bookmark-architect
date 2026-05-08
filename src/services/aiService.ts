@@ -28,7 +28,18 @@ export function generateCategorizationPrompt(params: {
     } = params;
 
     const bookmarksList = batch.map(b => `- ${b.title} (${b.url})`).join('\n');
-    const treeContext = JSON.stringify(currentTree.map(n => ({ name: n.name, id: n.id })));
+    
+    // Recursive helper to get full tree context (with depth limit to save tokens)
+    const getFullTreeContext = (folders: any[], depth: number = 0): any[] => {
+        if (depth > 4) return []; // Limit depth to 4 levels to keep prompt size manageable
+        
+        return folders.map(f => ({
+            name: f.name,
+            children: f.children && f.children.length > 0 ? getFullTreeContext(f.children, depth + 1) : []
+        }));
+    };
+    
+    const treeContext = JSON.stringify(getFullTreeContext(currentTree));
 
     let historyContext = '';
     if (userHistory && userHistory.length > 0) {
@@ -49,18 +60,25 @@ ${historyContext}
 Current Folder Structure (Reuse these if suitable):
 ${treeContext}
 
-Bookmarks to Process:
+Bookmarks to Process (${batch.length} items):
 ${bookmarksList}
 
-CRITICAL INSTRUCTION: Respond ONLY with a valid JSON object containing a "bookmarks" array.
-The structure must be exactly:
+CRITICAL INSTRUCTION: 
+1. Respond ONLY with a valid JSON object containing a "bookmarks" array.
+2. You MUST return exactly ${batch.length} items in the "bookmarks" array. Do not skip any bookmark.
+3. For each item, provide:
+   - "title": Original title
+   - "url": EXACT original URL (Do not modify!)
+   - "path": Array of folder names (e.g., ["Tech", "React"])
+   - "tags": Array of keywords
+4. The JSON structure:
 {
   "bookmarks": [
     {
-      "title": "Bookmark Title",
+      "title": "Example",
       "url": "https://example.com",
-      "path": ["TopFolder", "SubFolder"],
-      "tags": ["tag1", "tag2"]
+      "path": ["Folder"],
+      "tags": ["tag"]
     }
   ]
 }

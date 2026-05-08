@@ -1,5 +1,5 @@
 import React from 'react';
-import { useApp } from '@/src/context/AppContext';
+import { useAppDataContext, useAppConfig } from '@/src/context/AppContext';
 import { AppState } from '@/types';
 import type { Bookmark, Folder, SmartClassifyRule } from '@/types';
 import { WarningIcon, CogIcon } from '../ui/Icons';
@@ -19,6 +19,7 @@ interface RestructurePanelProps {
     proposedStructure: (Folder | Bookmark)[];
     isGeneratingStructure: boolean;
     onOpenAIConfigModal: () => void;
+    onRestructureMissing: () => void;
     sessionRules: SmartClassifyRule[];
     onSessionRulesChange: (rules: SmartClassifyRule[]) => void;
     
@@ -30,16 +31,17 @@ interface RestructurePanelProps {
     hasPartialResults: boolean;
 }
 
-const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
+const RestructurePanel: React.FC<RestructurePanelProps> = React.memo((props) => {
     const {
-        onStart, onStop, onForceStop, onApply, onDiscard, onContinue,
+        onStart, onStop, onForceStop, onApply, onDiscard, onContinue, onRestructureMissing,
         onOpenLogModal, onSuggestStructure, onConfirmProposedStructure,
         proposedStructure, isGeneratingStructure, onOpenAIConfigModal,
         sessionRules, onSessionRulesChange,
         progress, logs, errorDetails, sessionTokenUsage, hasPartialResults
     } = props;
     
-    const { appState, apiConfigs } = useApp();
+    const { appState } = useAppDataContext();
+    const { apiConfigs } = useAppConfig();
 
     const progressPercentage = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
 
@@ -70,56 +72,60 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
     const renderContent = () => {
         switch (appState) {
             case AppState.LOADED:
-            case AppState.STRUCTURED:
                 return (
-                    <>
-                        <h3 className="text-xl font-bold text-white mb-2">Tái cấu trúc bằng AI</h3>
-                        <p className="text-sm text-gray-400 mb-6">Sắp xếp lại các bookmarks của bạn vào một cấu trúc thư mục thông minh.</p>
-
-                        <div className="space-y-3 mb-6">
+                    <div className="flex flex-col h-full justify-center items-center text-center px-4">
+                        <div className="w-20 h-20 bg-sky-500/20 rounded-full flex items-center justify-center mb-6">
+                            <span className="text-4xl text-sky-400">⚡</span>
+                        </div>
+                        <h3 className="text-2xl font-bold text-white mb-2">Sẵn Sàng Phân Loại</h3>
+                        <p className="text-gray-400 mb-8">
+                            Dữ liệu đã được tải. Hãy bắt đầu quá trình tái cấu trúc bằng AI.
+                        </p>
+                        <div className="space-y-4 w-full">
                             <button
                                 onClick={onStart}
-                                disabled={apiConfigs.filter(c => c.status === 'active').length === 0}
-                                className="w-full bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-600 transition-all duration-200 shadow-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
-                                {apiConfigs.filter(c => c.status === 'active').length === 0 ? 'Vui lòng thêm API Key' : 'PHÂN LOẠI NHANH (BỎ QUA LẬP KẾ HOẠCH)'}
+                                className="w-full bg-sky-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-sky-700 transition-all shadow-lg transform hover:scale-[1.02] active:scale-95">
+                                Bắt đầu Tái cấu trúc (Tất cả)
                             </button>
-
-                            <div className="relative">
-                                <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                                    <div className="w-full border-t border-gray-700"></div>
-                                </div>
-                                <div className="relative flex justify-center text-xs uppercase">
-                                    <span className="bg-[#21252C] px-2 text-gray-500 font-bold">Hoặc tối ưu hơn</span>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2">
-                                <button
-                                    onClick={() => onSuggestStructure('tags')}
-                                    disabled={apiConfigs.filter(c => c.status === 'active').length === 0 || isGeneratingStructure}
-                                    className="text-[10px] bg-blue-600/20 text-blue-400 border border-blue-600/30 font-bold py-2 px-1 rounded-lg hover:bg-blue-600/30 transition-all disabled:opacity-50">
-                                    GỢI Ý THEO TAG
-                                </button>
-                                <button
-                                    onClick={() => onSuggestStructure('domains')}
-                                    disabled={apiConfigs.filter(c => c.status === 'active').length === 0 || isGeneratingStructure}
-                                    className="text-[10px] bg-purple-600/20 text-purple-400 border border-purple-600/30 font-bold py-2 px-1 rounded-lg hover:bg-purple-600/30 transition-all disabled:opacity-50">
-                                    GỢI Ý THEO LINK
-                                </button>
-                            </div>
-                            <p className="text-[10px] text-gray-500 italic text-center">Lập kế hoạch cấu trúc thư mục trước khi bắt đầu giúp AI chính xác hơn 40%.</p>
-                        </div>
-
-                        <div className="mt-6">
+                            
                             <button
-                                onClick={onOpenAIConfigModal}
-                                className="w-full flex items-center justify-center text-sm bg-gray-800 border border-gray-700 text-gray-300 font-bold py-3 px-4 rounded-lg hover:bg-gray-700 hover:text-white transition-all group"
-                            >
-                                <CogIcon className="w-5 h-5 mr-2 text-gray-500 group-hover:text-sky-400 transition-colors" />
-                                Cấu hình & Chỉ dẫn cho AI
+                                onClick={onRestructureMissing}
+                                className="w-full bg-amber-600/20 text-amber-400 border border-amber-600/50 font-bold py-3 px-6 rounded-lg hover:bg-amber-600/30 transition-all flex items-center justify-center gap-2">
+                                <span>⟳</span> Phân loại Bookmark ở Root
                             </button>
                         </div>
-                    </>
+                    </div>
+                );
+            case AppState.STRUCTURED:
+                return (
+                    <div className="flex flex-col h-full justify-center items-center text-center px-4">
+                        <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mb-6">
+                            <span className="text-4xl">✓</span>
+                        </div>
+                        <h3 className="text-2xl font-bold text-white mb-2">Đã Lưu Thành Công!</h3>
+                        <p className="text-gray-400 mb-8">
+                            Kiến trúc bookmark của bạn đã được cập nhật thành công.
+                        </p>
+                        <div className="space-y-4 w-full">
+                            <button
+                                onClick={onStart}
+                                className="w-full bg-sky-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-sky-700 transition-all">
+                                Bắt đầu Tái cấu trúc Mới
+                            </button>
+                            
+                            <button
+                                onClick={onRestructureMissing}
+                                className="w-full bg-amber-600/20 text-amber-400 border border-amber-600/50 font-bold py-3 px-6 rounded-lg hover:bg-amber-600/30 transition-all flex items-center justify-center gap-2">
+                                <span>⟳</span> Phân loại Bookmark ở Root
+                            </button>
+
+                            <button
+                                onClick={() => window.location.reload()}
+                                className="w-full bg-gray-700 text-white py-2 px-6 rounded-lg hover:bg-gray-600 transition-all">
+                                Làm mới Ứng dụng
+                            </button>
+                        </div>
+                    </div>
                 );
             case AppState.PLANNING: {
                 const handleAddSessionRule = (folderName: string, path: string[]) => {
@@ -388,6 +394,6 @@ const RestructurePanel: React.FC<RestructurePanelProps> = (props) => {
             </div>
         </aside>
     );
-};
+});
 
 export default RestructurePanel;

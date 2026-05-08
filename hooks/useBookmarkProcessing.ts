@@ -1,20 +1,22 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog } from '../types';
-import { arrayToTree } from '../src/utils/treeUtils';
+import { arrayToTree, removeEmptyFolders } from '../src/utils/treeUtils';
 import { perfMonitor } from '../src/performance';
 import { saveLog } from '../db';
 
 interface UseBookmarkProcessingProps {
     bookmarks: Bookmark[];
+    folders: (Folder | Bookmark)[];
     apiConfigs: ApiConfig[];
     batchSize: number;
     maxRetries: number;
-    processingMode: 'single' | 'multi';
+    processingMode: 'parallel' | 'sequential';
     systemPrompt: string;
     customInstructions: string;
     onFoldersUpdate: (folders: (Folder | Bookmark)[]) => void;
     onNotificationsAdd: (notification: { id: string, message: string, type: 'info' | 'error' | 'success' | 'warning' }) => void;
     onProcessingComplete?: (hasError: boolean) => void;
+    autoCleanupEmptyFolders?: boolean;
 }
 
 // Helper to simplify folder structure for AI context (removes IDs and Bookmarks)
@@ -37,6 +39,7 @@ const simplifyFolderStructure = (folders: (Folder | Bookmark)[]): SimplifiedFold
 
 export const useBookmarkProcessing = ({
     bookmarks,
+    folders,
     apiConfigs,
     batchSize,
     maxRetries,
@@ -45,7 +48,8 @@ export const useBookmarkProcessing = ({
     customInstructions,
     onFoldersUpdate,
     onNotificationsAdd,
-    onProcessingComplete
+    onProcessingComplete,
+    autoCleanupEmptyFolders = false
 }: UseBookmarkProcessingProps) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState({ current: 0, total: 0 });
@@ -58,6 +62,7 @@ export const useBookmarkProcessing = ({
     const workersRef = useRef<Worker[]>([]);
     const activeWorkersRef = useRef<Set<number>>(new Set());
     const stopProcessingRef = useRef(false);
+    const updateTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Cleanup workers on unmount
     useEffect(() => {
@@ -109,18 +114,40 @@ export const useBookmarkProcessing = ({
         setIsProcessing(false);
     }, [addDetailedLog]);
 
+    const latestBookmarksRef = useRef<Bookmark[]>(bookmarks);
+    const latestFoldersRef = useRef<(Folder | Bookmark)[]>(folders);
+    const latestApiConfigsRef = useRef<ApiConfig[]>(apiConfigs);
+    
+    // Always keep track of the latest data
+    useEffect(() => {
+        latestBookmarksRef.current = bookmarks;
+    }, [bookmarks]);
+
+    useEffect(() => {
+        latestFoldersRef.current = folders;
+    }, [folders]);
+
+    useEffect(() => {
+        latestApiConfigsRef.current = apiConfigs;
+    }, [apiConfigs]);
+
+    const sourceBookmarksRef = useRef<Bookmark[]>([]);
+
     const startProcessing = useCallback(async (
         initialProcessed: CategorizedBookmark[], 
         currentFolders: (Folder | Bookmark)[],
         overrideBookmarks?: Bookmark[]
     ) => {
-        const availableKeys = apiConfigs.filter(c => c.status === 'active');
+        const availableKeys = latestApiConfigsRef.current.filter(c => c.status === 'active');
         if (availableKeys.length === 0) {
             const errorMsg = 'Không có API key nào đang hoạt động. Vui lòng thêm hoặc kích hoạt một key hợp lệ.';
             setErrorDetails(errorMsg);
             addDetailedLog('error', 'Không tìm thấy API key', errorMsg);
             return false;
         }
+
+        const sourceBookmarks = overrideBookmarks || latestBookmarksRef.current;
+        sourceBookmarksRef.current = sourceBookmarks; // Snapshot bookmarks to avoid sync issues during processing
 
         addDetailedLog('info', 'Khởi tạo xử lý', `Bắt đầu với ${availableKeys.length} API key đang hoạt động: ${availableKeys.map(k => `${k.name} [ID: ${k.id}] (${k.provider})`).join(', ')}`);
 
@@ -131,11 +158,15 @@ export const useBookmarkProcessing = ({
             const currentProcessed = [...initialProcessed];
             setProcessedBookmarks(currentProcessed);
             
-            const sourceBookmarks = overrideBookmarks || bookmarks;
-            const bookmarksToProcess = sourceBookmarks.slice(currentProcessed.length);
+            const processedUrls = new Set(currentProcessed.map(b => b.url));
+            const bookmarksToProcess = sourceBookmarks.filter(bm => !processedUrls.has(bm.url));
             const BATCH_SIZE = Math.max(1, batchSize);
             const totalBatches = Math.ceil(bookmarksToProcess.length / BATCH_SIZE);
-            const MAX_CONCURRENT_WORKERS = processingMode === 'single' ? 1 : 3;
+            
+            // Dynamic concurrency based on hardware, capped at 6 for stability
+            const MAX_CONCURRENT_WORKERS = processingMode === 'sequential' 
+                ? 1 
+                : Math.min(6, (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 3);
 
             let completedBatches = 0;
             let failedBatches = 0;
@@ -148,6 +179,49 @@ export const useBookmarkProcessing = ({
 
             const currentTree = simplifyFolderStructure(currentFolders);
 
+            const updateFolderTree = (allNewResults: CategorizedBookmark[], cleanup: boolean = false, immediate: boolean = false) => {
+                if (updateTimerRef.current) {
+                    clearTimeout(updateTimerRef.current);
+                    updateTimerRef.current = null;
+                }
+
+                const runUpdate = () => {
+                    const categorizedMap = new Map<string, CategorizedBookmark>(
+                        [...initialProcessed, ...allNewResults].map(cb => [cb.url, cb])
+                    );
+                    
+                    // Filter the snapshotted list against current bookmarks to handle deletions during processing
+                    const currentValidUrls = new Set(latestBookmarksRef.current.map(bm => bm.url));
+                    const validSourceBookmarks = sourceBookmarksRef.current.filter(bm => currentValidUrls.has(bm.url));
+
+                    const finalFolders = arrayToTree(
+                        validSourceBookmarks.map(bm => {
+                            const categorized = categorizedMap.get(bm.url);
+                            // Safety net: If AI skips a bookmark, preserve its existing path and tags instead of resetting to root
+                            return { 
+                                ...bm, 
+                                path: categorized ? categorized.path : (bm.path || []), 
+                                tags: categorized ? categorized.tags : (bm.tags || []) 
+                            };
+                        }),
+                        latestFoldersRef.current
+                    );
+                    
+                    let cleanedFolders = finalFolders;
+                    if (cleanup) {
+                        cleanedFolders = removeEmptyFolders(finalFolders);
+                    }
+                    
+                    onFoldersUpdate(cleanedFolders);
+                };
+
+                if (immediate) {
+                    runUpdate();
+                } else {
+                    updateTimerRef.current = setTimeout(runUpdate, 2000); // 2s debounce to reduce UI stutter for large libraries
+                }
+            };
+
             const finalizeProcessing = (allNewResults: CategorizedBookmark[]) => {
                 setIsProcessing(false);
                 setProcessedBookmarks(prev => {
@@ -155,6 +229,8 @@ export const useBookmarkProcessing = ({
                     const newUnique = allNewResults.filter(b => !existingUrls.has(b.url));
                     return [...prev, ...newUnique];
                 });
+                
+                updateFolderTree(allNewResults, autoCleanupEmptyFolders, true);
                 
                 workersRef.current.forEach(w => w.terminate());
                 workersRef.current = [];
@@ -237,18 +313,7 @@ export const useBookmarkProcessing = ({
                                 total: sourceBookmarks.length 
                             });
 
-                            const categorizedMap = new Map<string, CategorizedBookmark>(
-                                [...currentProcessed, ...allResults].map(cb => [cb.url, cb])
-                            );
-                            
-                            const newFolders = arrayToTree(
-                                sourceBookmarks.map(bm => {
-                                    const categorized = categorizedMap.get(bm.url);
-                                    return { ...bm, path: categorized?.path || [], tags: categorized?.tags || [] };
-                                }),
-                                currentFolders
-                            );
-                            onFoldersUpdate(newFolders);
+                            updateFolderTree(allResults);
 
                             if (completedBatches + failedBatches >= totalBatches || (stopProcessingRef.current && activeWorkersRef.current.size === 0)) {
                                 finalizeProcessing(allResults);
@@ -276,7 +341,7 @@ export const useBookmarkProcessing = ({
             }
             return true;
         });
-    }, [bookmarks, apiConfigs, batchSize, maxRetries, processingMode, systemPrompt, customInstructions, onFoldersUpdate, addDetailedLog, onProcessingComplete]);
+    }, [batchSize, maxRetries, processingMode, systemPrompt, customInstructions, onFoldersUpdate, addDetailedLog, onProcessingComplete, autoCleanupEmptyFolders]);
 
     const resetProcessingState = useCallback(() => {
         setIsProcessing(false);

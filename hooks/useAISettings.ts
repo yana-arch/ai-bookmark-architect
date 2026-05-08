@@ -6,7 +6,8 @@ const STORAGE_KEYS = {
     CUSTOM_INSTRUCTIONS: 'ai_custom_instructions',
     BATCH_SIZE: 'ai_batch_size',
     MAX_RETRIES: 'ai_max_retries',
-    PROCESSING_MODE: 'ai_processing_mode'
+    PROCESSING_MODE: 'ai_processing_mode',
+    AUTO_CLEANUP_EMPTY_FOLDERS: 'ai_auto_cleanup_empty_folders'
 };
 
 export const useAISettings = () => {
@@ -49,20 +50,31 @@ export const useAISettings = () => {
     }, [maxRetries]);
 
     // 5. Processing Mode
-    const [processingMode, setProcessingMode] = useState<'single' | 'multi'>(() => {
+    const [processingMode, setProcessingMode] = useState<'parallel' | 'sequential'>(() => {
         const saved = localStorage.getItem(STORAGE_KEYS.PROCESSING_MODE);
-        return (saved === 'single' || saved === 'multi') ? saved : 'multi';
+        return (saved === 'parallel' || saved === 'sequential') ? saved : 'parallel';
     });
 
     useEffect(() => {
         localStorage.setItem(STORAGE_KEYS.PROCESSING_MODE, processingMode);
     }, [processingMode]);
+    
+    // 6. Auto Cleanup Empty Folders
+    const [autoCleanupEmptyFolders, setAutoCleanupEmptyFolders] = useState<boolean>(() => {
+        const saved = localStorage.getItem(STORAGE_KEYS.AUTO_CLEANUP_EMPTY_FOLDERS);
+        return saved === 'true'; // Default to false
+    });
+
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEYS.AUTO_CLEANUP_EMPTY_FOLDERS, autoCleanupEmptyFolders.toString());
+    }, [autoCleanupEmptyFolders]);
 
     return {
         systemPrompt, setSystemPrompt,
         customInstructions, setCustomInstructions,
         batchSize, setBatchSize,
         maxRetries, setMaxRetries,
-        processingMode, setProcessingMode
+        processingMode, setProcessingMode,
+        autoCleanupEmptyFolders, setAutoCleanupEmptyFolders
     };
 };

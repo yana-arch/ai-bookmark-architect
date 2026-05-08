@@ -7,7 +7,7 @@ interface TemplatesTabProps {
     onApplyFolderTemplate: (template: FolderTemplate) => void;
 }
 
-export const TemplatesTab: React.FC<TemplatesTabProps> = ({ folderTemplates, onApplyFolderTemplate }) => {
+export const TemplatesTab: React.FC<TemplatesTabProps> = ({ folderTemplates = [], onApplyFolderTemplate }) => {
     return (
         <div className="space-y-10 animate-slideIn pb-10">
             <header className="flex items-center space-x-3 mb-6">
@@ -21,7 +21,7 @@ export const TemplatesTab: React.FC<TemplatesTabProps> = ({ folderTemplates, onA
             </header>
 
             <div className="grid gap-6">
-                {folderTemplates.map(template => (
+                {(folderTemplates || []).map(template => (
                     <div key={template.id} className="bg-[#121418] border border-white/10 p-8 rounded-[2rem] hover:border-white/20 transition-all group relative overflow-hidden">
                         <div className="flex items-start justify-between relative z-10">
                             <div className="space-y-4">

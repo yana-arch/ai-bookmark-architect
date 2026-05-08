@@ -6,14 +6,19 @@ interface ConfigTabProps {
     onBatchSizeChange: (size: number) => void;
     maxRetries: number;
     onMaxRetriesChange: (retries: number) => void;
-    processingMode: 'single' | 'multi';
-    onProcessingModeChange: (mode: 'single' | 'multi') => void;
+    processingMode: 'parallel' | 'sequential';
+    onProcessingModeChange: (mode: 'parallel' | 'sequential') => void;
+    autoCleanupEmptyFolders?: boolean;
+    onAutoCleanupChange?: (cleanup: boolean) => void;
+    onCleanupEmptyFolders?: () => void;
     onClearData: () => void;
 }
 
 export const ConfigTab: React.FC<ConfigTabProps> = ({
     batchSize, onBatchSizeChange, maxRetries, onMaxRetriesChange,
-    processingMode, onProcessingModeChange, onClearData
+    processingMode, onProcessingModeChange, 
+    autoCleanupEmptyFolders = false, onAutoCleanupChange, onCleanupEmptyFolders,
+    onClearData
 }) => {
     return (
         <div className="space-y-10 animate-slideIn pb-10">
@@ -28,6 +33,7 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({
             </header>
 
             <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Throughput Tuning */}
                 <div className="bg-white/5 border border-white/10 rounded-3xl p-6 space-y-6">
                     <div className="flex items-center space-x-3 mb-2">
                         <BoltIcon className="w-4 h-4 text-yellow-400" />
@@ -62,6 +68,7 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({
                     </div>
                 </div>
 
+                {/* Processing Architecture */}
                 <div className="bg-white/5 border border-white/10 rounded-3xl p-6 space-y-6">
                     <div className="flex items-center space-x-3 mb-2">
                         <TerminalIcon className="w-4 h-4 text-blue-400" />
@@ -70,7 +77,7 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({
 
                     <div className="space-y-6">
                         <div className="flex bg-black/40 p-1 rounded-xl border border-white/5">
-                            {(['single', 'multi'] as const).map(m => (
+                            {(['sequential', 'parallel'] as const).map(m => (
                                 <button
                                     key={m}
                                     type="button"
@@ -81,19 +88,51 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({
                                         : 'text-gray-500 hover:text-gray-300'
                                     }`}
                                 >
-                                    {m === 'single' ? 'Single Stream' : 'Parallel Workers'}
+                                    {m === 'sequential' ? 'Sequential' : 'Parallel Workers'}
                                 </button>
                             ))}
                         </div>
                         <p className="text-[10px] text-gray-500 leading-relaxed">
-                            {processingMode === 'single' 
+                            {processingMode === 'sequential' 
                                 ? 'Sequential processing is safer for low-tier API keys to avoid rate limits.' 
                                 : 'Parallel processing utilizes multiple web workers for 3x-5x faster results.'}
                         </p>
                     </div>
                 </div>
+
+                {/* Workspace Optimization */}
+                <div className="bg-white/5 border border-white/10 rounded-3xl p-6 space-y-6">
+                    <div className="flex items-center space-x-3 mb-2">
+                        <TrashIcon className="w-4 h-4 text-emerald-400" />
+                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Workspace Optimization</h3>
+                    </div>
+
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between p-4 bg-black/20 rounded-2xl border border-white/5">
+                            <div>
+                                <label className="text-[11px] font-bold text-white uppercase tracking-tight">Auto Cleanup Empty Folders</label>
+                                <p className="text-[9px] text-gray-500 italic mt-0.5">Automatically remove empty folders after AI restructuring completes.</p>
+                            </div>
+                            <button
+                                onClick={() => onAutoCleanupChange?.(!autoCleanupEmptyFolders)}
+                                className={`w-12 h-6 rounded-full transition-all duration-300 relative ${autoCleanupEmptyFolders ? 'bg-emerald-500' : 'bg-gray-700'}`}
+                            >
+                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${autoCleanupEmptyFolders ? 'left-7' : 'left-1'}`} />
+                            </button>
+                        </div>
+
+                        <button
+                            onClick={onCleanupEmptyFolders}
+                            className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-bold text-gray-300 uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center space-x-2"
+                        >
+                            <TrashIcon className="w-3 h-3" />
+                            <span>Run Manual Cleanup Now</span>
+                        </button>
+                    </div>
+                </div>
             </section>
 
+            {/* Danger Zone */}
             <section className="bg-red-500/5 border border-red-500/10 rounded-3xl p-8">
                 <div className="flex items-center justify-between">
                     <div>

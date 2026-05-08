@@ -1,14 +1,20 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect } from 'react';
 import type { 
     Bookmark, Folder, ApiConfig, AppState as AppStateType, Notification, 
-    InstructionPreset, FolderTemplate, SmartClassifyRule 
+    InstructionPreset, FolderTemplate, SmartClassifyRule, CategorizedBookmark, UserCorrection,
+    TemplateSettings, ArchitectureStyle, ApiKeyStatus
 } from '../../types';
 
 import { useAppData } from '../../hooks/useAppData';
 import { useAISettings } from '../../hooks/useAISettings';
+import { useSmartClassify } from '../../hooks/useSmartClassify';
+import { useApiConfig } from '../../hooks/useApiConfig';
+import { useInstructionPresets } from '../../hooks/useInstructionPresets';
+import { useTemplateManagement } from '../../hooks/useTemplateManagement';
+import { removeEmptyFolders } from '../utils/treeUtils';
 
-interface AppContextType {
-    // Data
+// --- Data Context (Changes with user data) ---
+interface DataContextType {
     bookmarks: Bookmark[];
     setBookmarks: React.Dispatch<React.SetStateAction<Bookmark[]>>;
     folders: (Folder | Bookmark)[];
@@ -16,20 +22,31 @@ interface AppContextType {
     appState: AppStateType;
     setAppState: React.Dispatch<React.SetStateAction<AppStateType>>;
     isLoading: boolean;
-    
-    // Config
+    notifications: Notification[];
+    setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
+    smartClassifyRules: SmartClassifyRule[];
+    sessionRules: SmartClassifyRule[];
+    setSessionRules: React.Dispatch<React.SetStateAction<SmartClassifyRule[]>>;
+    isLoadingRules: boolean;
+    handleSaveSmartRule: (rule: SmartClassifyRule) => Promise<void>;
+    handleDeleteSmartRule: (id: string) => Promise<void>;
+    applySmartClassify: (bookmarksToProcess: Bookmark[], rules: SmartClassifyRule[]) => { classified: CategorizedBookmark[], remaining: Bookmark[] };
+    handleClearData: () => Promise<void>;
+    refreshData: () => Promise<void>;
+}
+
+const DataContext = createContext<DataContextType | undefined>(undefined);
+
+// --- Config Context (Stable AI/API settings) ---
+interface ConfigContextType {
     apiConfigs: ApiConfig[];
     setApiConfigs: React.Dispatch<React.SetStateAction<ApiConfig[]>>;
     instructionPresets: InstructionPreset[];
-    folderTemplates: FolderTemplate[];
-    
-    // Notifications
-    notifications: Notification[];
-    setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
-    
-    // AI Settings
+    setInstructionPresets: React.Dispatch<React.SetStateAction<InstructionPreset[]>>;
+    userCorrections: UserCorrection[];
+    setUserCorrections: React.Dispatch<React.SetStateAction<UserCorrection[]>>;
     systemPrompt: string;
-    setSystemPrompt: (prompt: string) => void;
+    setSystemPrompt: (prompt: string | ((prev: string) => string)) => void;
     customInstructions: string;
     setCustomInstructions: (inst: string) => void;
     batchSize: number;
@@ -38,35 +55,131 @@ interface AppContextType {
     setMaxRetries: (retries: number) => void;
     processingMode: 'parallel' | 'sequential';
     setProcessingMode: (mode: 'parallel' | 'sequential') => void;
-
-    // Actions
-    handleClearData: () => Promise<void>;
+    autoCleanupEmptyFolders: boolean;
+    setAutoCleanupEmptyFolders: (cleanup: boolean) => void;
+    isApiModalOpen: boolean;
+    setIsApiModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    handleSaveApiConfig: (config: ApiConfig) => Promise<void>;
+    handleDeleteApiConfig: (id: string) => Promise<void>;
+    handleToggleApiConfigStatus: (id: string, status: ApiKeyStatus) => Promise<void>;
+    isInstructionPresetModalOpen: boolean;
+    setIsInstructionPresetModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    selectedPresetId: string | null;
+    setSelectedPresetId: React.Dispatch<React.SetStateAction<string | null>>;
+    handleSaveInstructionPreset: (preset: InstructionPreset) => Promise<void>;
+    handleDeleteInstructionPreset: (id: string) => Promise<void>;
+    handleSelectPreset: (id: string | null) => void;
+    isFolderTemplateModalOpen: boolean;
+    setIsFolderTemplateModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    templateSettings: TemplateSettings;
+    setTemplateSettings: React.Dispatch<React.SetStateAction<TemplateSettings>>;
+    selectedArchitectureStyle: ArchitectureStyle;
+    handleArchitectureStyleChange: (style: ArchitectureStyle) => void;
+    handleSaveFolderTemplate: (template: FolderTemplate) => Promise<void>;
+    handleDeleteFolderTemplate: (id: string) => Promise<void>;
+    handleApplyFolderTemplate: (template: FolderTemplate) => Promise<void>;
+    handleTemplateSettingsChange: (settings: Partial<TemplateSettings>) => void;
 }
 
-const AppContext = createContext<AppContextType | undefined>(undefined);
+const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const appData = useAppData();
     const aiSettings = useAISettings();
+    const smartClassify = useSmartClassify();
+    
+    const apiConfig = useApiConfig(appData.apiConfigs, appData.setApiConfigs);
+    const instructionPresets = useInstructionPresets(appData.instructionPresets, appData.setInstructionPresets, aiSettings.setCustomInstructions);
+    const templateManagement = useTemplateManagement(
+        appData.folderTemplates, 
+        appData.setFolderTemplates, 
+        aiSettings.setSystemPrompt, 
+        appData.setNotifications
+    );
 
-    const value: AppContextType = {
-        ...appData,
+    useEffect(() => {
+        if (aiSettings.autoCleanupEmptyFolders && appData.folders.length > 0) {
+            appData.setFolders(prev => removeEmptyFolders(prev));
+        }
+    }, [aiSettings.autoCleanupEmptyFolders, appData.folders, appData.setFolders]);
+
+    const dataValue: DataContextType = {
+        bookmarks: appData.bookmarks,
+        setBookmarks: appData.setBookmarks,
+        folders: appData.folders,
+        setFolders: appData.setFolders,
+        appState: appData.appState,
+        setAppState: appData.setAppState,
+        isLoading: appData.isLoading,
+        notifications: appData.notifications,
+        setNotifications: appData.setNotifications,
+        smartClassifyRules: smartClassify.smartClassifyRules,
+        sessionRules: smartClassify.sessionRules,
+        setSessionRules: smartClassify.setSessionRules,
+        isLoadingRules: smartClassify.isLoadingRules,
+        handleSaveSmartRule: smartClassify.saveRule,
+        handleDeleteSmartRule: smartClassify.deleteRule,
+        applySmartClassify: smartClassify.applySmartClassify,
+        handleClearData: appData.handleClearData,
+        refreshData: appData.refreshData,
+    };
+
+    const configValue: ConfigContextType = {
+        apiConfigs: appData.apiConfigs,
+        setApiConfigs: appData.setApiConfigs,
+        instructionPresets: appData.instructionPresets,
+        setInstructionPresets: appData.setInstructionPresets,
+        userCorrections: appData.userCorrections,
+        setUserCorrections: appData.setUserCorrections,
         ...aiSettings,
+        isApiModalOpen: apiConfig.isApiModalOpen,
+        setIsApiModalOpen: apiConfig.setIsApiModalOpen,
+        handleSaveApiConfig: apiConfig.handleSaveApiConfig,
+        handleDeleteApiConfig: apiConfig.handleDeleteApiConfig,
+        handleToggleApiConfigStatus: apiConfig.handleToggleApiConfigStatus,
+        isInstructionPresetModalOpen: instructionPresets.isInstructionPresetModalOpen,
+        setIsInstructionPresetModalOpen: instructionPresets.setIsInstructionPresetModalOpen,
+        selectedPresetId: instructionPresets.selectedPresetId,
+        setSelectedPresetId: instructionPresets.setSelectedPresetId,
+        handleSaveInstructionPreset: instructionPresets.handleSaveInstructionPreset,
+        handleDeleteInstructionPreset: instructionPresets.handleDeleteInstructionPreset,
+        handleSelectPreset: instructionPresets.handleSelectPreset,
+        isFolderTemplateModalOpen: templateManagement.isFolderTemplateModalOpen,
+        setIsFolderTemplateModalOpen: templateManagement.setIsFolderTemplateModalOpen,
+        templateSettings: templateManagement.templateSettings,
+        setTemplateSettings: templateManagement.setTemplateSettings,
+        selectedArchitectureStyle: templateManagement.selectedArchitectureStyle,
+        handleArchitectureStyleChange: templateManagement.handleArchitectureStyleChange,
+        handleSaveFolderTemplate: templateManagement.handleSaveFolderTemplate,
+        handleDeleteFolderTemplate: templateManagement.handleDeleteFolderTemplate,
+        handleApplyFolderTemplate: templateManagement.handleApplyFolderTemplate,
+        handleTemplateSettingsChange: templateManagement.handleTemplateSettingsChange,
     };
 
     return (
-        <AppContext.Provider value={value}>
-            {children}
-        </AppContext.Provider>
+        <ConfigContext.Provider value={configValue}>
+            <DataContext.Provider value={dataValue}>
+                {children}
+            </DataContext.Provider>
+        </ConfigContext.Provider>
     );
 };
 
-export const useApp = () => {
-    const context = useContext(AppContext);
-    if (!context) {
-        throw new Error('useApp must be used within an AppProvider');
-    }
+export const useAppDataContext = () => {
+    const context = useContext(DataContext);
+    if (!context) throw new Error('useAppDataContext must be used within an AppProvider');
     return context;
 };
 
-// Provider component will be implemented in the next step
+export const useAppConfig = () => {
+    const context = useContext(ConfigContext);
+    if (!context) throw new Error('useAppConfig must be used within an AppProvider');
+    return context;
+};
+
+// Legacy support with warning-less combination
+export const useApp = () => {
+    const data = useAppDataContext();
+    const config = useAppConfig();
+    return { ...data, ...config };
+};

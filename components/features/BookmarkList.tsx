@@ -183,4 +183,4 @@ const BookmarkList: React.FC<BookmarkListProps> = ({ bookmarks, folderName, noBo
     );
 };
 
-export default BookmarkList;
+export default React.memo(BookmarkList);
