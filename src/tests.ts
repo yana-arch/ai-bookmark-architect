@@ -41,6 +41,27 @@ export const testCoreLogic = () => {
     console.log('✅ Empty Folder Removal (root empty):', cleanedTree.length === 1 && (cleanedTree[0] as Folder).name === 'Non-Empty');
     console.log('✅ Empty Folder Removal (nested empty):', !cleanedTree.some((f) => (f as Folder).name === 'Nested Empty'));
 
+    // 5. Test Path Canonicalization (The "Careful" Solution)
+    const existingTreeForPath: (Folder | Bookmark)[] = [
+        { id: 'f-design', name: 'Design', children: [
+            { id: 'f-tools', name: 'Tools', children: [], parentId: 'f-design' }
+        ], parentId: 'root' }
+    ];
+    
+    // Test Case: AI suggests ["AI", "Tools", "Design"] 
+    // Since "Design" is a Root Pillar and "Design > Tools" exists, 
+    // it should be standardized to ["Design", "Tools", "AI"]
+    const bookmarksToStandardize: (Bookmark & { path: string[] })[] = [
+        { id: 'b3', title: 'AI Design Tool', url: 'U3', path: ['AI', 'Tools', 'Design'], parentId: null, tags: [] }
+    ];
+    
+    const standardizedTree = arrayToTree(bookmarksToStandardize, existingTreeForPath);
+    const designFolder = standardizedTree.find(f => !('url' in f) && (f as Folder).name === 'Design') as Folder;
+    const toolsInDesign = designFolder?.children.find(f => !('url' in f) && (f as Folder).name === 'Tools') as Folder;
+    const aiInTools = toolsInDesign?.children.find(f => !('url' in f) && (f as Folder).name === 'AI') as Folder;
+    
+    console.log('✅ Path Canonicalization (Pillar & Hierarchy Priority):', !!aiInTools);
+
     console.groupEnd();
 };
 

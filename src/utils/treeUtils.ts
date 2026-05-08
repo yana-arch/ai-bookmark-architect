@@ -1,4 +1,5 @@
 import type { Bookmark, Folder, FolderStructureNode } from '../../types';
+import { getAllExistingPaths, standardizePath } from './pathUtils';
 
 /**
  * Converts a flat list of bookmarks with paths into a folder tree structure.
@@ -12,6 +13,7 @@ export const arrayToTree = (bookmarks: (Bookmark & { path?: string[] })[], exist
     foldersMap.set('root', root);
 
     const updatedUrls = new Set(bookmarks.map(bm => bm.url));
+    const existingPaths = getAllExistingPaths(existingTree);
 
     // Helper to clone existing tree and remove bookmarks that are being updated
     const cloneTree = (nodes: (Folder | Bookmark)[], currentPath: string[] = []): (Folder | Bookmark)[] => {
@@ -61,7 +63,9 @@ export const arrayToTree = (bookmarks: (Bookmark & { path?: string[] })[], exist
 
     bookmarks.forEach(bm => {
         if (bm.path && bm.path.length > 0) {
-            const parentFolder = getOrCreateFolder(bm.path);
+            // Standardize path before creating folders
+            const standardized = standardizePath(bm.path, existingPaths);
+            const parentFolder = getOrCreateFolder(standardized);
             parentFolder.children = [...parentFolder.children, { ...bm, parentId: parentFolder.id }];
         } else {
             root.children = [...root.children, { ...bm, parentId: 'root' }];
