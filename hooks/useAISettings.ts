@@ -122,7 +122,7 @@ export const useAISettings = () => {
             }
         }
         return {
-            flattenStructure: false,
+            maxFolderDepth: 2,
             groupByDomain: false,
             useEmojis: false,
             strictTechnical: false,

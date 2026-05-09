@@ -88,7 +88,7 @@ interface UnifiedSettingsModalProps {
     tagLanguage: string;
     onTagLanguageChange: (lang: string) => void;
     promptModifiers: PromptModifiers;
-    onPromptModifierChange: (key: keyof PromptModifiers, value: boolean) => void;
+    onPromptModifierChange: (key: keyof PromptModifiers, value: boolean | number) => void;
     autoCleanupEmptyFolders?: boolean;
     onAutoCleanupChange?: (cleanup: boolean) => void;
     onCleanupEmptyFolders?: () => void;

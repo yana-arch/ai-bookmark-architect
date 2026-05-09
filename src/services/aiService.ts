@@ -28,7 +28,7 @@ import type { PromptModifiers } from '../../types';
 function buildModifiersBlock(modifiers?: PromptModifiers): string {
     if (!modifiers) return '';
     const rules: string[] = [];
-    if (modifiers.flattenStructure) rules.push('- Flatten Structure: Keep the folder hierarchy completely flat (maximum 1 level deep). Do NOT create deeply nested folders.');
+    if (modifiers.maxFolderDepth) rules.push(`- Folder Depth Limit: Ensure the generated folder structure does NOT exceed ${modifiers.maxFolderDepth} levels of depth. Limit nesting strictly to ${modifiers.maxFolderDepth} levels.`);
     if (modifiers.groupByDomain) rules.push('- Group by Domain: Prioritize grouping bookmarks by their website/domain name first (e.g., "github.com", "youtube.com").');
     if (modifiers.useEmojis) rules.push('- Use Emojis: Prepend a relevant emoji to EVERY generated folder name (e.g., "🚀 Startup", "💻 Programming").');
     if (modifiers.strictTechnical) rules.push('- Strict Technical: Strictly use standard, professional technical terminology for categories. Avoid slang or vague terms.');
@@ -189,7 +189,7 @@ export function generateTagMappingPrompt(params: {
 
 Your task is to take a flat list of tags and map them into a logical, hierarchical folder structure.
 You MUST respect the Taxonomy Architecture defined in the system prompt above.
-Create a highly detailed, specific, and flatter folder structure. Avoid nesting folders too deeply (limit to 1-2 levels of depth maximum). Keep categories granular and visible at the top levels to provide a detailed taxonomy. Do not over-group independent topics into deep general folders.
+Create a highly detailed, specific folder structure. Keep categories granular and visible at the top levels to provide a detailed taxonomy. Do not over-group independent topics into deep general folders.
 ${buildModifiersBlock(promptModifiers)}
 Current Folder Structure (Reuse these if suitable):
 ${treeContext}
@@ -280,7 +280,7 @@ export function generateTagBatchRequestPrompt(batchIndex: number, totalBatches: 
 ${buildModifiersBlock(promptModifiers)}
 CRITICAL INSTRUCTION:
 1. Respond ONLY with a valid JSON object containing a "tagSchema" array for this specific batch.
-2. Remember to respect the taxonomy rules: create a highly detailed, specific, and flatter folder structure (limit to 1-2 levels of depth maximum).
+2. Remember to respect the taxonomy rules: create a highly detailed, specific folder structure.
 3. DO NOT create any folders named "[Unmapped Tags]", "[Uncategorized]", "Khác", "Others", or similar fallback folders. If a tag doesn't fit, find the closest semantic match.
 4. ALL generated folder names MUST be strictly written in the requested language: ${tagLanguage}.
 5. The JSON structure must be exactly:

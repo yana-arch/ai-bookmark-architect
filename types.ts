@@ -247,7 +247,7 @@ export interface SmartClassifyRule {
 }
 
 export interface PromptModifiers {
-  flattenStructure: boolean;
+  maxFolderDepth: number;
   groupByDomain: boolean;
   useEmojis: boolean;
   strictTechnical: boolean;

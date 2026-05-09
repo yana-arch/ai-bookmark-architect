@@ -37,7 +37,7 @@ interface IntelligenceTabProps {
 
     // Prompt Modifiers
     promptModifiers: PromptModifiers;
-    onPromptModifierChange: (key: keyof PromptModifiers, value: boolean) => void;
+    onPromptModifierChange: (key: keyof PromptModifiers, value: boolean | number) => void;
 
     // Lifted state for rule creation
     isAddingRule: boolean;
@@ -222,16 +222,43 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative z-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative z-10 mb-6">
+                    {/* Max Folder Depth Slider */}
+                    <div className="col-span-1 md:col-span-2 lg:col-span-3 p-5 bg-[#121418] border border-white/10 hover:border-blue-500/50 rounded-xl transition-all group">
+                        <div className="flex justify-between items-center mb-4">
+                            <div>
+                                <h4 className="text-[11px] font-bold text-white uppercase tracking-wider">Max Folder Depth</h4>
+                                <p className="text-[9px] text-gray-500">Maximum allowed nesting levels (1 = completely flat)</p>
+                            </div>
+                            <div className="text-blue-400 font-bold text-sm bg-blue-500/10 px-3 py-1 rounded-lg">
+                                {promptModifiers.maxFolderDepth || 2}
+                            </div>
+                        </div>
+                        <input 
+                            type="range" 
+                            min="1" 
+                            max="5" 
+                            value={promptModifiers.maxFolderDepth || 2} 
+                            onChange={(e) => onPromptModifierChange('maxFolderDepth', parseInt(e.target.value))}
+                            className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                        />
+                        <div className="flex justify-between text-[9px] text-gray-500 mt-2 px-1">
+                            <span>1 (Flat)</span>
+                            <span>2</span>
+                            <span>3</span>
+                            <span>4</span>
+                            <span>5 (Deep)</span>
+                        </div>
+                    </div>
+
                     {[
-                        { key: 'flattenStructure', label: 'Flatten Structure', desc: 'Max 1 level deep' },
                         { key: 'groupByDomain', label: 'Group by Domain', desc: 'Prioritize websites' },
                         { key: 'useEmojis', label: 'Use Emojis', desc: 'Add icons to names' },
                         { key: 'strictTechnical', label: 'Strict Technical', desc: 'Use standard dev terms' },
                         { key: 'groupByPurpose', label: 'Group by Purpose', desc: 'E.g., Read Later, Tools' },
                         { key: 'shortFolderNames', label: 'Short Folder Names', desc: 'Concise, 1-2 words max' },
                     ].map((mod) => {
-                        const isChecked = promptModifiers[mod.key as keyof PromptModifiers];
+                        const isChecked = promptModifiers[mod.key as keyof PromptModifiers] as boolean;
                         return (
                             <label key={mod.key} className="flex items-center space-x-3 p-4 bg-[#121418] border border-white/10 hover:border-blue-500/50 rounded-xl cursor-pointer transition-all group">
                                 <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
