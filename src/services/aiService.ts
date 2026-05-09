@@ -1,5 +1,6 @@
-import type { Bookmark, Folder, UserCorrection } from '../../types';
-export { 
+import type { Bookmark, Folder, UserCorrection, ApiConfig, AIProfile, CategorizedBookmark } from '../../types';
+import { AIClient } from './aiClient';
+import { 
     parseAIResponse, 
     validateBookmarks, 
     repairJson, 
@@ -8,6 +9,16 @@ export {
     parseTagMappingResponse,
     type TagFolderSchema
 } from '../utils/aiUtils';
+
+export { 
+    parseAIResponse, 
+    validateBookmarks, 
+    repairJson, 
+    extractBookmarksByRegex,
+    parseTagExtractionResponse,
+    parseTagMappingResponse,
+    type TagFolderSchema
+};
 
 
 /**
@@ -253,4 +264,42 @@ CRITICAL INSTRUCTION:
   ]
 }
 Do not include any explanation or markdown formatting outside the JSON object.`;
+}
+
+/**
+ * Runs a test categorization for the Prompt Playground
+ */
+export async function testCategorize(
+    bookmarks: Bookmark[],
+    profile: AIProfile,
+    apiConfigs: ApiConfig[],
+    customInstructions: string,
+    currentTree: Folder[]
+): Promise<{ categorized: CategorizedBookmark[], usage: any, rawText: string }> {
+    const availableConfigs = apiConfigs.filter(c => c.status === 'active');
+    if (availableConfigs.length === 0) throw new Error('Không có cấu hình API nào đang hoạt động.');
+
+    // Pick first active for test
+    const config = availableConfigs[0];
+    const client = new AIClient(config, profile);
+
+    const userInstructionBlock = customInstructions.trim()
+        ? `\n\nUSER'S CUSTOM INSTRUCTIONS:\n- ${customInstructions.trim().replace(/\n/g, '\n- ')}`
+        : '';
+
+    const prompt = generateCategorizationPrompt({
+        userInstructionBlock,
+        currentTree,
+        batch: bookmarks,
+    });
+
+    const response = await client.generateContent(profile.systemInstruction, prompt);
+    if (!response.text) throw new Error('AI trả về kết quả rỗng.');
+
+    const categorizedBookmarks = parseAIResponse(response.text) as CategorizedBookmark[];
+    return { 
+        categorized: categorizedBookmarks, 
+        usage: response.usage,
+        rawText: response.text 
+    };
 }

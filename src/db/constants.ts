@@ -13,3 +13,4 @@ export const ANALYTICS_STORE = 'analytics';
 export const OAUTH_TOKENS_STORE = 'oauthTokens';
 export const SMART_RULES_STORE = 'smartClassifyRules';
 export const DB_CONNECTIONS_STORE = 'dbConnections';
+export const AI_PROFILES_STORE = 'aiProfiles';

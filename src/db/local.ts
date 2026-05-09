@@ -3,12 +3,12 @@ import {
     BOOKMARKS_STORE, FOLDERS_STORE, API_CONFIGS_STORE, INSTRUCTION_PRESETS_STORE,
     FOLDER_TEMPLATES_STORE, EMPTY_FOLDER_TREES_STORE, LOGS_STORE, USER_CORRECTIONS_STORE,
     BACKUPS_STORE, SYNC_STATUS_STORE, ANALYTICS_STORE, OAUTH_TOKENS_STORE,
-    SMART_RULES_STORE, DB_CONNECTIONS_STORE
+    SMART_RULES_STORE, DB_CONNECTIONS_STORE, AI_PROFILES_STORE
 } from './constants';
 import type {
     Bookmark, Folder, ApiConfig, InstructionPreset, FolderTemplate, EmptyFolderTree,
     DetailedLog, UserCorrection, BackupMetadata, SyncStatus, AnalyticsData, OAuthToken,
-    SmartClassifyRule, DbConnection
+    SmartClassifyRule, DbConnection, AIProfile
 } from '../../types';
 
 /**
@@ -60,6 +60,7 @@ export const backupMetadataStore = new BaseStore<BackupMetadata>(BACKUPS_STORE);
 export const smartRuleStore = new BaseStore<SmartClassifyRule>(SMART_RULES_STORE);
 export const dbConnectionStore = new BaseStore<DbConnection>(DB_CONNECTIONS_STORE);
 export const oauthTokenStore = new BaseStore<OAuthToken>(OAUTH_TOKENS_STORE);
+export const aiProfileStore = new BaseStore<AIProfile>(AI_PROFILES_STORE);
 
 // Custom logic for Bookmarks (Batching)
 export const saveBookmarks = async (bookmarks: Bookmark[]): Promise<void> => {
@@ -94,7 +95,8 @@ export const clearAllData = async (): Promise<void> => {
     const stores = [
         BOOKMARKS_STORE, FOLDERS_STORE, API_CONFIGS_STORE, INSTRUCTION_PRESETS_STORE,
         FOLDER_TEMPLATES_STORE, EMPTY_FOLDER_TREES_STORE, LOGS_STORE, USER_CORRECTIONS_STORE,
-        BACKUPS_STORE, SYNC_STATUS_STORE, ANALYTICS_STORE, OAUTH_TOKENS_STORE, SMART_RULES_STORE
+        BACKUPS_STORE, SYNC_STATUS_STORE, ANALYTICS_STORE, OAUTH_TOKENS_STORE, SMART_RULES_STORE,
+        AI_PROFILES_STORE
     ];
     
     const tx = db.transaction(stores, 'readwrite');
@@ -179,3 +181,9 @@ export const saveDbConnection = (connection: DbConnection) => dbConnectionStore.
 export const getDbConnections = () => dbConnectionStore.getAll();
 export const getDbConnection = (id: string) => dbConnectionStore.get(id);
 export const deleteDbConnection = (id: string) => dbConnectionStore.delete(id);
+
+// AI Profiles
+export const saveAIProfile = (profile: AIProfile) => aiProfileStore.put(profile);
+export const getAIProfiles = () => aiProfileStore.getAll();
+export const getAIProfile = (id: string) => aiProfileStore.get(id);
+export const deleteAIProfile = (id: string) => aiProfileStore.delete(id);

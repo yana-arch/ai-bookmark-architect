@@ -1,7 +1,7 @@
 // AI Worker for multi-threaded bookmark processing
 // This worker handles AI API calls for a single batch of bookmarks
 import { AIClient } from './services/aiClient';
-import type { Bookmark, ApiConfig, UserCorrection, Folder } from '../types';
+import type { Bookmark, ApiConfig, UserCorrection, Folder, AIProfile } from '../types';
 import { 
     parseAIResponse, 
     generateCategorizationPrompt,
@@ -31,6 +31,7 @@ interface WorkerMessage {
     uniqueTags?: string[];
     tagCount?: number;
     tagLanguage?: string;
+    activeProfile?: AIProfile;
   };
 }
 
@@ -65,7 +66,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             taskType = 'categorize',
             uniqueTags = [],
             tagCount = 3,
-            tagLanguage = 'Vietnamese and Technical Terms'
+            tagLanguage = 'Vietnamese and Technical Terms',
+            activeProfile
         } = data;
 
         const availableConfigs = apiConfigs.filter(c => c.status === 'active');
@@ -86,7 +88,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
         while (attempts <= maxRetries && !success) {
             const activeConfig = availableConfigs[currentConfigIndex];
-            const client = new AIClient(activeConfig);
+            const client = new AIClient(activeConfig, activeProfile);
             
             try {
                 attempts++;

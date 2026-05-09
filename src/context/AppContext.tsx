@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect } from 'react';
 import type { 
     Bookmark, Folder, ApiConfig, AppState as AppStateType, Notification, 
     InstructionPreset, FolderTemplate, SmartClassifyRule, CategorizedBookmark, UserCorrection,
-    TemplateSettings, ArchitectureStyle, ApiKeyStatus
+    TemplateSettings, ArchitectureStyle, ApiKeyStatus, AIProfile
 } from '../../types';
 
 import { useAppData } from '../../hooks/useAppData';
@@ -11,6 +11,7 @@ import { useSmartClassify } from '../../hooks/useSmartClassify';
 import { useApiConfig } from '../../hooks/useApiConfig';
 import { useInstructionPresets } from '../../hooks/useInstructionPresets';
 import { useTemplateManagement } from '../../hooks/useTemplateManagement';
+import { useAIProfiles } from '../../hooks/useAIProfiles';
 import { removeEmptyFolders } from '../utils/treeUtils';
 
 // --- Data Context (Changes with user data) ---
@@ -49,6 +50,13 @@ interface ConfigContextType {
     setSystemPrompt: (prompt: string | ((prev: string) => string)) => void;
     customInstructions: string;
     setCustomInstructions: (inst: string) => void;
+    aiProfiles: AIProfile[];
+    setAiProfiles: React.Dispatch<React.SetStateAction<AIProfile[]>>;
+    activeProfile: AIProfile | null;
+    activeProfileId: string | null;
+    setActiveProfileId: React.Dispatch<React.SetStateAction<string | null>>;
+    handleSaveProfile: (profile: AIProfile) => Promise<void>;
+    handleDeleteProfile: (id: string) => Promise<void>;
     batchSize: number;
     setBatchSize: (size: number) => void;
     maxRetries: number;
@@ -103,6 +111,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         appData.setNotifications,
         aiSettings.tagDrivenMode
     );
+    
+    const aiProfilesLogic = useAIProfiles(appData.aiProfiles, appData.setAiProfiles, appData.setNotifications);
 
     useEffect(() => {
         if (aiSettings.autoCleanupEmptyFolders && appData.folders.length > 0) {
@@ -139,6 +149,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         userCorrections: appData.userCorrections,
         setUserCorrections: appData.setUserCorrections,
         ...aiSettings,
+        aiProfiles: appData.aiProfiles,
+        setAiProfiles: appData.setAiProfiles,
+        activeProfile: aiProfilesLogic.activeProfile,
+        activeProfileId: aiProfilesLogic.activeProfileId,
+        setActiveProfileId: aiProfilesLogic.setActiveProfileId,
+        handleSaveProfile: aiProfilesLogic.handleSaveProfile,
+        handleDeleteProfile: aiProfilesLogic.handleDeleteProfile,
         isApiModalOpen: apiConfig.isApiModalOpen,
         setIsApiModalOpen: apiConfig.setIsApiModalOpen,
         handleSaveApiConfig: apiConfig.handleSaveApiConfig,

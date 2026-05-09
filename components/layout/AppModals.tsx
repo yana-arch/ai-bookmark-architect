@@ -83,7 +83,12 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
         templateSettings,
         setTemplateSettings,
         selectedArchitectureStyle,
-        handleArchitectureStyleChange
+        handleArchitectureStyleChange,
+        aiProfiles,
+        activeProfileId,
+        setActiveProfileId,
+        handleSaveProfile,
+        handleDeleteProfile
     } = useApp();
 
     const handleManualCleanup = () => {
@@ -118,6 +123,13 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     smartClassifyRules={smartClassifyRules}
                     onSaveSmartRule={handleSaveSmartRule}
                     onDeleteSmartRule={handleDeleteSmartRule}
+
+                    // AI Profiles
+                    aiProfiles={aiProfiles}
+                    activeProfileId={activeProfileId}
+                    setActiveProfileId={setActiveProfileId}
+                    onSaveProfile={handleSaveProfile}
+                    onDeleteProfile={handleDeleteProfile}
 
                     // Templates
                     folderTemplates={folderTemplates}

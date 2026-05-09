@@ -53,7 +53,15 @@ const App: React.FC = () => {
         smartClassifyRules, 
         sessionRules, setSessionRules, 
         handleSaveSmartRule, handleDeleteSmartRule, 
-        applySmartClassify 
+        applySmartClassify,
+        
+        // AI Profiles
+        aiProfiles,
+        activeProfile,
+        activeProfileId,
+        setActiveProfileId,
+        handleSaveProfile,
+        handleDeleteProfile
     } = useApp();
 
     // UI Local State
@@ -102,7 +110,8 @@ const App: React.FC = () => {
         onFoldersUpdate: setFolders,
         onNotificationsAdd: handleNotificationsAdd,
         onProcessingComplete: handleProcessingComplete,
-        autoCleanupEmptyFolders
+        autoCleanupEmptyFolders,
+        activeProfile
     });
 
     const handleForceStopWrapper = useCallback(() => {

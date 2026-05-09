@@ -12,7 +12,8 @@ import type {
     ApiProvider,
     DuplicateStats,
     ExportOptions,
-    Notification
+    Notification,
+    AIProfile
 } from '@/types';
 import {
     CogIcon, XIcon, AILogoIcon, TerminalIcon, LayersIcon,
@@ -52,6 +53,13 @@ interface UnifiedSettingsModalProps {
     smartClassifyRules: SmartClassifyRule[];
     onSaveSmartRule: (rule: SmartClassifyRule) => Promise<void> | void;
     onDeleteSmartRule: (id: string) => Promise<void> | void;
+
+    // AI Profiles
+    aiProfiles: AIProfile[];
+    activeProfileId: string | null;
+    setActiveProfileId: (id: string | null) => void;
+    onSaveProfile: (profile: AIProfile) => Promise<void> | void;
+    onDeleteProfile: (id: string) => Promise<void> | void;
 
     // Architecture
     selectedArchitectureStyle: ArchitectureStyle;
@@ -117,6 +125,7 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
         systemPrompt, onSystemPromptChange, planningPrompt, onPlanningPromptChange,
         customInstructions, onCustomInstructionsChange, instructionPresets,
         smartClassifyRules, onSaveSmartRule, onDeleteSmartRule,
+        aiProfiles, activeProfileId, setActiveProfileId, onSaveProfile, onDeleteProfile,
         selectedArchitectureStyle, onArchitectureStyleChange,
         folderTemplates, onApplyFolderTemplate, onSaveFolderTemplate,
         batchSize, onBatchSizeChange, maxRetries, onMaxRetriesChange, 
@@ -287,6 +296,13 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
                                 smartClassifyRules={smartClassifyRules}
                                 onSaveSmartRule={onSaveSmartRule}
                                 onDeleteSmartRule={onDeleteSmartRule}
+                                aiProfiles={aiProfiles}
+                                activeProfileId={activeProfileId}
+                                setActiveProfileId={setActiveProfileId}
+                                handleSaveProfile={onSaveProfile}
+                                handleDeleteProfile={onDeleteProfile}
+                                apiConfigs={apiConfigs}
+                                currentTree={folders as Folder[]}
                                 selectedStyle={selectedArchitectureStyle}
                                 onStyleChange={onArchitectureStyleChange}
                                 tagDrivenMode={tagDrivenMode}

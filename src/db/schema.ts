@@ -14,14 +14,15 @@ import {
     ANALYTICS_STORE,
     OAUTH_TOKENS_STORE,
     SMART_RULES_STORE,
-    DB_CONNECTIONS_STORE
+    DB_CONNECTIONS_STORE,
+    AI_PROFILES_STORE
 } from './constants';
 
 let dbPromise: Promise<IDBPDatabase>;
 
 export const initDB = () => {
     if (!dbPromise) {
-        dbPromise = openDB(DB_NAME, 9, {
+        dbPromise = openDB(DB_NAME, 10, {
             upgrade(db, oldVersion) {
                 if (oldVersion < 1) {
                     if (!db.objectStoreNames.contains(BOOKMARKS_STORE)) {
@@ -93,6 +94,11 @@ export const initDB = () => {
                     }
                     if (!db.objectStoreNames.contains(DB_CONNECTIONS_STORE)) {
                         db.createObjectStore(DB_CONNECTIONS_STORE, { keyPath: 'id' });
+                    }
+                }
+                if (oldVersion < 10) {
+                    if (!db.objectStoreNames.contains(AI_PROFILES_STORE)) {
+                        db.createObjectStore(AI_PROFILES_STORE, { keyPath: 'id' });
                     }
                 }
             },

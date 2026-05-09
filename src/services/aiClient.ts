@@ -1,4 +1,4 @@
-import type { ApiConfig } from '../../types';
+import type { ApiConfig, AIProfile } from '../../types';
 
 /**
  * Interface representing a standardized AI response.
@@ -27,13 +27,16 @@ export interface ChatMessage {
  */
 export class AIClient {
     private config: ApiConfig;
+    private profile?: AIProfile;
 
     /**
      * Initializes the AIClient with a specific configuration.
      * @param config The API configuration including provider, key, and model.
+     * @param profile The AI Profile containing model parameters.
      */
-    constructor(config: ApiConfig) {
+    constructor(config: ApiConfig, profile?: AIProfile) {
         this.config = config;
+        this.profile = profile;
     }
 
     /**
@@ -97,6 +100,12 @@ export class AIClient {
                 }],
                 generationConfig: {
                     responseMimeType: 'application/json',
+                    ...(this.profile?.temperature !== undefined ? { temperature: this.profile.temperature } : {}),
+                    ...(this.profile?.topP !== undefined ? { topP: this.profile.topP } : {}),
+                    ...(this.profile?.topK !== undefined ? { topK: this.profile.topK } : {}),
+                    ...(this.profile?.maxOutputTokens !== undefined ? { maxOutputTokens: this.profile.maxOutputTokens } : {}),
+                    ...(this.profile?.frequencyPenalty !== undefined ? { frequencyPenalty: this.profile.frequencyPenalty } : {}),
+                    ...(this.profile?.presencePenalty !== undefined ? { presencePenalty: this.profile.presencePenalty } : {}),
                 }
             })
         });
@@ -146,6 +155,12 @@ export class AIClient {
                 contents: contents,
                 generationConfig: {
                     responseMimeType: 'application/json',
+                    ...(this.profile?.temperature !== undefined ? { temperature: this.profile.temperature } : {}),
+                    ...(this.profile?.topP !== undefined ? { topP: this.profile.topP } : {}),
+                    ...(this.profile?.topK !== undefined ? { topK: this.profile.topK } : {}),
+                    ...(this.profile?.maxOutputTokens !== undefined ? { maxOutputTokens: this.profile.maxOutputTokens } : {}),
+                    ...(this.profile?.frequencyPenalty !== undefined ? { frequencyPenalty: this.profile.frequencyPenalty } : {}),
+                    ...(this.profile?.presencePenalty !== undefined ? { presencePenalty: this.profile.presencePenalty } : {}),
                 }
             })
         });
@@ -200,7 +215,12 @@ export class AIClient {
             body: JSON.stringify({
                 model: model,
                 messages: apiMessages,
-                response_format: { type: 'json_object' }
+                response_format: { type: 'json_object' },
+                ...(this.profile?.temperature !== undefined ? { temperature: this.profile.temperature } : {}),
+                ...(this.profile?.topP !== undefined ? { top_p: this.profile.topP } : {}),
+                ...(this.profile?.maxOutputTokens !== undefined ? { max_tokens: this.profile.maxOutputTokens } : {}),
+                ...(this.profile?.frequencyPenalty !== undefined ? { frequency_penalty: this.profile.frequencyPenalty } : {}),
+                ...(this.profile?.presencePenalty !== undefined ? { presence_penalty: this.profile.presencePenalty } : {}),
             })
         });
 

@@ -60,6 +60,21 @@ export interface ApiConfig {
   status: ApiKeyStatus;
 }
 
+export interface AIProfile {
+  id: string;
+  name: string;
+  isDefault?: boolean;
+  systemInstruction?: string;
+  temperature?: number;
+  topK?: number;
+  topP?: number;
+  maxOutputTokens?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface DetailedLog {
   id: string;
   timestamp: string;

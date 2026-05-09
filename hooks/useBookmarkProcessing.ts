@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog } from '../types';
+import { type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, type AIProfile } from '../types';
 import { arrayToTree, removeEmptyFolders, distributeBookmarksByTagSchema } from '../src/utils/treeUtils';
 import { perfMonitor } from '../src/performance';
 import { saveLog } from '../db';
@@ -20,6 +20,7 @@ interface UseBookmarkProcessingProps {
     onNotificationsAdd: (notification: { id: string, message: string, type: 'info' | 'error' | 'success' | 'warning' }) => void;
     onProcessingComplete?: (hasError: boolean) => void;
     autoCleanupEmptyFolders?: boolean;
+    activeProfile: AIProfile | null;
 }
 
 // Helper to simplify folder structure for AI context (removes IDs and Bookmarks)
@@ -55,7 +56,8 @@ export const useBookmarkProcessing = ({
     onFoldersUpdate,
     onNotificationsAdd,
     onProcessingComplete,
-    autoCleanupEmptyFolders = false
+    autoCleanupEmptyFolders = false,
+    activeProfile
 }: UseBookmarkProcessingProps) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState({ current: 0, total: 0 });
@@ -313,7 +315,8 @@ export const useBookmarkProcessing = ({
                             maxRetries,
                             currentTree,
                             taskType: 'map_tags_to_tree',
-                            uniqueTags
+                            uniqueTags,
+                            activeProfile
                         }
                     });
                 };
@@ -338,7 +341,8 @@ export const useBookmarkProcessing = ({
                             maxRetries,
                             taskType: 'extract_tags',
                             tagCount,
-                            tagLanguage
+                            tagLanguage,
+                            activeProfile
                         }
                     });
                 };
@@ -532,7 +536,8 @@ export const useBookmarkProcessing = ({
                         userInstructionBlock,
                         apiConfigs: availableKeys,
                         maxRetries,
-                        currentTree
+                        currentTree,
+                        activeProfile
                     }
                 });
             };
@@ -604,7 +609,7 @@ export const useBookmarkProcessing = ({
             }
             return true;
         });
-    }, [batchSize, maxRetries, processingMode, tagDrivenMode, tagCount, tagLanguage, systemPrompt, customInstructions, onFoldersUpdate, addDetailedLog, onProcessingComplete, autoCleanupEmptyFolders]);
+    }, [batchSize, maxRetries, processingMode, tagDrivenMode, tagCount, tagLanguage, systemPrompt, customInstructions, onFoldersUpdate, addDetailedLog, onProcessingComplete, autoCleanupEmptyFolders, activeProfile]);
 
     const resetProcessingState = useCallback(() => {
         setIsProcessing(false);

@@ -41,7 +41,7 @@ const RestructurePanel: React.FC<RestructurePanelProps> = React.memo((props) => 
     } = props;
     
     const { appState } = useAppDataContext();
-    const { apiConfigs } = useAppConfig();
+    const { apiConfigs, aiProfiles, activeProfileId, setActiveProfileId } = useAppConfig();
 
     const progressPercentage = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
 
@@ -78,9 +78,24 @@ const RestructurePanel: React.FC<RestructurePanelProps> = React.memo((props) => 
                             <span className="text-4xl text-sky-400">⚡</span>
                         </div>
                         <h3 className="text-2xl font-bold text-white mb-2">Sẵn Sàng Phân Loại</h3>
-                        <p className="text-gray-400 mb-8">
+                        <p className="text-gray-400 mb-6">
                             Dữ liệu đã được tải. Hãy bắt đầu quá trình tái cấu trúc bằng AI.
                         </p>
+
+                        <div className="w-full mb-6 text-left">
+                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Cấu hình AI</label>
+                            <select
+                                value={activeProfileId || ''}
+                                onChange={(e) => setActiveProfileId(e.target.value || null)}
+                                className="w-full bg-[#121418] border border-white/10 rounded-lg p-2 text-sm text-gray-200 outline-none focus:ring-2 focus:ring-sky-500/50"
+                            >
+                                <option value="" disabled>-- Chọn cấu hình --</option>
+                                {aiProfiles.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name} {p.isDefault ? '(Mặc định)' : ''}</option>
+                                ))}
+                            </select>
+                        </div>
+
                         <div className="space-y-4 w-full">
                             <button
                                 onClick={onStart}

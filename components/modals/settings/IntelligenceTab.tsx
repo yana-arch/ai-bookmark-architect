@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import type { InstructionPreset, SmartClassifyRule, ArchitectureStyle } from '@/types';
+import type { InstructionPreset, SmartClassifyRule, ArchitectureStyle, AIProfile, ApiConfig, Folder } from '@/types';
 import { TagIcon, LinkIcon, TrashIcon, SparklesIcon, AILogoIcon, LayersIcon, ChipIcon, XIcon } from '../../ui/Icons';
 import { ARCHITECTURE_STYLES } from '@/src/architectureStyles';
+import AIProfilesManager from './AIProfilesManager';
 
 interface IntelligenceTabProps {
     instructionPresets: InstructionPreset[];
@@ -12,6 +13,15 @@ interface IntelligenceTabProps {
     smartClassifyRules: SmartClassifyRule[];
     onSaveSmartRule: (rule: SmartClassifyRule) => Promise<void> | void;
     onDeleteSmartRule: (id: string) => Promise<void> | void;
+    
+    // AI Profiles Props
+    aiProfiles: AIProfile[];
+    activeProfileId: string | null;
+    setActiveProfileId: (id: string | null) => void;
+    handleSaveProfile: (profile: AIProfile) => Promise<void> | void;
+    handleDeleteProfile: (id: string) => Promise<void> | void;
+    apiConfigs: ApiConfig[];
+    currentTree: Folder[];
     
     // Architecture props
     selectedStyle: ArchitectureStyle;
@@ -39,6 +49,7 @@ interface IntelligenceTabProps {
 export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
     instructionPresets, onCustomInstructionsChange, systemPrompt,
     onSystemPromptChange, customInstructions, smartClassifyRules, onSaveSmartRule, onDeleteSmartRule,
+    aiProfiles, activeProfileId, setActiveProfileId, handleSaveProfile, handleDeleteProfile, apiConfigs, currentTree,
     selectedStyle, onStyleChange,
     tagDrivenMode, onTagDrivenModeChange, tagCount, onTagCountChange, tagLanguage, onTagLanguageChange,
     isAddingRule, setIsAddingRule, newRulePattern, setNewRulePattern, newRuleType, setNewRuleType, newRulePath, setNewRulePath
@@ -181,6 +192,17 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
                 )}
             </section>
 
+            <AIProfilesManager 
+                aiProfiles={aiProfiles}
+                activeProfileId={activeProfileId}
+                setActiveProfileId={setActiveProfileId}
+                onSaveProfile={handleSaveProfile}
+                onDeleteProfile={handleDeleteProfile}
+                apiConfigs={apiConfigs}
+                currentTree={currentTree}
+                customInstructions={customInstructions}
+            />
+
             <section className="bg-white/5 border border-white/10 rounded-3xl p-8 relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-8 opacity-[0.02] pointer-events-none">
                     <AILogoIcon className="w-32 h-32 text-white" />
@@ -189,7 +211,7 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
                 <div className="flex items-center justify-between mb-8 relative z-10">
                     <div className="flex items-center space-x-3">
                         <AILogoIcon className="w-5 h-5 text-emerald-400" />
-                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Prompt Engineering</h3>
+                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Behavioral Overrides</h3>
                     </div>
                     <div className="flex items-center space-x-2 bg-black/40 p-1 rounded-xl border border-white/5">
                         {instructionPresets.map(preset => (
@@ -206,35 +228,12 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
 
                 <div className="space-y-8 relative z-10">
                     <div className="flex flex-col space-y-2">
-                        <div className="flex justify-between items-end px-1">
-                            <div className="flex items-center space-x-2">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Base System Architecture</label>
-                                <span className="text-[9px] bg-white/5 text-gray-600 px-1.5 py-0.5 rounded font-mono">v1.4.0-CORE</span>
-                            </div>
-                            <span className="text-[9px] text-emerald-500 font-mono">INJECTED WITH {ARCHITECTURE_STYLES.find(s => s.id === selectedStyle)?.name} LOGIC</span>
-                        </div>
-                        <div className="relative group">
-                            <textarea 
-                                value={systemPrompt} onChange={e => onSystemPromptChange(e.target.value)}
-                                className="w-full h-48 bg-[#121418] border border-white/10 rounded-2xl p-5 text-xs text-gray-400 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none resize-none font-mono leading-relaxed transition-all"
-                                placeholder="Core AI logic definition..."
-                            />
-                            <div className="absolute top-4 right-4 opacity-20 group-hover:opacity-40 transition-opacity">
-                                <LayersIcon className="w-5 h-5 text-white" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col space-y-2">
-                        <div className="flex justify-between items-end px-1">
-                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Behavioral Overrides</label>
-                            <span className="text-[9px] text-blue-400 font-mono">DYNAMIC USER INSTRUCTIONS</span>
-                        </div>
                         <textarea 
                             value={customInstructions} onChange={e => onCustomInstructionsChange(e.target.value)}
                             className="w-full h-32 bg-[#121418] border border-white/10 rounded-2xl p-5 text-sm text-gray-200 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none resize-none transition-all shadow-inner"
                             placeholder="Add specific rules (e.g. 'Always use Vietnamese', 'Prefer deep nesting')..."
                         />
+                        <p className="text-[10px] text-gray-500 italic px-1">Các quy tắc này sẽ được ưu tiên cao nhất, ghi đè lên System Prompt của Profile hiện tại.</p>
                     </div>
                 </div>
             </section>

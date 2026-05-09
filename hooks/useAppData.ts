@@ -3,7 +3,7 @@ import * as db from '../db';
 import { perfMonitor } from '../src/performance';
 import { backupScheduler } from '../src/services/backupScheduler';
 import { createMockData } from '../src/utils/mockUtils';
-import { AppState, Bookmark, Folder, ApiConfig, InstructionPreset, FolderTemplate, UserCorrection } from '../types';
+import { AppState, Bookmark, Folder, ApiConfig, InstructionPreset, FolderTemplate, UserCorrection, AIProfile } from '../types';
 
 export const useAppData = () => {
     const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
@@ -14,6 +14,7 @@ export const useAppData = () => {
     const [instructionPresets, setInstructionPresets] = useState<InstructionPreset[]>([]);
     const [folderTemplates, setFolderTemplates] = useState<FolderTemplate[]>([]);
     const [userCorrections, setUserCorrections] = useState<UserCorrection[]>([]);
+    const [aiProfiles, setAiProfiles] = useState<AIProfile[]>([]);
     const [notifications, setNotifications] = useState<{ id: string, message: string, type: 'info' | 'error' | 'success' | 'warning', duration?: number, action?: { label: string, onClick: () => void } }[]>([]);
 
     // Function to initialize default templates
@@ -154,6 +155,49 @@ export const useAppData = () => {
         setFolderTemplates(defaultTemplates);
     }, []);
 
+    const initializeDefaultAIProfiles = useCallback(async () => {
+        const defaultProfiles: AIProfile[] = [
+            {
+                id: 'profile-default',
+                name: 'Cơ bản (Khuyên dùng)',
+                isDefault: true,
+                systemInstruction: 'You are an intelligent bookmark organizer. Categorize bookmarks into a clean, hierarchical folder structure in VIETNAMESE.',
+                temperature: 0.2,
+                topK: 40,
+                topP: 0.95,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            },
+            {
+                id: 'profile-creative',
+                name: 'Sáng tạo (Thư mục mới)',
+                isDefault: true,
+                systemInstruction: 'You are an intelligent bookmark organizer. You are encouraged to create new and creative folder categories based on the content of the bookmarks.',
+                temperature: 0.7,
+                topK: 40,
+                topP: 0.95,
+                presencePenalty: 0.1,
+                frequencyPenalty: 0.1,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            },
+            {
+                id: 'profile-strict',
+                name: 'Nghiêm ngặt (Gộp nhóm)',
+                isDefault: true,
+                systemInstruction: 'You are a strict taxonomy organizer. Do NOT create new folders unless absolutely necessary. Consolidate bookmarks into the most suitable existing folders.',
+                temperature: 0.0,
+                topK: 1,
+                topP: 0.1,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            }
+        ];
+
+        await Promise.all(defaultProfiles.map(profile => db.saveAIProfile(profile)));
+        setAiProfiles(defaultProfiles);
+    }, []);
+
     const loadData = useCallback(async () => {
         await perfMonitor.timeAsyncFunction('app_load_data', async () => {
             setIsLoading(true);
@@ -163,15 +207,21 @@ export const useAppData = () => {
             const savedInstructionPresets = await db.getInstructionPresets();
             const savedFolderTemplates = await db.getFolderTemplates();
             const savedUserCorrections = await db.getUserCorrections();
+            const savedAIProfiles = await db.getAIProfiles();
 
             setApiConfigs(savedApiConfigs || []);
             setInstructionPresets(savedInstructionPresets || []);
             setFolderTemplates(savedFolderTemplates || []);
             setUserCorrections(savedUserCorrections || []);
+            setAiProfiles(savedAIProfiles || []);
 
             // Initialize default templates if none exist
             if (!savedFolderTemplates || savedFolderTemplates.length === 0) {
                 await initializeDefaultTemplates();
+            }
+
+            if (!savedAIProfiles || savedAIProfiles.length === 0) {
+                await initializeDefaultAIProfiles();
             }
 
             // Initialize backup scheduler
@@ -193,7 +243,7 @@ export const useAppData = () => {
             }
             setIsLoading(false);
         });
-    }, [initializeDefaultTemplates]);
+    }, [initializeDefaultTemplates, initializeDefaultAIProfiles]);
 
     useEffect(() => {
         loadData();
@@ -226,6 +276,8 @@ export const useAppData = () => {
         setFolderTemplates,
         userCorrections,
         setUserCorrections,
+        aiProfiles,
+        setAiProfiles,
         notifications,
         setNotifications,
         handleClearData,
