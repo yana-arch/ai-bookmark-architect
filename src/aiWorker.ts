@@ -121,7 +121,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                     const analysisPrompt = generateTagAnalysisPrompt({
                         userInstructionBlock,
                         uniqueTags,
-                        currentTree: filteredTree
+                        currentTree: filteredTree,
+                        tagLanguage
                     });
 
                     // Initial call to get batching plan
@@ -158,7 +159,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                             batchIndex
                         } as WorkerResponse);
 
-                        const batchRequestPrompt = generateTagBatchRequestPrompt(i, totalBatches);
+                        const batchRequestPrompt = generateTagBatchRequestPrompt(i, totalBatches, tagLanguage);
                         history.push({ role: 'user', content: batchRequestPrompt });
 
                         const { text: batchText, usage: batchUsage } = await client.generateChatContent(systemPrompt, history);
@@ -193,7 +194,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                         currentTree,
                         batch,
                         userHistory,
-                        domainKnowledge
+                        domainKnowledge,
+                        tagLanguage
                     });
 
                     const { text: responseText, usage: responseUsage } = await client.generateContent(systemPrompt, userPrompt);

@@ -30,13 +30,15 @@ export function generateCategorizationPrompt(params: {
     batch: Bookmark[];
     userHistory?: UserCorrection[];
     domainKnowledge?: string;
+    tagLanguage?: string;
 }): string {
     const {
         userInstructionBlock,
         currentTree,
         batch,
         userHistory,
-        domainKnowledge
+        domainKnowledge,
+        tagLanguage = 'English'
     } = params;
 
     const bookmarksList = batch.map(b => `- ${b.title} (${b.url})`).join('\n');
@@ -81,7 +83,8 @@ CRITICAL INSTRUCTION:
    - "url": EXACT original URL (Do not modify!)
    - "path": Array of folder names (e.g., ["Tech", "React"])
    - "tags": Array of keywords
-4. The JSON structure:
+4. Folder names and tags MUST be written in the language specified: ${tagLanguage}.
+5. The JSON structure:
 {
   "bookmarks": [
     {
@@ -139,8 +142,9 @@ export function generateTagMappingPrompt(params: {
     userInstructionBlock: string;
     uniqueTags: string[];
     currentTree: Folder[];
+    tagLanguage?: string;
 }): string {
-    const { userInstructionBlock, uniqueTags, currentTree } = params;
+    const { userInstructionBlock, uniqueTags, currentTree, tagLanguage = 'English' } = params;
 
     // Recursive helper to get full tree context (with depth limit)
     const getFullTreeContext = (folders: any[], depth: number = 0): any[] => {
@@ -180,7 +184,8 @@ CRITICAL INSTRUCTION:
 4. If a tag is very general (like "Resources" or "Web"), try to find a more specific child folder or create one.
 5. Ensure ALL tags from the list are mapped somewhere.
 6. DO NOT create any folders named "[Unmapped Tags]", "[Uncategorized]", "Khác", "Others", or similar fallback folders. If a tag doesn't fit, find the closest semantic match.
-7. The JSON structure:
+7. ALL generated folder names MUST be strictly written in the requested language: ${tagLanguage}.
+8. The JSON structure:
 {
   "tagSchema": [
     {
@@ -206,8 +211,9 @@ export function generateTagAnalysisPrompt(params: {
     userInstructionBlock: string;
     uniqueTags: string[];
     currentTree: Folder[];
+    tagLanguage?: string;
 }): string {
-    const { userInstructionBlock, uniqueTags, currentTree } = params;
+    const { userInstructionBlock, uniqueTags, currentTree, tagLanguage = 'English' } = params;
 
     const getFullTreeContext = (folders: any[], depth: number = 0): any[] => {
         if (depth > 4) return []; 
@@ -231,6 +237,8 @@ ${treeContext}
 All Unique Tags to Map (${uniqueTags.length} tags):
 [${tagsList}]
 
+Target Language for Folders: ${tagLanguage}
+
 CRITICAL INSTRUCTION FOR THIS STEP:
 1. You are constrained by output token limits. A single JSON response containing a massive schema might exceed your output limit.
 2. Calculate how many batches (totalBatches) you need to safely return the complete TagFolderSchema without being truncated. Assume you can safely return about 150-200 mapped tags per batch.
@@ -246,14 +254,15 @@ Do not include any explanation or markdown formatting outside the JSON object.`;
 /**
  * Generates prompt to request a specific batch of the schema in the stateful chat session.
  */
-export function generateTagBatchRequestPrompt(batchIndex: number, totalBatches: number): string {
+export function generateTagBatchRequestPrompt(batchIndex: number, totalBatches: number, tagLanguage: string = 'English'): string {
     return `Please generate the TagFolderSchema for batch ${batchIndex} of ${totalBatches}.
 
 CRITICAL INSTRUCTION:
 1. Respond ONLY with a valid JSON object containing a "tagSchema" array for this specific batch.
 2. Remember to respect the taxonomy rules: create a highly detailed, specific, and flatter folder structure (limit to 1-2 levels of depth maximum).
 3. DO NOT create any folders named "[Unmapped Tags]", "[Uncategorized]", "Khác", "Others", or similar fallback folders. If a tag doesn't fit, find the closest semantic match.
-4. The JSON structure must be exactly:
+4. ALL generated folder names MUST be strictly written in the requested language: ${tagLanguage}.
+5. The JSON structure must be exactly:
 {
   "tagSchema": [
     {
