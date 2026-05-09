@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import type { InstructionPreset, SmartClassifyRule, ArchitectureStyle, AIProfile, ApiConfig, Folder } from '@/types';
-import { TagIcon, LinkIcon, TrashIcon, SparklesIcon, AILogoIcon, LayersIcon, ChipIcon, XIcon } from '../../ui/Icons';
+import type { InstructionPreset, SmartClassifyRule, ArchitectureStyle, AIProfile, ApiConfig, Folder, PromptModifiers } from '@/types';
+import { TagIcon, LinkIcon, TrashIcon, SparklesIcon, AILogoIcon, LayersIcon, ChipIcon, XIcon, FolderIcon } from '../../ui/Icons';
 import { ARCHITECTURE_STYLES } from '@/src/architectureStyles';
 import AIProfilesManager from './AIProfilesManager';
 
@@ -35,6 +35,10 @@ interface IntelligenceTabProps {
     tagLanguage: string;
     onTagLanguageChange: (lang: string) => void;
 
+    // Prompt Modifiers
+    promptModifiers: PromptModifiers;
+    onPromptModifierChange: (key: keyof PromptModifiers, value: boolean) => void;
+
     // Lifted state for rule creation
     isAddingRule: boolean;
     setIsAddingRule: (isAdding: boolean) => void;
@@ -52,6 +56,7 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
     aiProfiles, activeProfileId, setActiveProfileId, handleSaveProfile, handleDeleteProfile, apiConfigs, currentTree,
     selectedStyle, onStyleChange,
     tagDrivenMode, onTagDrivenModeChange, tagCount, onTagCountChange, tagLanguage, onTagLanguageChange,
+    promptModifiers, onPromptModifierChange,
     isAddingRule, setIsAddingRule, newRulePattern, setNewRulePattern, newRuleType, setNewRuleType, newRulePath, setNewRulePath
 }) => {
     const handleAddRule = async (e: React.FormEvent) => {
@@ -202,6 +207,53 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
                 currentTree={currentTree}
                 customInstructions={customInstructions}
             />
+
+            {/* Prompt Modifiers Section */}
+            <section className="bg-white/5 border border-white/10 rounded-3xl p-8 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 opacity-[0.02] pointer-events-none">
+                    <FolderIcon className="w-32 h-32 text-white" />
+                </div>
+
+                <div className="flex items-center space-x-3 mb-8 relative z-10">
+                    <SparklesIcon className="w-5 h-5 text-blue-400" />
+                    <div>
+                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Structural Requirements</h3>
+                        <p className="text-[9px] text-gray-500 italic mt-0.5">Prompt Modifiers for Folder Formatting</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative z-10">
+                    {[
+                        { key: 'flattenStructure', label: 'Flatten Structure', desc: 'Max 1 level deep' },
+                        { key: 'groupByDomain', label: 'Group by Domain', desc: 'Prioritize websites' },
+                        { key: 'useEmojis', label: 'Use Emojis', desc: 'Add icons to names' },
+                        { key: 'strictTechnical', label: 'Strict Technical', desc: 'Use standard dev terms' },
+                        { key: 'groupByPurpose', label: 'Group by Purpose', desc: 'E.g., Read Later, Tools' },
+                        { key: 'shortFolderNames', label: 'Short Folder Names', desc: 'Concise, 1-2 words max' },
+                    ].map((mod) => {
+                        const isChecked = promptModifiers[mod.key as keyof PromptModifiers];
+                        return (
+                            <label key={mod.key} className="flex items-center space-x-3 p-4 bg-[#121418] border border-white/10 hover:border-blue-500/50 rounded-xl cursor-pointer transition-all group">
+                                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
+                                    isChecked ? 'bg-blue-500 border-blue-500' : 'border-white/20 group-hover:border-white/40'
+                                }`}>
+                                    {isChecked && <div className="w-2 h-2 bg-white rounded-sm"></div>}
+                                </div>
+                                <div>
+                                    <h4 className="text-[11px] font-bold text-white uppercase tracking-wider">{mod.label}</h4>
+                                    <p className="text-[9px] text-gray-500">{mod.desc}</p>
+                                </div>
+                                <input 
+                                    type="checkbox" 
+                                    checked={isChecked} 
+                                    onChange={(e) => onPromptModifierChange(mod.key as keyof PromptModifiers, e.target.checked)} 
+                                    className="hidden" 
+                                />
+                            </label>
+                        );
+                    })}
+                </div>
+            </section>
 
             <section className="bg-white/5 border border-white/10 rounded-3xl p-8 relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-8 opacity-[0.02] pointer-events-none">

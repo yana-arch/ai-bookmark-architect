@@ -14,6 +14,7 @@ interface UseBookmarkProcessingProps {
     tagDrivenMode: boolean;
     tagCount: number;
     tagLanguage: string;
+    promptModifiers: any; // PromptModifiers
     systemPrompt: string;
     customInstructions: string;
     onFoldersUpdate: (folders: (Folder | Bookmark)[]) => void;
@@ -51,6 +52,7 @@ export const useBookmarkProcessing = ({
     tagDrivenMode,
     tagCount,
     tagLanguage,
+    promptModifiers,
     systemPrompt,
     customInstructions,
     onFoldersUpdate,
@@ -316,7 +318,9 @@ export const useBookmarkProcessing = ({
                             currentTree,
                             taskType: 'map_tags_to_tree',
                             uniqueTags,
-                            activeProfile
+                            tagLanguage,
+                            activeProfile,
+                            promptModifiers
                         }
                     });
                 };
@@ -342,7 +346,8 @@ export const useBookmarkProcessing = ({
                             taskType: 'extract_tags',
                             tagCount,
                             tagLanguage,
-                            activeProfile
+                            activeProfile,
+                            promptModifiers
                         }
                     });
                 };
@@ -537,7 +542,9 @@ export const useBookmarkProcessing = ({
                         apiConfigs: availableKeys,
                         maxRetries,
                         currentTree,
-                        activeProfile
+                        tagLanguage,
+                        activeProfile,
+                        promptModifiers
                     }
                 });
             };
@@ -609,7 +616,7 @@ export const useBookmarkProcessing = ({
             }
             return true;
         });
-    }, [batchSize, maxRetries, processingMode, tagDrivenMode, tagCount, tagLanguage, systemPrompt, customInstructions, onFoldersUpdate, addDetailedLog, onProcessingComplete, autoCleanupEmptyFolders, activeProfile]);
+    }, [batchSize, maxRetries, processingMode, tagDrivenMode, tagCount, tagLanguage, promptModifiers, systemPrompt, customInstructions, onFoldersUpdate, addDetailedLog, onProcessingComplete, autoCleanupEmptyFolders, activeProfile]);
 
     const resetProcessingState = useCallback(() => {
         setIsProcessing(false);

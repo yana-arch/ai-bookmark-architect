@@ -32,6 +32,7 @@ interface WorkerMessage {
     tagCount?: number;
     tagLanguage?: string;
     activeProfile?: AIProfile;
+    promptModifiers?: any; // To avoid importing PromptModifiers if not strictly needed, but better to import it
   };
 }
 
@@ -67,7 +68,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             uniqueTags = [],
             tagCount = 3,
             tagLanguage = 'Vietnamese and Technical Terms',
-            activeProfile
+            activeProfile,
+            promptModifiers
         } = data;
 
         const availableConfigs = apiConfigs.filter(c => c.status === 'active');
@@ -122,7 +124,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                         userInstructionBlock,
                         uniqueTags,
                         currentTree: filteredTree,
-                        tagLanguage
+                        tagLanguage,
+                        promptModifiers
                     });
 
                     // Initial call to get batching plan
@@ -159,7 +162,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                             batchIndex
                         } as WorkerResponse);
 
-                        const batchRequestPrompt = generateTagBatchRequestPrompt(i, totalBatches, tagLanguage);
+                        const batchRequestPrompt = generateTagBatchRequestPrompt(i, totalBatches, tagLanguage, promptModifiers);
                         history.push({ role: 'user', content: batchRequestPrompt });
 
                         const { text: batchText, usage: batchUsage } = await client.generateChatContent(systemPrompt, history);
@@ -195,7 +198,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                         batch,
                         userHistory,
                         domainKnowledge,
-                        tagLanguage
+                        tagLanguage,
+                        promptModifiers
                     });
 
                     const { text: responseText, usage: responseUsage } = await client.generateContent(systemPrompt, userPrompt);

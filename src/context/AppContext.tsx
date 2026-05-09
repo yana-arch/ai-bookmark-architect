@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect } from 'react';
 import type { 
     Bookmark, Folder, ApiConfig, AppState as AppStateType, Notification, 
     InstructionPreset, FolderTemplate, SmartClassifyRule, CategorizedBookmark, UserCorrection,
-    TemplateSettings, ArchitectureStyle, ApiKeyStatus, AIProfile
+    TemplateSettings, ArchitectureStyle, ApiKeyStatus, AIProfile, PromptModifiers
 } from '../../types';
 
 import { useAppData } from '../../hooks/useAppData';
@@ -69,6 +69,8 @@ interface ConfigContextType {
     setTagCount: (count: number) => void;
     tagLanguage: string;
     setTagLanguage: (lang: string) => void;
+    promptModifiers: PromptModifiers;
+    setPromptModifiers: React.Dispatch<React.SetStateAction<PromptModifiers>>;
     autoCleanupEmptyFolders: boolean;
     setAutoCleanupEmptyFolders: (cleanup: boolean) => void;
     isApiModalOpen: boolean;

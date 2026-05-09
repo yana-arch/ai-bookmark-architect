@@ -20,7 +20,24 @@ export {
     type TagFolderSchema
 };
 
+import type { PromptModifiers } from '../../types';
 
+/**
+ * Helper to build the prompt modifiers block
+ */
+function buildModifiersBlock(modifiers?: PromptModifiers): string {
+    if (!modifiers) return '';
+    const rules: string[] = [];
+    if (modifiers.flattenStructure) rules.push('- Flatten Structure: Keep the folder hierarchy completely flat (maximum 1 level deep). Do NOT create deeply nested folders.');
+    if (modifiers.groupByDomain) rules.push('- Group by Domain: Prioritize grouping bookmarks by their website/domain name first (e.g., "github.com", "youtube.com").');
+    if (modifiers.useEmojis) rules.push('- Use Emojis: Prepend a relevant emoji to EVERY generated folder name (e.g., "🚀 Startup", "💻 Programming").');
+    if (modifiers.strictTechnical) rules.push('- Strict Technical: Strictly use standard, professional technical terminology for categories. Avoid slang or vague terms.');
+    if (modifiers.groupByPurpose) rules.push('- Group by Purpose: Categorize based on user intent (e.g., "Read Later", "Tools", "Documentation", "Tutorials").');
+    if (modifiers.shortFolderNames) rules.push('- Short Folder Names: Keep folder names extremely concise (1-2 words maximum). Never use long phrases.');
+
+    if (rules.length === 0) return '';
+    return `\nSTRUCTURAL REQUIREMENTS (MUST FOLLOW):\n${rules.join('\n')}\n`;
+}
 /**
  * Generates the full prompt for AI categorization
  */
@@ -31,6 +48,7 @@ export function generateCategorizationPrompt(params: {
     userHistory?: UserCorrection[];
     domainKnowledge?: string;
     tagLanguage?: string;
+    promptModifiers?: PromptModifiers;
 }): string {
     const {
         userInstructionBlock,
@@ -38,7 +56,8 @@ export function generateCategorizationPrompt(params: {
         batch,
         userHistory,
         domainKnowledge,
-        tagLanguage = 'English'
+        tagLanguage = 'English',
+        promptModifiers
     } = params;
 
     const bookmarksList = batch.map(b => `- ${b.title} (${b.url})`).join('\n');
@@ -68,7 +87,7 @@ export function generateCategorizationPrompt(params: {
 ${domainKnowledge ? `Domain Knowledge:\n${domainKnowledge}\n` : ''}
 
 ${historyContext}
-
+${buildModifiersBlock(promptModifiers)}
 Current Folder Structure (Reuse these if suitable):
 ${treeContext}
 
@@ -143,8 +162,9 @@ export function generateTagMappingPrompt(params: {
     uniqueTags: string[];
     currentTree: Folder[];
     tagLanguage?: string;
+    promptModifiers?: PromptModifiers;
 }): string {
-    const { userInstructionBlock, uniqueTags, currentTree, tagLanguage = 'English' } = params;
+    const { userInstructionBlock, uniqueTags, currentTree, tagLanguage = 'English', promptModifiers } = params;
 
     // Recursive helper to get full tree context (with depth limit)
     const getFullTreeContext = (folders: any[], depth: number = 0): any[] => {
@@ -170,7 +190,7 @@ export function generateTagMappingPrompt(params: {
 Your task is to take a flat list of tags and map them into a logical, hierarchical folder structure.
 You MUST respect the Taxonomy Architecture defined in the system prompt above.
 Create a highly detailed, specific, and flatter folder structure. Avoid nesting folders too deeply (limit to 1-2 levels of depth maximum). Keep categories granular and visible at the top levels to provide a detailed taxonomy. Do not over-group independent topics into deep general folders.
-
+${buildModifiersBlock(promptModifiers)}
 Current Folder Structure (Reuse these if suitable):
 ${treeContext}
 
@@ -212,8 +232,9 @@ export function generateTagAnalysisPrompt(params: {
     uniqueTags: string[];
     currentTree: Folder[];
     tagLanguage?: string;
+    promptModifiers?: PromptModifiers;
 }): string {
-    const { userInstructionBlock, uniqueTags, currentTree, tagLanguage = 'English' } = params;
+    const { userInstructionBlock, uniqueTags, currentTree, tagLanguage = 'English', promptModifiers } = params;
 
     const getFullTreeContext = (folders: any[], depth: number = 0): any[] => {
         if (depth > 4) return []; 
@@ -230,7 +251,7 @@ export function generateTagAnalysisPrompt(params: {
 
 Your task is to analyze a flat list of tags and determine how many batches you will need to map ALL of them into a detailed, hierarchical folder structure.
 We will conduct a stateful chat session. In this first step, you just need to calculate the plan.
-
+${buildModifiersBlock(promptModifiers)}
 Current Folder Structure (Reuse these if suitable):
 ${treeContext}
 
@@ -254,9 +275,9 @@ Do not include any explanation or markdown formatting outside the JSON object.`;
 /**
  * Generates prompt to request a specific batch of the schema in the stateful chat session.
  */
-export function generateTagBatchRequestPrompt(batchIndex: number, totalBatches: number, tagLanguage: string = 'English'): string {
+export function generateTagBatchRequestPrompt(batchIndex: number, totalBatches: number, tagLanguage: string = 'English', promptModifiers?: PromptModifiers): string {
     return `Please generate the TagFolderSchema for batch ${batchIndex} of ${totalBatches}.
-
+${buildModifiersBlock(promptModifiers)}
 CRITICAL INSTRUCTION:
 1. Respond ONLY with a valid JSON object containing a "tagSchema" array for this specific batch.
 2. Remember to respect the taxonomy rules: create a highly detailed, specific, and flatter folder structure (limit to 1-2 levels of depth maximum).

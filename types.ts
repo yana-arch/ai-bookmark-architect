@@ -245,3 +245,12 @@ export interface SmartClassifyRule {
   enabled: boolean;
   createdAt: number;
 }
+
+export interface PromptModifiers {
+  flattenStructure: boolean;
+  groupByDomain: boolean;
+  useEmojis: boolean;
+  strictTechnical: boolean;
+  groupByPurpose: boolean;
+  shortFolderNames: boolean;
+}

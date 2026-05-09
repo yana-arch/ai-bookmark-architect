@@ -88,7 +88,9 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
         activeProfileId,
         setActiveProfileId,
         handleSaveProfile,
-        handleDeleteProfile
+        handleDeleteProfile,
+        promptModifiers,
+        setPromptModifiers
     } = useApp();
 
     const handleManualCleanup = () => {
@@ -152,6 +154,8 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     onTagCountChange={setTagCount}
                     tagLanguage={tagLanguage}
                     onTagLanguageChange={setTagLanguage}
+                    promptModifiers={promptModifiers}
+                    onPromptModifierChange={(key, value) => setPromptModifiers(prev => ({ ...prev, [key]: value }))}
                     autoCleanupEmptyFolders={autoCleanupEmptyFolders}
                     onAutoCleanupChange={setAutoCleanupEmptyFolders}
                     onCleanupEmptyFolders={handleManualCleanup}

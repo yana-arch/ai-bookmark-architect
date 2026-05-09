@@ -10,8 +10,11 @@ const STORAGE_KEYS = {
     AUTO_CLEANUP_EMPTY_FOLDERS: 'ai_auto_cleanup_empty_folders',
     TAG_DRIVEN_MODE: 'ai_tag_driven_mode',
     TAG_COUNT: 'ai_tag_count',
-    TAG_LANGUAGE: 'ai_tag_language'
+    TAG_LANGUAGE: 'ai_tag_language',
+    PROMPT_MODIFIERS: 'ai_prompt_modifiers'
 };
+
+import type { PromptModifiers } from '../types';
 
 export const useAISettings = () => {
     // 1. System Prompt
@@ -108,6 +111,30 @@ export const useAISettings = () => {
         localStorage.setItem(STORAGE_KEYS.TAG_LANGUAGE, tagLanguage);
     }, [tagLanguage]);
 
+    // 10. Prompt Modifiers
+    const [promptModifiers, setPromptModifiers] = useState<PromptModifiers>(() => {
+        const saved = localStorage.getItem(STORAGE_KEYS.PROMPT_MODIFIERS);
+        if (saved) {
+            try {
+                return JSON.parse(saved);
+            } catch (e) {
+                console.error("Failed to parse promptModifiers", e);
+            }
+        }
+        return {
+            flattenStructure: false,
+            groupByDomain: false,
+            useEmojis: false,
+            strictTechnical: false,
+            groupByPurpose: false,
+            shortFolderNames: false
+        };
+    });
+
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEYS.PROMPT_MODIFIERS, JSON.stringify(promptModifiers));
+    }, [promptModifiers]);
+
     return {
         systemPrompt, setSystemPrompt,
         customInstructions, setCustomInstructions,
@@ -117,6 +144,7 @@ export const useAISettings = () => {
         autoCleanupEmptyFolders, setAutoCleanupEmptyFolders,
         tagDrivenMode, setTagDrivenMode,
         tagCount, setTagCount,
-        tagLanguage, setTagLanguage
+        tagLanguage, setTagLanguage,
+        promptModifiers, setPromptModifiers
     };
 };

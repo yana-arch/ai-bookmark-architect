@@ -13,7 +13,8 @@ import type {
     DuplicateStats,
     ExportOptions,
     Notification,
-    AIProfile
+    AIProfile,
+    PromptModifiers
 } from '@/types';
 import {
     CogIcon, XIcon, AILogoIcon, TerminalIcon, LayersIcon,
@@ -86,6 +87,8 @@ interface UnifiedSettingsModalProps {
     onTagCountChange: (count: number) => void;
     tagLanguage: string;
     onTagLanguageChange: (lang: string) => void;
+    promptModifiers: PromptModifiers;
+    onPromptModifierChange: (key: keyof PromptModifiers, value: boolean) => void;
     autoCleanupEmptyFolders?: boolean;
     onAutoCleanupChange?: (cleanup: boolean) => void;
     onCleanupEmptyFolders?: () => void;
@@ -131,6 +134,7 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
         batchSize, onBatchSizeChange, maxRetries, onMaxRetriesChange, 
         processingMode, onProcessingModeChange,
         tagDrivenMode, onTagDrivenModeChange, tagCount, onTagCountChange, tagLanguage, onTagLanguageChange,
+        promptModifiers, onPromptModifierChange,
         autoCleanupEmptyFolders, onAutoCleanupChange,
         bookmarks, folders, onImport, onExport, onClearData,
         duplicateStats, onCleanDuplicates, brokenLinkCheckState, brokenLinkCheckProgress, onStartBrokenLinkCheck,
@@ -311,6 +315,8 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
                                 onTagCountChange={onTagCountChange}
                                 tagLanguage={tagLanguage}
                                 onTagLanguageChange={onTagLanguageChange}
+                                promptModifiers={promptModifiers}
+                                onPromptModifierChange={onPromptModifierChange}
                                 isAddingRule={isAddingRule}
                                 setIsAddingRule={setIsAddingRule}
                                 newRulePattern={newRulePattern}

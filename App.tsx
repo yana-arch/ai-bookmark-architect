@@ -60,8 +60,8 @@ const App: React.FC = () => {
         activeProfile,
         activeProfileId,
         setActiveProfileId,
-        handleSaveProfile,
-        handleDeleteProfile
+        handleDeleteProfile,
+        promptModifiers
     } = useApp();
 
     // UI Local State
@@ -105,6 +105,7 @@ const App: React.FC = () => {
         tagDrivenMode,
         tagCount,
         tagLanguage,
+        promptModifiers,
         systemPrompt,
         customInstructions,
         onFoldersUpdate: setFolders,
