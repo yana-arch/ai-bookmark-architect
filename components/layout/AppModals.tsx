@@ -64,6 +64,9 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
         batchSize, setBatchSize,
         maxRetries, setMaxRetries,
         processingMode, setProcessingMode,
+        tagDrivenMode, setTagDrivenMode,
+        tagCount, setTagCount,
+        tagLanguage, setTagLanguage,
         autoCleanupEmptyFolders, setAutoCleanupEmptyFolders,
         smartClassifyRules,
         handleClearData,
@@ -131,6 +134,12 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     onMaxRetriesChange={setMaxRetries}
                     processingMode={processingMode}
                     onProcessingModeChange={setProcessingMode}
+                    tagDrivenMode={tagDrivenMode}
+                    onTagDrivenModeChange={setTagDrivenMode}
+                    tagCount={tagCount}
+                    onTagCountChange={setTagCount}
+                    tagLanguage={tagLanguage}
+                    onTagLanguageChange={setTagLanguage}
                     autoCleanupEmptyFolders={autoCleanupEmptyFolders}
                     onAutoCleanupChange={setAutoCleanupEmptyFolders}
                     onCleanupEmptyFolders={handleManualCleanup}

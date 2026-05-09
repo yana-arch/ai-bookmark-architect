@@ -7,7 +7,10 @@ const STORAGE_KEYS = {
     BATCH_SIZE: 'ai_batch_size',
     MAX_RETRIES: 'ai_max_retries',
     PROCESSING_MODE: 'ai_processing_mode',
-    AUTO_CLEANUP_EMPTY_FOLDERS: 'ai_auto_cleanup_empty_folders'
+    AUTO_CLEANUP_EMPTY_FOLDERS: 'ai_auto_cleanup_empty_folders',
+    TAG_DRIVEN_MODE: 'ai_tag_driven_mode',
+    TAG_COUNT: 'ai_tag_count',
+    TAG_LANGUAGE: 'ai_tag_language'
 };
 
 export const useAISettings = () => {
@@ -52,6 +55,7 @@ export const useAISettings = () => {
     // 5. Processing Mode
     const [processingMode, setProcessingMode] = useState<'parallel' | 'sequential'>(() => {
         const saved = localStorage.getItem(STORAGE_KEYS.PROCESSING_MODE);
+        if (saved === 'tag_driven') return 'parallel';
         return (saved === 'parallel' || saved === 'sequential') ? saved : 'parallel';
     });
 
@@ -69,12 +73,50 @@ export const useAISettings = () => {
         localStorage.setItem(STORAGE_KEYS.AUTO_CLEANUP_EMPTY_FOLDERS, autoCleanupEmptyFolders.toString());
     }, [autoCleanupEmptyFolders]);
 
+    // 7. Tag Driven Mode
+    const [tagDrivenMode, setTagDrivenMode] = useState<boolean>(() => {
+        const saved = localStorage.getItem(STORAGE_KEYS.TAG_DRIVEN_MODE);
+        if (saved === null) {
+            // Migration check: was it the old processing mode?
+            const oldMode = localStorage.getItem(STORAGE_KEYS.PROCESSING_MODE);
+            if (oldMode === 'tag_driven') return true;
+            return true; // Default to true as requested/implied
+        }
+        return saved === 'true';
+    });
+
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEYS.TAG_DRIVEN_MODE, tagDrivenMode.toString());
+    }, [tagDrivenMode]);
+
+    // 8. Tag Count
+    const [tagCount, setTagCount] = useState<number>(() => {
+        const saved = localStorage.getItem(STORAGE_KEYS.TAG_COUNT);
+        return saved ? parseInt(saved, 10) : 3;
+    });
+
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEYS.TAG_COUNT, tagCount.toString());
+    }, [tagCount]);
+
+    // 9. Tag Language
+    const [tagLanguage, setTagLanguage] = useState<string>(() => {
+        return localStorage.getItem(STORAGE_KEYS.TAG_LANGUAGE) || 'Vietnamese and Technical Terms';
+    });
+
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEYS.TAG_LANGUAGE, tagLanguage);
+    }, [tagLanguage]);
+
     return {
         systemPrompt, setSystemPrompt,
         customInstructions, setCustomInstructions,
         batchSize, setBatchSize,
         maxRetries, setMaxRetries,
         processingMode, setProcessingMode,
-        autoCleanupEmptyFolders, setAutoCleanupEmptyFolders
+        autoCleanupEmptyFolders, setAutoCleanupEmptyFolders,
+        tagDrivenMode, setTagDrivenMode,
+        tagCount, setTagCount,
+        tagLanguage, setTagLanguage
     };
 };

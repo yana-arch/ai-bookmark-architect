@@ -22,11 +22,13 @@ export const useAppOrchestration = ({
     const {
         bookmarks, setBookmarks,
         folders, setFolders,
-        setAppState,
+        appState, setAppState,
         smartClassifyRules,
         sessionRules, setSessionRules,
-        applySmartClassify
+        applySmartClassify,
+        tagDrivenMode
     } = useApp();
+
 
     const [foldersSnapshot, setFoldersSnapshot] = useState<(Folder | Bookmark)[]>([]);
 
@@ -118,7 +120,8 @@ export const useAppOrchestration = ({
             bookmarksToProcessList = [...classified, ...remaining];
             setLogs(prev => [...prev, `Smart Classify: Đã tự động phân loại ${classified.length} bookmark ở root.`]);
         } else {
-            setLogs(prev => [...prev, `Phát hiện ${missingBookmarks.length} bookmark ở thư mục gốc. Bắt đầu xử lý gom batch...`]);
+            const modeText = tagDrivenMode ? 'chế độ Tag-driven' : 'gom batch';
+            setLogs(prev => [...prev, `Phát hiện ${missingBookmarks.length} bookmark ở thư mục gốc. Bắt đầu xử lý theo ${modeText}...`]);
         }
         
         setAppState(AppState.PROCESSING);

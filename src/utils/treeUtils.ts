@@ -1,5 +1,6 @@
 import type { Bookmark, Folder, FolderStructureNode } from '../../types';
 import { getAllExistingPaths, standardizePath } from './pathUtils';
+import type { TagFolderSchema } from './aiUtils';
 
 /**
  * Converts a flat list of bookmarks with paths into a folder tree structure.
@@ -184,4 +185,85 @@ export const removeEmptyFolders = (items: (Folder | Bookmark)[]): (Folder | Book
 
     // Return original array reference if no items were removed or modified
     return (changed || result.length !== items.length) ? result : items;
+};
+
+/**
+ * Distributes bookmarks into paths based on a tag-to-folder schema.
+ * Handles multiple tags by prioritizing the first mapped tag found.
+ * Unmapped bookmarks get an empty path (root).
+ */
+export const distributeBookmarksByTagSchema = (
+    bookmarks: Bookmark[],
+    schema: TagFolderSchema[]
+): Bookmark[] => {
+    // Build a map of tag to full path string[]
+    const tagToPathMap = new Map<string, string[]>();
+    const folderNameToPathMap = new Map<string, string[]>();
+
+    const traverseSchema = (nodes: TagFolderSchema[], currentPath: string[]) => {
+        nodes.forEach(node => {
+            // Handle cases where AI returns "Parent/Child" or "Parent > Child" instead of a nested structure
+            const nameSegments = node.name.split(/[/>|\\]/).map(s => s.trim()).filter(Boolean);
+            const newPath = [...currentPath, ...nameSegments];
+            
+            const leafName = nameSegments.length > 0 ? nameSegments[nameSegments.length - 1] : node.name;
+            folderNameToPathMap.set(leafName.toLowerCase().trim(), newPath);
+            if (leafName !== node.name) {
+                folderNameToPathMap.set(node.name.toLowerCase().trim(), newPath);
+            }
+            
+            if (node.mappedTags && node.mappedTags.length > 0) {
+                node.mappedTags.forEach(tag => {
+                    const normalizedTag = tag.toLowerCase().trim();
+                    if (!tagToPathMap.has(normalizedTag)) {
+                        tagToPathMap.set(normalizedTag, newPath);
+                    }
+                });
+            }
+            if (node.children && node.children.length > 0) {
+                traverseSchema(node.children, newPath);
+            }
+        });
+    };
+
+    traverseSchema(schema, []);
+
+    return bookmarks.map(bm => {
+        let assignedPath: string[] = [];
+        
+        if (bm.tags && bm.tags.length > 0) {
+            let bestPath: string[] = [];
+            
+            // 1. Exact Match with mappedTags
+            for (const tag of bm.tags) {
+                const normalizedTag = tag.toLowerCase().trim();
+                const path = tagToPathMap.get(normalizedTag);
+                if (path && path.length > bestPath.length) {
+                    bestPath = path;
+                }
+            }
+            
+            // 2. Fuzzy Match with folder names (if no exact match found yet)
+            if (bestPath.length === 0) {
+                for (const tag of bm.tags) {
+                    const normalizedTag = tag.toLowerCase().trim();
+                    // Check if tag is exactly a folder name or folder name contains tag
+                    for (const [folderName, path] of folderNameToPathMap.entries()) {
+                        if (folderName === normalizedTag || folderName.includes(normalizedTag) || normalizedTag.includes(folderName)) {
+                            if (path.length > bestPath.length) {
+                                bestPath = path;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            assignedPath = bestPath;
+        }
+
+        return {
+            ...bm,
+            path: assignedPath
+        };
+    });
 };

@@ -55,6 +55,12 @@ interface ConfigContextType {
     setMaxRetries: (retries: number) => void;
     processingMode: 'parallel' | 'sequential';
     setProcessingMode: (mode: 'parallel' | 'sequential') => void;
+    tagDrivenMode: boolean;
+    setTagDrivenMode: (enabled: boolean) => void;
+    tagCount: number;
+    setTagCount: (count: number) => void;
+    tagLanguage: string;
+    setTagLanguage: (lang: string) => void;
     autoCleanupEmptyFolders: boolean;
     setAutoCleanupEmptyFolders: (cleanup: boolean) => void;
     isApiModalOpen: boolean;
@@ -94,7 +100,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         appData.folderTemplates, 
         appData.setFolderTemplates, 
         aiSettings.setSystemPrompt, 
-        appData.setNotifications
+        appData.setNotifications,
+        aiSettings.tagDrivenMode
     );
 
     useEffect(() => {

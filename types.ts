@@ -86,6 +86,8 @@ export interface FolderTemplate {
   createdAt: number;
   updatedAt: number;
   isDefault?: boolean;
+  customPrompt?: string; // Standard engine prompt
+  tagDrivenPrompt?: string; // Tag-driven engine prompt
 }
 
 export interface FolderStructureNode {

@@ -4,8 +4,15 @@ import { AIClient } from './services/aiClient';
 import type { Bookmark, ApiConfig, UserCorrection, Folder } from '../types';
 import { 
     parseAIResponse, 
-    generateCategorizationPrompt 
+    generateCategorizationPrompt,
+    generateTagExtractionPrompt,
+    parseTagExtractionResponse,
+    generateTagMappingPrompt,
+    parseTagMappingResponse,
+    generateTagAnalysisPrompt,
+    generateTagBatchRequestPrompt
 } from './services/aiService';
+import type { ChatMessage } from './services/aiClient';
 
 // Type definitions for the worker
 interface WorkerMessage {
@@ -20,12 +27,16 @@ interface WorkerMessage {
     maxRetries: number;
     userHistory?: UserCorrection[];
     domainKnowledge?: string;
+    taskType?: 'categorize' | 'extract_tags' | 'map_tags_to_tree';
+    uniqueTags?: string[];
+    tagCount?: number;
+    tagLanguage?: string;
   };
 }
 
 interface WorkerResponse {
   type: 'batch_result' | 'batch_error' | 'log' | 'progress';
-  data?: Bookmark[];
+  data?: any;
   error?: string;
   batchIndex?: number;
   log?: any;
@@ -50,7 +61,11 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             batchIndex, 
             maxRetries,
             userHistory,
-            domainKnowledge
+            domainKnowledge,
+            taskType = 'categorize',
+            uniqueTags = [],
+            tagCount = 3,
+            tagLanguage = 'Vietnamese and Technical Terms'
         } = data;
 
         const availableConfigs = apiConfigs.filter(c => c.status === 'active');
@@ -82,45 +97,136 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                     batchIndex
                 } as WorkerResponse);
 
-                const userPrompt = generateCategorizationPrompt({
-                    systemPrompt: '',
-                    userInstructionBlock,
-                    currentTree,
-                    batch,
-                    userHistory,
-                    domainKnowledge
-                });
+                let userPrompt = '';
+                let resultData: any = null;
+                let usage: any = null;
 
-                const { text: responseText } = await client.generateContent(systemPrompt, userPrompt);
+                if (taskType === 'extract_tags') {
+                    userPrompt = generateTagExtractionPrompt({ batch, tagCount, tagLanguage });
+                    const { text: responseText, usage: responseUsage } = await client.generateContent('', userPrompt);
+                    if (!responseText) throw new Error('AI returned empty response');
+                    resultData = parseTagExtractionResponse(responseText);
+                    usage = responseUsage;
+                    if (resultData.length === 0) throw new Error('Failed to parse tag extraction response');
+                } 
+                else if (taskType === 'map_tags_to_tree') {
+                    // Stateful Chat Session for Mapping
+                    const history: ChatMessage[] = [];
+                    
+                    // Do not show the AI existing fallback folders to prevent it from using them
+                    const filteredTree = currentTree.filter(f => f.name !== '[Unmapped Tags]' && f.name !== '[Uncategorized]');
 
-                if (!responseText) {
-                    throw new Error('AI returned empty response');
-                }
+                    const analysisPrompt = generateTagAnalysisPrompt({
+                        userInstructionBlock,
+                        uniqueTags,
+                        currentTree: filteredTree
+                    });
 
-                const categorizedBookmarks = parseAIResponse(responseText);
+                    // Initial call to get batching plan
+                    const { text: planText, usage: planUsage } = await client.generateChatContent(systemPrompt, [{ role: 'user', content: analysisPrompt }]);
+                    usage = planUsage;
 
-                if (categorizedBookmarks.length === 0) {
-                    let errMsg = responseText || 'empty response';
-                    if (errMsg.length > 150) {
-                        errMsg = errMsg.substring(0, 150) + '...';
+                    let totalBatches = 1;
+                    try {
+                        const cleanedPlan = planText.replace(/```json/g, '').replace(/```/g, '').trim();
+                        const planJson = JSON.parse(cleanedPlan);
+                        totalBatches = planJson.totalBatches || 1;
+                    } catch (e) {
+                        console.warn('Failed to parse AI batching plan, defaulting to 1 batch', e);
                     }
-                    throw new Error(`AI returned invalid format or API error: ${errMsg}`);
-                }
 
-                const finalBookmarks = categorizedBookmarks.map(cbm => {
-                    const original = batch.find(b => b.url === cbm.url);
-                    return {
-                        ...cbm,
-                        id: original ? original.id : cbm.id,
-                        parentId: null
-                    };
-                });
+                    // Safety bounds
+                    totalBatches = Math.max(1, Math.min(totalBatches, 10));
+
+                    self.postMessage({
+                        type: 'log',
+                        log: { message: `AI determined it needs ${totalBatches} batches to deliver the complete schema.` },
+                        batchIndex
+                    } as WorkerResponse);
+
+                    history.push({ role: 'user', content: analysisPrompt });
+                    history.push({ role: 'assistant', content: planText });
+
+                    resultData = [];
+                    
+                    for (let i = 1; i <= totalBatches; i++) {
+                        self.postMessage({
+                            type: 'log',
+                            log: { message: `Requesting Tag Schema batch ${i}/${totalBatches}...` },
+                            batchIndex
+                        } as WorkerResponse);
+
+                        const batchRequestPrompt = generateTagBatchRequestPrompt(i, totalBatches);
+                        history.push({ role: 'user', content: batchRequestPrompt });
+
+                        const { text: batchText, usage: batchUsage } = await client.generateChatContent(systemPrompt, history);
+                        
+                        // Accumulate token usage
+                        if (batchUsage && usage) {
+                            usage.promptTokens += batchUsage.promptTokens;
+                            usage.completionTokens += batchUsage.completionTokens;
+                            usage.totalTokens += batchUsage.totalTokens;
+                        }
+
+                        history.push({ role: 'assistant', content: batchText });
+
+                        const batchSchema = parseTagMappingResponse(batchText);
+                        if (batchSchema && batchSchema.length > 0) {
+                            resultData = [...resultData, ...batchSchema];
+                        } else {
+                            self.postMessage({
+                                type: 'log',
+                                log: { message: `Warning: AI returned empty or invalid schema for batch ${i}.` },
+                                batchIndex
+                            } as WorkerResponse);
+                        }
+                    }
+
+                    if (resultData.length === 0) throw new Error('Failed to parse any tag mapping schema from the chat session');
+                }
+                else {
+                    // categorize
+                    userPrompt = generateCategorizationPrompt({
+                        userInstructionBlock,
+                        currentTree,
+                        batch,
+                        userHistory,
+                        domainKnowledge
+                    });
+
+                    const { text: responseText, usage: responseUsage } = await client.generateContent(systemPrompt, userPrompt);
+
+                    if (!responseText) {
+                        throw new Error('AI returned empty response');
+                    }
+
+                    const categorizedBookmarks = parseAIResponse(responseText);
+                    usage = responseUsage;
+
+                    if (categorizedBookmarks.length === 0) {
+                        let errMsg = responseText || 'empty response';
+                        if (errMsg.length > 150) {
+                            errMsg = errMsg.substring(0, 150) + '...';
+                        }
+                        throw new Error(`AI returned invalid format: ${errMsg}`);
+                    }
+
+                    resultData = categorizedBookmarks.map(cbm => {
+                        const original = batch.find(b => b.url === cbm.url);
+                        return {
+                            ...cbm,
+                            id: original ? original.id : cbm.id,
+                            parentId: null
+                        };
+                    });
+                }
 
                 success = true;
                 self.postMessage({
                     type: 'batch_result',
-                    data: finalBookmarks,
-                    batchIndex
+                    data: resultData,
+                    batchIndex,
+                    usage: usage
                 } as WorkerResponse);
 
             } catch (error: any) {

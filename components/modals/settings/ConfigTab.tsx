@@ -1,5 +1,5 @@
 import React from 'react';
-import { CogIcon, TrashIcon, BoltIcon, TerminalIcon } from '../../ui/Icons';
+import { CogIcon, TrashIcon, BoltIcon, TerminalIcon, LayersIcon } from '../../ui/Icons';
 
 interface ConfigTabProps {
     batchSize: number;
@@ -8,6 +8,8 @@ interface ConfigTabProps {
     onMaxRetriesChange: (retries: number) => void;
     processingMode: 'parallel' | 'sequential';
     onProcessingModeChange: (mode: 'parallel' | 'sequential') => void;
+    tagDrivenMode: boolean;
+    onTagDrivenModeChange: (enabled: boolean) => void;
     autoCleanupEmptyFolders?: boolean;
     onAutoCleanupChange?: (cleanup: boolean) => void;
     onCleanupEmptyFolders?: () => void;
@@ -17,6 +19,7 @@ interface ConfigTabProps {
 export const ConfigTab: React.FC<ConfigTabProps> = ({
     batchSize, onBatchSizeChange, maxRetries, onMaxRetriesChange,
     processingMode, onProcessingModeChange, 
+    tagDrivenMode, onTagDrivenModeChange,
     autoCleanupEmptyFolders = false, onAutoCleanupChange, onCleanupEmptyFolders,
     onClearData
 }) => {
@@ -76,23 +79,23 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({
                     </div>
 
                     <div className="space-y-6">
-                        <div className="flex bg-black/40 p-1 rounded-xl border border-white/5">
+                        <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 overflow-x-auto">
                             {(['sequential', 'parallel'] as const).map(m => (
                                 <button
                                     key={m}
                                     type="button"
                                     onClick={() => onProcessingModeChange(m)}
-                                    className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all uppercase tracking-tighter ${
+                                    className={`flex-1 py-2 px-2 text-[10px] font-black rounded-lg transition-all uppercase tracking-tighter whitespace-nowrap ${
                                         processingMode === m 
                                         ? 'bg-white/10 text-white shadow-lg' 
                                         : 'text-gray-500 hover:text-gray-300'
                                     }`}
                                 >
-                                    {m === 'sequential' ? 'Sequential' : 'Parallel Workers'}
+                                    {m === 'sequential' ? 'Sequential' : 'Parallel'}
                                 </button>
                             ))}
                         </div>
-                        <p className="text-[10px] text-gray-500 leading-relaxed">
+                        <p className="text-[10px] text-gray-500 leading-relaxed min-h-[30px]">
                             {processingMode === 'sequential' 
                                 ? 'Sequential processing is safer for low-tier API keys to avoid rate limits.' 
                                 : 'Parallel processing utilizes multiple web workers for 3x-5x faster results.'}

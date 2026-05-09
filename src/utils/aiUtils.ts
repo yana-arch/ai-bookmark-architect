@@ -86,3 +86,79 @@ export function parseAIResponse(content: string): Bookmark[] {
 
     return extractBookmarksByRegex(cleanedContent);
 }
+
+// Helper to extract JSON content from text (Robust)
+function extractJsonBlock(content: string): string {
+    let cleaned = content.trim();
+    if (cleaned.includes('```')) {
+        cleaned = cleaned.replace(/```(?:json)?\s*([\s\S]*?)\s*```/g, '$1').trim();
+    }
+    
+    // If it still doesn't parse, try finding the first { or [
+    try {
+        JSON.parse(repairJson(cleaned));
+        return cleaned;
+    } catch (e) {
+        const startBrace = cleaned.indexOf('{');
+        const startBracket = cleaned.indexOf('[');
+        const jsonStart = (startBrace !== -1 && (startBracket === -1 || startBrace < startBracket)) ? startBrace : startBracket;
+        
+        const endBrace = cleaned.lastIndexOf('}');
+        const endBracket = cleaned.lastIndexOf(']');
+        const jsonEnd = (endBrace !== -1 && (endBracket === -1 || endBrace > endBracket)) ? endBrace : endBracket;
+
+        if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+            return cleaned.substring(jsonStart, jsonEnd + 1);
+        }
+    }
+    return cleaned;
+}
+
+// Parse response for Tag Extraction
+export function parseTagExtractionResponse(content: string): { url: string, tags: string[] }[] {
+    const cleanedContent = extractJsonBlock(content);
+    
+    try {
+        const parsed = JSON.parse(repairJson(cleanedContent));
+        const bookmarks = Array.isArray(parsed) ? parsed : (parsed.bookmarks || []);
+        if (Array.isArray(bookmarks)) {
+            return bookmarks.map(bm => ({
+                url: bm.url || '',
+                tags: Array.isArray(bm.tags) ? bm.tags : []
+            })).filter(bm => bm.url);
+        }
+    } catch (e) {
+        console.error("Failed to parse tag extraction response", e);
+    }
+    return [];
+}
+
+// Parse response for Tag Mapping Schema
+export interface TagFolderSchema {
+    name: string;
+    mappedTags: string[];
+    children: TagFolderSchema[];
+}
+
+export function parseTagMappingResponse(content: string): TagFolderSchema[] {
+    const cleanedContent = extractJsonBlock(content);
+    
+    try {
+        const parsed = JSON.parse(repairJson(cleanedContent));
+        const schema = Array.isArray(parsed) ? parsed : (parsed.tagSchema || []);
+        if (Array.isArray(schema)) {
+            // Helper to recursively validate schema
+            const validateSchema = (nodes: any[]): TagFolderSchema[] => {
+                return nodes.map(node => ({
+                    name: node.name || 'Untitled',
+                    mappedTags: Array.isArray(node.mappedTags) ? node.mappedTags : [],
+                    children: Array.isArray(node.children) ? validateSchema(node.children) : []
+                }));
+            };
+            return validateSchema(schema);
+        }
+    } catch (e) {
+        console.error("Failed to parse tag mapping response", e);
+    }
+    return [];
+}

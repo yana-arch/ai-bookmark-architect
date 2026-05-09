@@ -72,6 +72,12 @@ interface UnifiedSettingsModalProps {
     onMaxRetriesChange: (retries: number) => void;
     processingMode: 'parallel' | 'sequential';
     onProcessingModeChange: (mode: 'parallel' | 'sequential') => void;
+    tagDrivenMode: boolean;
+    onTagDrivenModeChange: (enabled: boolean) => void;
+    tagCount: number;
+    onTagCountChange: (count: number) => void;
+    tagLanguage: string;
+    onTagLanguageChange: (lang: string) => void;
     autoCleanupEmptyFolders?: boolean;
     onAutoCleanupChange?: (cleanup: boolean) => void;
     onCleanupEmptyFolders?: () => void;
@@ -112,8 +118,10 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
         customInstructions, onCustomInstructionsChange, instructionPresets,
         smartClassifyRules, onSaveSmartRule, onDeleteSmartRule,
         selectedArchitectureStyle, onArchitectureStyleChange,
-        folderTemplates, onApplyFolderTemplate,
-        batchSize, onBatchSizeChange, maxRetries, onMaxRetriesChange, processingMode, onProcessingModeChange,
+        folderTemplates, onApplyFolderTemplate, onSaveFolderTemplate,
+        batchSize, onBatchSizeChange, maxRetries, onMaxRetriesChange, 
+        processingMode, onProcessingModeChange,
+        tagDrivenMode, onTagDrivenModeChange, tagCount, onTagCountChange, tagLanguage, onTagLanguageChange,
         autoCleanupEmptyFolders, onAutoCleanupChange,
         bookmarks, folders, onImport, onExport, onClearData,
         duplicateStats, onCleanDuplicates, brokenLinkCheckState, brokenLinkCheckProgress, onStartBrokenLinkCheck,
@@ -281,6 +289,12 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
                                 onDeleteSmartRule={onDeleteSmartRule}
                                 selectedStyle={selectedArchitectureStyle}
                                 onStyleChange={onArchitectureStyleChange}
+                                tagDrivenMode={tagDrivenMode}
+                                onTagDrivenModeChange={onTagDrivenModeChange}
+                                tagCount={tagCount}
+                                onTagCountChange={onTagCountChange}
+                                tagLanguage={tagLanguage}
+                                onTagLanguageChange={onTagLanguageChange}
                                 isAddingRule={isAddingRule}
                                 setIsAddingRule={setIsAddingRule}
                                 newRulePattern={newRulePattern}
@@ -296,6 +310,7 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
                             <TemplatesTab
                                 folderTemplates={folderTemplates}
                                 onApplyFolderTemplate={onApplyFolderTemplate}
+                                onSaveFolderTemplate={onSaveFolderTemplate}
                             />
                         )}
 
@@ -330,6 +345,8 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
                                 onMaxRetriesChange={onMaxRetriesChange}
                                 processingMode={processingMode}
                                 onProcessingModeChange={onProcessingModeChange}
+                                tagDrivenMode={tagDrivenMode}
+                                onTagDrivenModeChange={onTagDrivenModeChange}
                                 autoCleanupEmptyFolders={autoCleanupEmptyFolders}
                                 onAutoCleanupChange={onAutoCleanupChange}
                                 onClearData={onClearData}

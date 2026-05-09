@@ -5,9 +5,16 @@ import { LayersIcon, FolderIcon, SparklesIcon } from '../../ui/Icons';
 interface TemplatesTabProps {
     folderTemplates: FolderTemplate[];
     onApplyFolderTemplate: (template: FolderTemplate) => void;
+    onSaveFolderTemplate?: (template: FolderTemplate) => void;
 }
 
-export const TemplatesTab: React.FC<TemplatesTabProps> = ({ folderTemplates = [], onApplyFolderTemplate }) => {
+export const TemplatesTab: React.FC<TemplatesTabProps> = ({ 
+    folderTemplates = [], 
+    onApplyFolderTemplate,
+    onSaveFolderTemplate 
+}) => {
+    const [editingTemplateId, setEditingTemplateId] = React.useState<string | null>(null);
+
     return (
         <div className="space-y-10 animate-slideIn pb-10">
             <header className="flex items-center space-x-3 mb-6">
@@ -22,8 +29,8 @@ export const TemplatesTab: React.FC<TemplatesTabProps> = ({ folderTemplates = []
 
             <div className="grid gap-6">
                 {(folderTemplates || []).map(template => (
-                    <div key={template.id} className="bg-[#121418] border border-white/10 p-8 rounded-[2rem] hover:border-white/20 transition-all group relative overflow-hidden">
-                        <div className="flex items-start justify-between relative z-10">
+                    <div key={template.id} className="bg-[#121418] border border-white/10 p-8 rounded-[2rem] hover:border-white/20 transition-all group relative overflow-hidden flex flex-col">
+                        <div className="flex items-start justify-between relative z-10 mb-6">
                             <div className="space-y-4">
                                 <div>
                                     <h4 className="text-lg font-black text-white tracking-tight uppercase group-hover:text-orange-400 transition-colors">{template.name}</h4>
@@ -42,28 +49,66 @@ export const TemplatesTab: React.FC<TemplatesTabProps> = ({ folderTemplates = []
                                         {template.structure.length} ROOT CATEGORIES
                                     </span>
                                 </div>
-
-                                <div className="flex flex-wrap gap-2">
-                                    {template.structure.slice(0, 5).map((f, i) => (
-                                        <span key={i} className="text-[9px] font-black px-2.5 py-1 rounded-lg bg-white/5 text-gray-400 uppercase tracking-tighter border border-white/5">
-                                            {f.name}
-                                        </span>
-                                    ))}
-                                    {template.structure.length > 5 && (
-                                        <span className="text-[9px] font-black text-gray-600 uppercase tracking-tighter self-center">
-                                            +{template.structure.length - 5} MORE
-                                        </span>
-                                    )}
-                                </div>
                             </div>
 
-                            <button 
-                                onClick={() => onApplyFolderTemplate(template)} 
-                                className="px-6 py-3 bg-white hover:bg-orange-500 text-black hover:text-white text-[10px] font-black rounded-xl transition-all shadow-xl uppercase tracking-widest active:scale-95 flex items-center"
-                            >
-                                <SparklesIcon className="w-3.5 h-3.5 mr-2" />
-                                Deploy Template
-                            </button>
+                            <div className="flex flex-col space-y-2">
+                                <button 
+                                    onClick={() => onApplyFolderTemplate(template)} 
+                                    className="px-6 py-3 bg-white hover:bg-orange-500 text-black hover:text-white text-[10px] font-black rounded-xl transition-all shadow-xl uppercase tracking-widest active:scale-95 flex items-center justify-center"
+                                >
+                                    <SparklesIcon className="w-3.5 h-3.5 mr-2" />
+                                    Deploy Template
+                                </button>
+                                <button 
+                                    onClick={() => setEditingTemplateId(editingTemplateId === template.id ? null : template.id)}
+                                    className="px-6 py-2 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white text-[9px] font-black rounded-xl transition-all uppercase tracking-widest active:scale-95 border border-white/5"
+                                >
+                                    {editingTemplateId === template.id ? 'Hide Customization' : 'Customize Prompts'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {editingTemplateId === template.id && (
+                            <div className="relative z-10 p-6 bg-black/40 rounded-2xl border border-white/5 space-y-6 animate-fadeIn">
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Standard Engine Prompt</label>
+                                        <span className="text-[8px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase font-black">Direct Mapping</span>
+                                    </div>
+                                    <textarea 
+                                        value={template.customPrompt || ''}
+                                        onChange={(e) => onSaveFolderTemplate?.({ ...template, customPrompt: e.target.value })}
+                                        placeholder="Specific instructions for standard categorization mode..."
+                                        className="w-full h-24 bg-[#0a0c0e] border border-white/5 rounded-xl p-4 text-xs text-gray-400 focus:border-orange-500/50 outline-none resize-none transition-all font-mono"
+                                    />
+                                </div>
+                                
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Tag-Driven Engine Prompt</label>
+                                        <span className="text-[8px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 uppercase font-black">Global Mapping</span>
+                                    </div>
+                                    <textarea 
+                                        value={template.tagDrivenPrompt || ''}
+                                        onChange={(e) => onSaveFolderTemplate?.({ ...template, tagDrivenPrompt: e.target.value })}
+                                        placeholder="Specific instructions for tag-driven global mapping mode..."
+                                        className="w-full h-24 bg-[#0a0c0e] border border-white/5 rounded-xl p-4 text-xs text-gray-400 focus:border-orange-500/50 outline-none resize-none transition-all font-mono"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="mt-4 flex flex-wrap gap-2 relative z-10">
+                            {template.structure.slice(0, 5).map((f, i) => (
+                                <span key={i} className="text-[9px] font-black px-2.5 py-1 rounded-lg bg-white/5 text-gray-400 uppercase tracking-tighter border border-white/5">
+                                    {f.name}
+                                </span>
+                            ))}
+                            {template.structure.length > 5 && (
+                                <span className="text-[9px] font-black text-gray-600 uppercase tracking-tighter self-center">
+                                    +{template.structure.length - 5} MORE
+                                </span>
+                            )}
                         </div>
 
                         {/* Background watermark */}

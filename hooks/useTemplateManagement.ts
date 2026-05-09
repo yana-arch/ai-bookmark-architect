@@ -8,7 +8,8 @@ export const useTemplateManagement = (
     folderTemplates: FolderTemplate[],
     setFolderTemplates: (templates: FolderTemplate[] | ((prev: FolderTemplate[]) => FolderTemplate[])) => void,
     setSystemPrompt: (prompt: string) => void,
-    setNotifications: (callback: (prev: any[]) => any[]) => void
+    setNotifications: (callback: (prev: any[]) => any[]) => void,
+    tagDrivenMode: boolean
 ) => {
     const [isFolderTemplateModalOpen, setIsFolderTemplateModalOpen] = useState(false);
     const [templateSettings, setTemplateSettings] = useState<TemplateSettings>({
@@ -48,7 +49,13 @@ export const useTemplateManagement = (
                 const availableFolders = template.structure.flatMap(node => flattenTemplateFolders(node));
                 const folderGuide = availableFolders.map((folder, index) => `${index + 1}. ${folder}`).join('\n');
 
+                const customEnginePrompt = tagDrivenMode 
+                    ? (template.tagDrivenPrompt || '') 
+                    : (template.customPrompt || '');
+
                 prompt += `\n\n**TEMPLATE MODE ACTIVATED - STRICT TEMPLATE FOLLOWING:** You MUST use the selected template "${template.name}" as your ONLY categorization framework. The template has created empty folders that you MUST fill with bookmarks.
+
+${customEnginePrompt ? `**TEMPLATE ENGINE GUIDANCE:** ${customEnginePrompt}\n` : ''}
 
 **AVAILABLE TEMPLATE FOLDERS (You may ONLY use these - NO NEW FOLDERS ALLOWED):**
 ${folderGuide}
@@ -63,7 +70,12 @@ ${folderGuide}
         }
         
         setSystemPrompt(prompt);
-    }, [folderTemplates, setSystemPrompt]);
+    }, [folderTemplates, setSystemPrompt, tagDrivenMode]);
+
+    // Update prompt when tagDrivenMode changes
+    useEffect(() => {
+        generateSystemPrompt(selectedArchitectureStyle, templateSettings.selectedTemplateId);
+    }, [tagDrivenMode, generateSystemPrompt, selectedArchitectureStyle, templateSettings.selectedTemplateId]);
 
     const handleArchitectureStyleChange = useCallback((styleId: ArchitectureStyle) => {
         setSelectedArchitectureStyle(styleId);

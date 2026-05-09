@@ -60,6 +60,8 @@ export const useAppData = () => {
                 createdAt: Date.now(),
                 updatedAt: Date.now(),
                 isDefault: true,
+                customPrompt: "Act as a specialized Web Development Architect. Focus on grouping technical documentation and frameworks into the provided structure.",
+                tagDrivenPrompt: "Focus on technical tags like 'react', 'nodejs', 'api', 'frontend', 'backend'. Group these tags logically into the Web Development taxonomy."
             },
             {
                 id: 'template-ai-ml',
@@ -101,6 +103,8 @@ export const useAppData = () => {
                 createdAt: Date.now(),
                 updatedAt: Date.now(),
                 isDefault: true,
+                customPrompt: "Act as an AI Research Librarian. Categorize highly technical papers and tools into the ML hierarchy.",
+                tagDrivenPrompt: "Extract specific AI tags like 'LLM', 'neural-networks', 'transformers'. Map them to the AI/ML folder structure."
             },
             {
                 id: 'template-general',
@@ -141,6 +145,8 @@ export const useAppData = () => {
                 createdAt: Date.now(),
                 updatedAt: Date.now(),
                 isDefault: true,
+                customPrompt: "General organizer mode. Balance the categorization across Tech, Learning and Tools.",
+                tagDrivenPrompt: "Identify broad tags and distribute them across the three main pillars: Tech, Learning, and Tools."
             },
         ];
 

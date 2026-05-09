@@ -44,6 +44,9 @@ const App: React.FC = () => {
         batchSize, setBatchSize,
         maxRetries, setMaxRetries,
         processingMode, setProcessingMode,
+        tagDrivenMode, setTagDrivenMode,
+        tagCount, setTagCount,
+        tagLanguage, setTagLanguage,
         autoCleanupEmptyFolders, setAutoCleanupEmptyFolders,
 
         // Smart Classify
@@ -91,6 +94,9 @@ const App: React.FC = () => {
         batchSize,
         maxRetries,
         processingMode,
+        tagDrivenMode,
+        tagCount,
+        tagLanguage,
         systemPrompt,
         customInstructions,
         onFoldersUpdate: setFolders,

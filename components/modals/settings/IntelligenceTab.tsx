@@ -17,6 +17,14 @@ interface IntelligenceTabProps {
     selectedStyle: ArchitectureStyle;
     onStyleChange: (styleId: ArchitectureStyle) => void;
 
+    // Tag Engine props
+    tagDrivenMode: boolean;
+    onTagDrivenModeChange: (enabled: boolean) => void;
+    tagCount: number;
+    onTagCountChange: (count: number) => void;
+    tagLanguage: string;
+    onTagLanguageChange: (lang: string) => void;
+
     // Lifted state for rule creation
     isAddingRule: boolean;
     setIsAddingRule: (isAdding: boolean) => void;
@@ -32,6 +40,7 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
     instructionPresets, onCustomInstructionsChange, systemPrompt,
     onSystemPromptChange, customInstructions, smartClassifyRules, onSaveSmartRule, onDeleteSmartRule,
     selectedStyle, onStyleChange,
+    tagDrivenMode, onTagDrivenModeChange, tagCount, onTagCountChange, tagLanguage, onTagLanguageChange,
     isAddingRule, setIsAddingRule, newRulePattern, setNewRulePattern, newRuleType, setNewRuleType, newRulePath, setNewRulePath
 }) => {
     const handleAddRule = async (e: React.FormEvent) => {
@@ -109,6 +118,67 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
                         </button>
                     ))}
                 </div>
+            </section>
+
+            {/* Global Tag Engine Section */}
+            <section className="bg-purple-500/5 border border-purple-500/10 rounded-3xl p-8 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
+                    <LayersIcon className="w-32 h-32 text-purple-400" />
+                </div>
+
+                <div className="flex items-center justify-between mb-8 relative z-10">
+                    <div className="flex items-center space-x-3">
+                        <LayersIcon className="w-5 h-5 text-purple-400" />
+                        <div>
+                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Global Tag Engine</h3>
+                            <p className="text-[9px] text-gray-500 italic mt-0.5">Dual-phase classification: Extraction → Global Mapping</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => onTagDrivenModeChange(!tagDrivenMode)}
+                        className={`w-14 h-7 rounded-full transition-all duration-300 relative shadow-inner ${tagDrivenMode ? 'bg-purple-600' : 'bg-gray-800'}`}
+                    >
+                        <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all duration-300 shadow-lg ${tagDrivenMode ? 'left-8' : 'left-1'}`} />
+                    </button>
+                </div>
+
+                <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 transition-all duration-500 ${tagDrivenMode ? 'opacity-100' : 'opacity-40 pointer-events-none grayscale'}`}>
+                    <div className="space-y-4">
+                        <div className="flex flex-col space-y-2">
+                            <div className="flex justify-between items-center px-1">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Tags Per Bookmark</label>
+                                <span className="text-[10px] text-purple-400 font-mono font-black">{tagCount} TAGS</span>
+                            </div>
+                            <input 
+                                type="range" min="1" max="10" step="1"
+                                value={tagCount} onChange={e => onTagCountChange(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-black/40 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                            />
+                            <p className="text-[9px] text-gray-600 leading-relaxed italic">Higher counts improve discovery but increase folder complexity.</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="flex flex-col space-y-2">
+                            <div className="flex justify-between items-center px-1">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Semantic Language</label>
+                                <span className="text-[9px] text-blue-400 font-mono uppercase">Output Optimization</span>
+                            </div>
+                            <input 
+                                type="text" 
+                                value={tagLanguage} 
+                                onChange={e => onTagLanguageChange(e.target.value)}
+                                placeholder="e.g. English, Vietnamese, Tech Slang..."
+                                className="w-full bg-[#121418] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 outline-none transition-all font-medium"
+                            />
+                        </div>
+                    </div>
+                </div>
+                {!tagDrivenMode && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-[#1a1d23]/20 backdrop-blur-[1px] rounded-3xl z-20">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Engine Offline</p>
+                    </div>
+                )}
             </section>
 
             <section className="bg-white/5 border border-white/10 rounded-3xl p-8 relative overflow-hidden">

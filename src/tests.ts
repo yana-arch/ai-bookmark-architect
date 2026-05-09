@@ -1,9 +1,10 @@
 import { generateHash, cacheStats, CachedOperation, MemoryCache } from './cache';
 import { perfMonitor } from './performance';
 import { repairJson, parseAIResponse } from './services/aiService';
-import { arrayToTree, removeEmptyFolders } from './utils/treeUtils';
+import { arrayToTree, removeEmptyFolders, distributeBookmarksByTagSchema } from './utils/treeUtils';
 import { getApiConfigs, saveApiConfig, deleteApiConfig } from '../db';
 import type { Bookmark, Folder, CategorizedBookmark } from '../types';
+import type { TagFolderSchema } from './utils/aiUtils';
 
 // Test core business logic
 export const testCoreLogic = () => {
@@ -61,6 +62,20 @@ export const testCoreLogic = () => {
     const aiInTools = toolsInDesign?.children.find(f => !('url' in f) && (f as Folder).name === 'AI') as Folder;
     
     console.log('✅ Path Canonicalization (Pillar & Hierarchy Priority):', !!aiInTools);
+
+    // 6. Test Tag-Driven Distribution
+    const mockSchema: TagFolderSchema[] = [
+        { name: 'Development', mappedTags: ['coding', 'software'], children: [
+            { name: 'Frontend', mappedTags: ['react', 'vue'], children: [] }
+        ]}
+    ];
+    const bookmarksForTags: Bookmark[] = [
+        { id: 't1', title: 'React Docs', url: 'U-R', tags: ['React'], parentId: null },
+        { id: 't2', title: 'Random', url: 'U-M', tags: ['random-tag'], parentId: null }
+    ];
+    const distributed = distributeBookmarksByTagSchema(bookmarksForTags, mockSchema);
+    console.log('✅ Tag Distribution (Mapped):', distributed[0].path?.join('/') === 'Development/Frontend');
+    console.log('✅ Tag Distribution (Unmapped):', distributed[1].path?.[0] === '[Unmapped Tags]');
 
     console.groupEnd();
 };

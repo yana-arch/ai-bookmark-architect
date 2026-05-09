@@ -16,6 +16,11 @@ export interface AIResponse {
     };
 }
 
+export interface ChatMessage {
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+}
+
 /**
  * A client for interacting with various AI providers (Gemini, OpenAI, OpenRouter).
  * Standardizes requests and responses across different API architectures.
@@ -49,6 +54,25 @@ export class AIClient {
             case 'openrouter':
             case 'custom-openai':
                 return this.callOpenAI(systemPrompt, userPrompt);
+            default:
+                throw new Error(`Unsupported provider: ${provider}`);
+        }
+    }
+
+    /**
+     * Generates content using a stateful chat session approach.
+     */
+    async generateChatContent(systemPrompt: string, messages: ChatMessage[]): Promise<AIResponse> {
+        const { provider } = this.config;
+
+        switch (provider) {
+            case 'gemini':
+            case 'custom-gemini':
+                return this.callGeminiChat(systemPrompt, messages);
+            case 'openai':
+            case 'openrouter':
+            case 'custom-openai':
+                return this.callOpenAIChat(systemPrompt, messages);
             default:
                 throw new Error(`Unsupported provider: ${provider}`);
         }
@@ -97,12 +121,73 @@ export class AIClient {
     }
 
     /**
+     * Internal method to call Google Gemini with chat history.
+     */
+    private async callGeminiChat(systemPrompt: string, messages: ChatMessage[]): Promise<AIResponse> {
+        const { apiKey, model, apiUrl, provider } = this.config;
+        
+        let endpoint = this.resolveGeminiEndpoint(provider, model || 'gemini-1.5-flash', apiKey, apiUrl);
+
+        // Map ChatMessage to Gemini format
+        const contents = messages.map(msg => ({
+            role: msg.role === 'assistant' ? 'model' : msg.role === 'system' ? 'user' : msg.role,
+            parts: [{ text: msg.content }]
+        }));
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+                contents: contents,
+                generationConfig: {
+                    responseMimeType: 'application/json',
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Gemini API Error (${provider}): ${response.status} - ${errText}`);
+        }
+
+        const data = await response.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        
+        return { 
+            text, 
+            raw: data,
+            usage: data.usageMetadata ? {
+                promptTokens: data.usageMetadata.promptTokenCount || 0,
+                completionTokens: data.usageMetadata.candidatesTokenCount || 0,
+                totalTokens: data.usageMetadata.totalTokenCount || 0
+            } : undefined
+        };
+    }
+
+    /**
      * Internal method to call OpenAI, OpenRouter, or compatible custom endpoints.
      */
     private async callOpenAI(systemPrompt: string, userPrompt: string): Promise<AIResponse> {
+        return this.callOpenAIChat(systemPrompt, [{ role: 'user', content: userPrompt }]);
+    }
+
+    /**
+     * Internal method to call OpenAI-compatible endpoints with chat history.
+     */
+    private async callOpenAIChat(systemPrompt: string, messages: ChatMessage[]): Promise<AIResponse> {
         const { provider, apiKey, model, apiUrl } = this.config;
         
         const endpoint = this.resolveOpenAIEndpoint(provider, apiUrl);
+
+        const apiMessages = [
+            { role: 'system', content: systemPrompt },
+            ...messages
+        ];
 
         const response = await fetch(endpoint, {
             method: 'POST',
@@ -114,10 +199,7 @@ export class AIClient {
             },
             body: JSON.stringify({
                 model: model,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ],
+                messages: apiMessages,
                 response_format: { type: 'json_object' }
             })
         });

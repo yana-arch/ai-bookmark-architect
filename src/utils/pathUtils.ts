@@ -1,4 +1,4 @@
-import type { Folder, Bookmark } from '../types';
+import type { Folder, Bookmark } from '@/types';
 
 /**
  * Utilities for smart path canonicalization and standardization.
@@ -25,7 +25,7 @@ export const getPathSignature = (path: string[]): string => {
  */
 export const getAllExistingPaths = (nodes: (Folder | Bookmark)[], currentPath: string[] = []): string[][] => {
     let paths: string[][] = [];
-    
+
     nodes.forEach(node => {
         if (!('url' in node)) { // It's a folder
             const path = [...currentPath, node.name];
@@ -35,7 +35,7 @@ export const getAllExistingPaths = (nodes: (Folder | Bookmark)[], currentPath: s
             }
         }
     });
-    
+
     return paths;
 };
 
@@ -49,7 +49,7 @@ export const getAllExistingPaths = (nodes: (Folder | Bookmark)[], currentPath: s
  *    all exist in the proposed path, and use it as the prefix.
  */
 export const standardizePath = (
-    proposedPath: string[], 
+    proposedPath: string[],
     existingPaths: string[][]
 ): string[] => {
     if (!proposedPath || proposedPath.length === 0) return [];
@@ -75,9 +75,9 @@ export const standardizePath = (
 
     for (const existingPath of existingPaths) {
         const normalizedExisting = existingPath.map(normalizeName);
-        
+
         // Check if all components of existingPath are in proposedPath
-        const allComponentsPresent = normalizedExisting.every(comp => 
+        const allComponentsPresent = normalizedExisting.every(comp =>
             normalizedProposed.includes(comp)
         );
 
@@ -91,7 +91,7 @@ export const standardizePath = (
     if (bestMatch) {
         const normalizedBestMatch = bestMatch.map(normalizeName);
         // Create the standardized path: [Best Match Components] + [Remaining Proposed Components]
-        const remaining = proposedPath.filter(comp => 
+        const remaining = proposedPath.filter(comp =>
             !normalizedBestMatch.includes(normalizeName(comp))
         );
         return [...bestMatch, ...remaining];
