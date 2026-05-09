@@ -34,6 +34,8 @@ function buildModifiersBlock(modifiers?: PromptModifiers): string {
     if (modifiers.strictTechnical) rules.push('- Strict Technical: Strictly use standard, professional technical terminology for categories. Avoid slang or vague terms.');
     if (modifiers.groupByPurpose) rules.push('- Group by Purpose: Categorize based on user intent (e.g., "Read Later", "Tools", "Documentation", "Tutorials").');
     if (modifiers.shortFolderNames) rules.push('- Short Folder Names: Keep folder names extremely concise (1-2 words maximum). Never use long phrases.');
+    if (modifiers.maintainContext) rules.push('- Maintain Context: You are part of a multi-batch process. Strive for consistency with previous decisions.');
+    if (modifiers.includeHierarchy) rules.push('- Use Existing Hierarchy: Strictly follow and reuse the provided "Current Folder Structure" where possible to ensure structural continuity.');
 
     if (rules.length === 0) return '';
     return `\nSTRUCTURAL REQUIREMENTS:\n${rules.join('\n')}\n`;
@@ -48,6 +50,7 @@ export function generateCategorizationPrompt(params: {
     userHistory?: UserCorrection[];
     domainKnowledge?: string;
     tagLanguage?: string;
+    tagCount?: number;
     promptModifiers?: PromptModifiers;
 }): string {
     const {
@@ -57,6 +60,7 @@ export function generateCategorizationPrompt(params: {
         userHistory,
         domainKnowledge,
         tagLanguage = 'English',
+        tagCount = 3,
         promptModifiers
     } = params;
 
@@ -72,7 +76,9 @@ export function generateCategorizationPrompt(params: {
         }));
     };
     
-    const treeContext = JSON.stringify(getFullTreeContext(currentTree));
+    const treeContext = (promptModifiers?.includeHierarchy && currentTree.length > 0)
+        ? JSON.stringify(getFullTreeContext(currentTree))
+        : "None (Initial run or deep re-architecture)";
 
     let historyContext = '';
     if (userHistory && userHistory.length > 0) {
@@ -100,7 +106,7 @@ CRITICAL INSTRUCTION:
    - "title": Original title
    - "url": EXACT original URL (Do not modify!)
    - "path": Array of folder names (e.g., ["Tech", "React"])
-   - "tags": Array of keywords
+   - "tags": Array of keywords (Aim for exactly ${tagCount} tags per bookmark)
    - "confidence": A number from 0 to 100 representing your certainty in this categorization.
 4. Folder names and tags MUST be written in the language specified: ${tagLanguage}.
 5. The JSON structure:
@@ -331,4 +337,24 @@ export async function testCategorize(
         usage: response.usage,
         rawText: response.text 
     };
+}
+
+/**
+ * Heuristic token estimation (Characters / 4)
+ * Includes a 15% safety buffer
+ */
+export function estimateTokens(text: string): number {
+    if (!text) return 0;
+    const baseTokens = Math.ceil(text.length / 4);
+    return Math.ceil(baseTokens * 1.15);
+}
+
+/**
+ * Calculates the total tokens for a categorization request
+ */
+export function calculateRequestTokens(params: {
+    systemPrompt: string;
+    userPrompt: string;
+}): number {
+    return estimateTokens(params.systemPrompt) + estimateTokens(params.userPrompt);
 }

@@ -54,6 +54,8 @@ export const AIProfilesManager: React.FC<AIProfilesManagerProps> = ({
             temperature: 0.5,
             topK: 40,
             topP: 0.95,
+            maxOutputTokens: 2048,
+            requestTokenLimit: 16000,
             createdAt: Date.now(),
             updatedAt: Date.now()
         };
@@ -189,6 +191,22 @@ export const AIProfilesManager: React.FC<AIProfilesManagerProps> = ({
                         />
                         <p className="text-[9px] text-gray-600 italic">Giới hạn tập hợp từ vựng dựa trên xác suất tích lũy.</p>
                     </div>
+
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Request Token Limit</label>
+                            <span className="text-xs text-blue-400 font-mono font-black bg-blue-500/10 px-3 py-1 rounded-lg border border-blue-500/10">
+                                {editingProfile.requestTokenLimit ? (editingProfile.requestTokenLimit / 1000).toFixed(0) + 'K' : '16K'} TOKENS
+                            </span>
+                        </div>
+                        <input
+                            type="range" min="4000" max="128000" step="1000"
+                            value={editingProfile.requestTokenLimit || 16000}
+                            onChange={e => setEditingProfile({ ...editingProfile, requestTokenLimit: parseInt(e.target.value) })}
+                            className="w-full h-1.5 bg-black/40 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                        />
+                        <p className="text-[9px] text-gray-600 italic">Giới hạn token cho mỗi batch request (Model context window).</p>
+                    </div>
                 </div>
 
                 {/* Advanced Settings Accordion */}
@@ -216,6 +234,7 @@ export const AIProfilesManager: React.FC<AIProfilesManagerProps> = ({
                                     placeholder="e.g. 2048"
                                 />
                             </div>
+
 
                             <div className="space-y-3">
                                 <div className="flex justify-between items-center">

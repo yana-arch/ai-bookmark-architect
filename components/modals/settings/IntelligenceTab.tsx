@@ -132,42 +132,30 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
                     ))}
                 </div>
             </section>
-
-            {/* Global Tag Engine Section */}
-            <section className="bg-gradient-to-br from-purple-500/10 to-indigo-500/5 border border-purple-500/10 rounded-[2.5rem] p-10 relative overflow-hidden shadow-2xl shadow-purple-500/5">
-                <div className="absolute top-0 right-0 p-10 opacity-[0.05] pointer-events-none group-hover:scale-110 transition-transform duration-1000">
-                    <LayersIcon className="w-40 h-40 text-purple-400" />
-                </div>
-
-                <div className="flex items-center justify-between mb-10 relative z-10">
-                    <div className="flex items-center space-x-4">
-                        <div className="p-3 bg-purple-500/20 rounded-2xl border border-purple-500/20 shadow-inner">
-                            <LayersIcon className="w-6 h-6 text-purple-400" />
-                        </div>
-                        <div>
-                            <h3 className="text-xs font-black text-white uppercase tracking-widest">Global Tag Engine</h3>
-                            <p className="text-[10px] text-gray-500 italic mt-0.5 font-medium">Dual-phase classification: Extraction → Global Mapping</p>
-                        </div>
+            
+            {/* Global Reasoning Parameters */}
+            <section className="bg-[#121418]/40 border border-white/5 rounded-[2.5rem] p-10 relative overflow-hidden shadow-xl">
+                <div className="flex items-center space-x-4 mb-10 relative z-10">
+                    <div className="p-3 bg-blue-500/10 rounded-2xl border border-blue-500/10">
+                        <TagIcon className="w-6 h-6 text-blue-400" />
                     </div>
-                    <button
-                        onClick={() => onTagDrivenModeChange(!tagDrivenMode)}
-                        className={`w-16 h-8 rounded-full transition-all duration-500 relative shadow-2xl ${tagDrivenMode ? 'bg-purple-600 shadow-purple-500/20' : 'bg-gray-800'}`}
-                    >
-                        <div className={`absolute top-1.5 w-5 h-5 bg-white rounded-full transition-all duration-500 shadow-lg ${tagDrivenMode ? 'left-9' : 'left-1.5'}`} />
-                    </button>
+                    <div>
+                        <h3 className="text-xs font-black text-white uppercase tracking-widest">Global Reasoning Parameters</h3>
+                        <p className="text-[10px] text-gray-500 italic mt-0.5 font-medium">Configure extraction density and semantic output language</p>
+                    </div>
                 </div>
 
-                <div className={`grid grid-cols-1 md:grid-cols-2 gap-10 transition-all duration-700 ${tagDrivenMode ? 'opacity-100 translate-y-0' : 'opacity-20 pointer-events-none grayscale translate-y-2'}`}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10 relative z-10">
                     <div className="space-y-6">
                         <div className="flex flex-col space-y-3">
                             <div className="flex justify-between items-center px-1">
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tags Per Bookmark</label>
-                                <span className="text-[11px] text-purple-400 font-mono font-black bg-purple-500/10 px-3 py-1 rounded-lg border border-purple-500/10">{tagCount} TAGS</span>
+                                <span className="text-[11px] text-blue-400 font-mono font-black bg-blue-500/10 px-3 py-1 rounded-lg border border-blue-500/10">{tagCount} TAGS</span>
                             </div>
                             <input 
                                 type="range" min="1" max="10" step="1"
                                 value={tagCount} onChange={e => onTagCountChange(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-black/40 rounded-lg appearance-none cursor-pointer accent-purple-500 hover:accent-purple-400 transition-all"
+                                className="w-full h-1.5 bg-black/40 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-all"
                             />
                             <p className="text-[9px] text-gray-600 leading-relaxed font-medium">Higher counts improve discovery but increase folder complexity.</p>
                         </div>
@@ -187,18 +175,42 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
                                 value={tagLanguage} 
                                 onChange={e => onTagLanguageChange(e.target.value)}
                                 placeholder="e.g. English, Vietnamese, Tech Slang..."
-                                className="w-full bg-black/30 border border-white/5 rounded-2xl px-5 py-4 text-sm text-white focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 outline-none transition-all font-medium placeholder:text-gray-700 shadow-inner"
+                                className="w-full bg-black/30 border border-white/5 rounded-2xl px-5 py-4 text-sm text-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-medium placeholder:text-gray-700 shadow-inner"
                             />
                         </div>
                     </div>
                 </div>
-                {!tagDrivenMode && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-[#1a1d23]/40 backdrop-blur-[2px] rounded-3xl z-20 animate-fadeIn">
-                        <div className="px-6 py-2 bg-black/60 border border-white/10 rounded-full backdrop-blur-md">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Tag Engine Inactive</p>
+            </section>
+
+            {/* Global Tag Engine Section */}
+            <section className="bg-gradient-to-br from-purple-500/10 to-indigo-500/5 border border-purple-500/10 rounded-[2.5rem] p-10 relative overflow-hidden shadow-2xl shadow-purple-500/5">
+                <div className="absolute top-0 right-0 p-10 opacity-[0.05] pointer-events-none group-hover:scale-110 transition-transform duration-1000">
+                    <LayersIcon className="w-40 h-40 text-purple-400" />
+                </div>
+
+                <div className="flex items-center justify-between relative z-10">
+                    <div className="flex items-center space-x-4">
+                        <div className="p-3 bg-purple-500/20 rounded-2xl border border-purple-500/20 shadow-inner">
+                            <LayersIcon className="w-6 h-6 text-purple-400" />
+                        </div>
+                        <div>
+                            <h3 className="text-xs font-black text-white uppercase tracking-widest">Global Tag Engine</h3>
+                            <p className="text-[10px] text-gray-500 italic mt-0.5 font-medium">Dual-phase classification: Extraction → Global Mapping</p>
                         </div>
                     </div>
-                )}
+                    <button
+                        onClick={() => onTagDrivenModeChange(!tagDrivenMode)}
+                        className={`w-16 h-8 rounded-full transition-all duration-500 relative shadow-2xl ${tagDrivenMode ? 'bg-purple-600 shadow-purple-500/20' : 'bg-gray-800'}`}
+                    >
+                        <div className={`absolute top-1.5 w-5 h-5 bg-white rounded-full transition-all duration-500 shadow-lg ${tagDrivenMode ? 'left-9' : 'left-1.5'}`} />
+                    </button>
+                </div>
+                
+                <div className="mt-8 relative z-10">
+                    <p className="text-[10px] text-gray-400 leading-relaxed max-w-2xl font-medium">
+                        Khi bật, hệ thống sẽ thực hiện quy trình 2 giai đoạn: Trước tiên trích xuất các nhãn (tags) từ bookmarks, sau đó sử dụng AI để lập bản đồ các nhãn này vào một cấu trúc thư mục nhất quán. Phương pháp này giúp giảm thiểu sự phân mảnh và lặp lại thư mục.
+                    </p>
+                </div>
             </section>
 
             <AIProfilesManager 
@@ -263,6 +275,8 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
                         { key: 'strictTechnical', label: 'Strict Technical', desc: 'Dev-centric naming' },
                         { key: 'groupByPurpose', label: 'Group by Purpose', desc: 'Intent-based buckets' },
                         { key: 'shortFolderNames', label: 'Short Naming', desc: '1-2 words maximum' },
+                        { key: 'maintainContext', label: 'Maintain Context', desc: 'Use AI session memory' },
+                        { key: 'includeHierarchy', label: 'Inject Hierarchy', desc: 'Feed existing tree to AI' },
                     ].map((mod) => {
                         const isChecked = promptModifiers[mod.key as keyof PromptModifiers] as boolean;
                         return (

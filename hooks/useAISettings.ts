@@ -127,7 +127,9 @@ export const useAISettings = () => {
             useEmojis: false,
             strictTechnical: false,
             groupByPurpose: false,
-            shortFolderNames: false
+            shortFolderNames: false,
+            maintainContext: true,
+            includeHierarchy: false
         };
     });
 

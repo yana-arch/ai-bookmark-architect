@@ -70,6 +70,7 @@ export interface AIProfile {
   topK?: number;
   topP?: number;
   maxOutputTokens?: number;
+  requestTokenLimit?: number;
   frequencyPenalty?: number;
   presencePenalty?: number;
   createdAt: number;
@@ -254,4 +255,6 @@ export interface PromptModifiers {
   strictTechnical: boolean;
   groupByPurpose: boolean;
   shortFolderNames: boolean;
+  maintainContext: boolean;
+  includeHierarchy: boolean;
 }

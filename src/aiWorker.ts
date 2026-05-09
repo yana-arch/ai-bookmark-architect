@@ -10,7 +10,8 @@ import {
     generateTagMappingPrompt,
     parseTagMappingResponse,
     generateTagAnalysisPrompt,
-    generateTagBatchRequestPrompt
+    generateTagBatchRequestPrompt,
+    calculateRequestTokens
 } from './services/aiService';
 import type { ChatMessage } from './services/aiClient';
 
@@ -101,17 +102,106 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                     batchIndex
                 } as WorkerResponse);
 
+                // Token-aware Batch Splitting Logic
+                const tokenLimit = activeProfile?.requestTokenLimit || 16000;
+                const chatHistory: ChatMessage[] = [];
+                
+                const processWithTokenLimit = async (subBatch: Bookmark[]): Promise<any[]> => {
+                    let tempPrompt = '';
+                    let subSystemPrompt = systemPrompt;
+
+                    if (taskType === 'extract_tags') {
+                        tempPrompt = generateTagExtractionPrompt({ batch: subBatch, tagCount, tagLanguage });
+                        subSystemPrompt = ''; // Tag extraction doesn't use the main system prompt
+                    } else {
+                        tempPrompt = generateCategorizationPrompt({
+                            userInstructionBlock,
+                            currentTree,
+                            batch: subBatch,
+                            userHistory,
+                            domainKnowledge,
+                            tagLanguage,
+                            tagCount,
+                            promptModifiers
+                        });
+                    }
+
+                    const totalTokens = calculateRequestTokens({ systemPrompt: subSystemPrompt, userPrompt: tempPrompt });
+
+                    if (totalTokens > tokenLimit && subBatch.length > 1) {
+                        const mid = Math.floor(subBatch.length / 2);
+                        const left = subBatch.slice(0, mid);
+                        const right = subBatch.slice(mid);
+                        
+                        self.postMessage({
+                            type: 'log',
+                            log: { message: `Batch ${batchIndex}: [${taskType}] Request size (${totalTokens} tokens) exceeds limit (${tokenLimit}). Splitting sub-batch of ${subBatch.length} into ${left.length} and ${right.length}.` },
+                            batchIndex
+                        } as WorkerResponse);
+
+                        const leftResults = await processWithTokenLimit(left);
+                        const rightResults = await processWithTokenLimit(right);
+                        return [...leftResults, ...rightResults];
+                    }
+
+                    // Base case: Process the sub-batch
+                    let responseText = '';
+                    let responseUsage: any = null;
+
+                    if (taskType === 'categorize' && promptModifiers?.maintainContext) {
+                        const { text, usage: u } = await client.generateChatContent(subSystemPrompt, [
+                            ...chatHistory,
+                            { role: 'user', content: tempPrompt }
+                        ]);
+                        responseText = text;
+                        responseUsage = u;
+                        
+                        if (responseText) {
+                            chatHistory.push({ role: 'user', content: tempPrompt });
+                            chatHistory.push({ role: 'assistant', content: responseText });
+                            if (chatHistory.length > 10) chatHistory.splice(0, 2);
+                        }
+                    } else {
+                        const { text, usage: u } = await client.generateContent(subSystemPrompt, tempPrompt);
+                        responseText = text;
+                        responseUsage = u;
+                    }
+                    
+                    if (!responseText) throw new Error('AI returned empty response');
+                    
+                    let parsedData: any[] = [];
+                    if (taskType === 'extract_tags') {
+                        parsedData = parseTagExtractionResponse(responseText);
+                        if (parsedData.length === 0) throw new Error('Failed to parse tag extraction response');
+                    } else {
+                        parsedData = parseAIResponse(responseText);
+                    }
+                    
+                    if (responseUsage) {
+                        if (!usage) usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+                        usage.promptTokens += responseUsage.promptTokens;
+                        usage.completionTokens += responseUsage.completionTokens;
+                        usage.totalTokens += responseUsage.totalTokens;
+                    }
+
+                    if (taskType === 'extract_tags') return parsedData;
+
+                    return parsedData.map(cbm => {
+                        const original = subBatch.find(b => b.url === cbm.url);
+                        return {
+                            ...cbm,
+                            id: original ? original.id : cbm.id,
+                            parentId: null
+                        };
+                    });
+                };
+
                 let userPrompt = '';
                 let resultData: any = null;
                 let usage: any = null;
 
                 if (taskType === 'extract_tags') {
-                    userPrompt = generateTagExtractionPrompt({ batch, tagCount, tagLanguage });
-                    const { text: responseText, usage: responseUsage } = await client.generateContent('', userPrompt);
-                    if (!responseText) throw new Error('AI returned empty response');
-                    resultData = parseTagExtractionResponse(responseText);
-                    usage = responseUsage;
-                    if (resultData.length === 0) throw new Error('Failed to parse tag extraction response');
+                    resultData = await processWithTokenLimit(batch);
                 } 
                 else if (taskType === 'map_tags_to_tree') {
                     // Stateful Chat Session for Mapping
@@ -191,42 +281,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                     if (resultData.length === 0) throw new Error('Failed to parse any tag mapping schema from the chat session');
                 }
                 else {
-                    // categorize
-                    userPrompt = generateCategorizationPrompt({
-                        userInstructionBlock,
-                        currentTree,
-                        batch,
-                        userHistory,
-                        domainKnowledge,
-                        tagLanguage,
-                        promptModifiers
-                    });
-
-                    const { text: responseText, usage: responseUsage } = await client.generateContent(systemPrompt, userPrompt);
-
-                    if (!responseText) {
-                        throw new Error('AI returned empty response');
-                    }
-
-                    const categorizedBookmarks = parseAIResponse(responseText);
-                    usage = responseUsage;
-
-                    if (categorizedBookmarks.length === 0) {
-                        let errMsg = responseText || 'empty response';
-                        if (errMsg.length > 150) {
-                            errMsg = errMsg.substring(0, 150) + '...';
-                        }
-                        throw new Error(`AI returned invalid format: ${errMsg}`);
-                    }
-
-                    resultData = categorizedBookmarks.map(cbm => {
-                        const original = batch.find(b => b.url === cbm.url);
-                        return {
-                            ...cbm,
-                            id: original ? original.id : cbm.id,
-                            parentId: null
-                        };
-                    });
+                    resultData = await processWithTokenLimit(batch);
                 }
 
                 success = true;
