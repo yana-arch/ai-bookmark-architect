@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, type AIProfile } from '../types';
+import { type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, type AIProfile, type UserCorrection } from '../types';
 import { arrayToTree, removeEmptyFolders, distributeBookmarksByTagSchema } from '../src/utils/treeUtils';
 import { perfMonitor } from '../src/performance';
 import { saveLog } from '../db';
@@ -22,6 +22,7 @@ interface UseBookmarkProcessingProps {
     onProcessingComplete?: (hasError: boolean) => void;
     autoCleanupEmptyFolders?: boolean;
     activeProfile: AIProfile | null;
+    userHistory: UserCorrection[];
 }
 
 // Helper to simplify folder structure for AI context (removes IDs and Bookmarks)
@@ -59,7 +60,8 @@ export const useBookmarkProcessing = ({
     onNotificationsAdd,
     onProcessingComplete,
     autoCleanupEmptyFolders = false,
-    activeProfile
+    activeProfile,
+    userHistory = []
 }: UseBookmarkProcessingProps) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState({ current: 0, total: 0 });
@@ -320,7 +322,8 @@ export const useBookmarkProcessing = ({
                             uniqueTags,
                             tagLanguage,
                             activeProfile,
-                            promptModifiers
+                            promptModifiers,
+                            userHistory
                         }
                     });
                 };
@@ -347,7 +350,8 @@ export const useBookmarkProcessing = ({
                             tagCount,
                             tagLanguage,
                             activeProfile,
-                            promptModifiers
+                            promptModifiers,
+                            userHistory
                         }
                     });
                 };
@@ -544,7 +548,8 @@ export const useBookmarkProcessing = ({
                         currentTree,
                         tagLanguage,
                         activeProfile,
-                        promptModifiers
+                        promptModifiers,
+                        userHistory
                     }
                 });
             };
@@ -616,7 +621,7 @@ export const useBookmarkProcessing = ({
             }
             return true;
         });
-    }, [batchSize, maxRetries, processingMode, tagDrivenMode, tagCount, tagLanguage, promptModifiers, systemPrompt, customInstructions, onFoldersUpdate, addDetailedLog, onProcessingComplete, autoCleanupEmptyFolders, activeProfile]);
+    }, [batchSize, maxRetries, processingMode, tagDrivenMode, tagCount, tagLanguage, promptModifiers, systemPrompt, customInstructions, onFoldersUpdate, addDetailedLog, onProcessingComplete, autoCleanupEmptyFolders, activeProfile, userHistory]);
 
     const resetProcessingState = useCallback(() => {
         setIsProcessing(false);

@@ -33,6 +33,7 @@ interface DataContextType {
     handleDeleteSmartRule: (id: string) => Promise<void>;
     applySmartClassify: (bookmarksToProcess: Bookmark[], rules: SmartClassifyRule[]) => { classified: CategorizedBookmark[], remaining: Bookmark[] };
     handleClearData: () => Promise<void>;
+    handleMoveBookmark: (bookmarkId: string, targetFolderId: string | 'root') => Promise<void>;
     refreshData: () => Promise<void>;
 }
 
@@ -140,6 +141,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         handleDeleteSmartRule: smartClassify.deleteRule,
         applySmartClassify: smartClassify.applySmartClassify,
         handleClearData: appData.handleClearData,
+        handleMoveBookmark: appData.handleMoveBookmark,
         refreshData: appData.refreshData,
     };
 

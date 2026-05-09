@@ -48,9 +48,9 @@ export const DataTab: React.FC<DataTabProps> = ({
                         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Advanced Export Engine</h3>
                     </div>
                 </div>
-                
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2 space-y-8">
+
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                    <div className="lg:col-span-3 space-y-10">
                         <div className="space-y-4">
                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Target Format</label>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -58,11 +58,10 @@ export const DataTab: React.FC<DataTabProps> = ({
                                     <button
                                         key={f}
                                         onClick={() => setExportOptions(prev => ({ ...prev, format: f }))}
-                                        className={`p-4 rounded-2xl border transition-all relative overflow-hidden group ${
-                                            exportOptions.format === f 
-                                            ? 'border-blue-500 bg-blue-500/10 text-white' 
-                                            : 'border-white/5 bg-[#121418] hover:border-white/10 text-gray-500'
-                                        }`}
+                                        className={`p-5 rounded-2xl border transition-all relative overflow-hidden group ${exportOptions.format === f
+                                                ? 'border-blue-500 bg-blue-500/10 text-white shadow-[0_0_20px_rgba(59,130,246,0.15)]'
+                                                : 'border-white/5 bg-[#121418] hover:border-white/10 text-gray-500'
+                                            }`}
                                     >
                                         <div className="text-sm font-black uppercase tracking-widest relative z-10">{f}</div>
                                         <div className="text-[9px] opacity-60 mt-1 relative z-10">{formatDetails[f].name}</div>
@@ -80,25 +79,24 @@ export const DataTab: React.FC<DataTabProps> = ({
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between px-1">
                                     <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Selective Folders</label>
-                                    <LayersIcon className="w-3 h-3 text-gray-600" />
+                                    <LayersIcon className="w-4 h-4 text-gray-600" />
                                 </div>
-                                <div className="bg-[#121418] border border-white/10 rounded-2xl p-4 h-56 overflow-y-auto custom-scrollbar space-y-1">
+                                <div className="bg-[#121418] border border-white/10 rounded-2xl p-4 h-72 overflow-y-auto custom-scrollbar space-y-1 shadow-inner">
                                     {folders.map(f => (
-                                        <label key={f.id} className={`flex items-center space-x-3 p-2.5 rounded-xl cursor-pointer transition-colors ${
-                                            exportOptions.selectedFolders.includes(f.id) ? 'bg-blue-500/10' : 'hover:bg-white/5'
-                                        }`}>
-                                            <input 
-                                                type="checkbox" 
+                                        <label key={f.id} className={`flex items-center space-x-3 p-3 rounded-xl cursor-pointer transition-colors ${exportOptions.selectedFolders.includes(f.id) ? 'bg-blue-500/10 border border-blue-500/20' : 'hover:bg-white/5 border border-transparent'
+                                            }`}>
+                                            <input
+                                                type="checkbox"
                                                 checked={exportOptions.selectedFolders.includes(f.id)}
                                                 onChange={() => setExportOptions(prev => ({
                                                     ...prev,
-                                                    selectedFolders: prev.selectedFolders.includes(f.id) 
+                                                    selectedFolders: prev.selectedFolders.includes(f.id)
                                                         ? prev.selectedFolders.filter(id => id !== f.id)
                                                         : [...prev.selectedFolders, f.id]
                                                 }))}
-                                                className="w-4 h-4 rounded border-white/10 bg-black/40 text-blue-500 focus:ring-0"
+                                                className="w-4 h-4 rounded border-white/10 bg-black/40 text-blue-500 focus:ring-0 transition-all"
                                             />
-                                            <span className={`text-xs font-medium ${exportOptions.selectedFolders.includes(f.id) ? 'text-blue-400' : 'text-gray-400'}`}>
+                                            <span className={`text-xs font-bold uppercase tracking-tight ${exportOptions.selectedFolders.includes(f.id) ? 'text-blue-400' : 'text-gray-400'}`}>
                                                 {f.name}
                                             </span>
                                         </label>
@@ -110,9 +108,9 @@ export const DataTab: React.FC<DataTabProps> = ({
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between px-1">
                                     <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Tag Filtering</label>
-                                    <TagIcon className="w-3 h-3 text-gray-600" />
+                                    <TagIcon className="w-4 h-4 text-gray-600" />
                                 </div>
-                                <div className="bg-[#121418] border border-white/10 rounded-2xl p-4 h-56 overflow-y-auto custom-scrollbar flex flex-wrap gap-2 content-start">
+                                <div className="bg-[#121418] border border-white/10 rounded-2xl p-4 h-72 overflow-y-auto custom-scrollbar flex flex-wrap gap-2 content-start shadow-inner">
                                     {Array.from(new Set(bookmarks.flatMap(b => b.tags || []))).map(tag => (
                                         <button
                                             key={tag}
@@ -122,11 +120,10 @@ export const DataTab: React.FC<DataTabProps> = ({
                                                     ? prev.selectedTags.filter(t => t !== tag)
                                                     : [...prev.selectedTags, tag]
                                             }))}
-                                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all uppercase tracking-tighter ${
-                                                exportOptions.selectedTags.includes(tag)
-                                                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                                                : 'bg-white/5 text-gray-500 border border-white/5 hover:border-white/20'
-                                            }`}
+                                            className={`px-3 py-2 rounded-xl text-[10px] font-bold transition-all uppercase tracking-tight ${exportOptions.selectedTags.includes(tag)
+                                                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
+                                                    : 'bg-white/5 text-gray-500 border border-white/5 hover:border-white/20'
+                                                }`}
                                         >
                                             {tag}
                                         </button>
@@ -137,17 +134,21 @@ export const DataTab: React.FC<DataTabProps> = ({
                         </div>
                     </div>
 
-                    <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[2.5rem] p-10 flex flex-col items-center justify-center text-center shadow-2xl shadow-blue-500/20 h-full relative overflow-hidden group">
+                    <div className="lg:col-span-1 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-center shadow-2xl shadow-blue-500/20 h-full min-h-[300px] relative overflow-hidden group border border-white/10">
                         <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700"></div>
-                        <div className="text-5xl font-black text-white mb-2 tracking-tighter">{bookmarks.length}</div>
-                        <p className="text-[10px] text-white/60 mb-10 uppercase tracking-[0.3em] font-black">ENTITIES LOADED</p>
-                        <button 
-                            onClick={() => onExport(exportOptions)}
-                            className="w-full bg-white text-blue-600 font-black py-4 rounded-2xl transition-all hover:scale-105 active:scale-95 shadow-xl flex items-center justify-center uppercase tracking-widest text-xs"
-                        >
-                            <DownloadIcon className="w-5 h-5 mr-3" />
-                            Compile Export
-                        </button>
+                        <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-blue-400/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700 delay-100"></div>
+
+                        <div className="relative z-10">
+                            <div className="text-4xl font-black text-white mb-2 tracking-tighter drop-shadow-2xl">{bookmarks.length}</div>
+                            <p className="text-[10px] text-white/70 mb-10 uppercase tracking-[0.3em] font-black">ENTITIES LOADED</p>
+                            <button
+                                onClick={() => onExport(exportOptions)}
+                                className="w-full bg-white text-blue-600 font-black py-4 px-6 rounded-2xl transition-all hover:scale-105 active:scale-95 shadow-xl flex items-center justify-center uppercase tracking-widest text-[10px]"
+                            >
+                                <DownloadIcon className="w-4 h-4 mr-3" />
+                                Compile Export
+                            </button>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -162,10 +163,10 @@ export const DataTab: React.FC<DataTabProps> = ({
 
                 {!importFile ? (
                     <div className="border-2 border-dashed border-white/10 rounded-[2.5rem] p-16 flex flex-col items-center justify-center text-center group hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all cursor-pointer relative bg-[#121418]">
-                        <input 
-                            type="file" 
+                        <input
+                            type="file"
                             onChange={(e) => e.target.files?.[0] && onFileSelect(e.target.files[0])}
-                            className="absolute inset-0 opacity-0 cursor-pointer" 
+                            className="absolute inset-0 opacity-0 cursor-pointer"
                         />
                         <div className="p-5 bg-emerald-500/10 text-emerald-400 rounded-[2rem] mb-6 group-hover:scale-110 transition-transform duration-500 shadow-inner">
                             <UploadIcon className="w-10 h-10" />
@@ -202,13 +203,13 @@ export const DataTab: React.FC<DataTabProps> = ({
                         </div>
 
                         <div className="flex space-x-6 relative z-10">
-                            <button 
+                            <button
                                 onClick={() => onImport('merge')}
                                 className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-black font-black py-5 rounded-2xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] uppercase tracking-widest text-xs active:scale-95"
                             >
                                 Merge into Cluster
                             </button>
-                            <button 
+                            <button
                                 onClick={() => onImport('overwrite')}
                                 className="flex-1 bg-white/5 hover:bg-white/10 text-white font-black py-5 rounded-2xl transition-all border border-white/10 uppercase tracking-widest text-xs active:scale-95"
                             >

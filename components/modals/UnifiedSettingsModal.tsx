@@ -230,38 +230,61 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
     ];
 
     return (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] backdrop-blur-sm animate-fadeIn">
-            <div className="bg-[#1a1d23]/95 border border-white/10 rounded-2xl shadow-2xl w-full max-w-5xl h-[85vh] flex overflow-hidden glass-effect">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] backdrop-blur-md animate-fadeIn transition-all duration-500">
+            <div className="bg-[#121418]/90 border border-white/10 rounded-[3rem] shadow-[0_0_100px_rgba(0,0,0,0.8)] w-full max-w-6xl h-[85vh] flex overflow-hidden glass-effect animate-slideUp relative">
+                {/* Global Glow */}
+                <div className="absolute -top-[20%] -right-[10%] w-[50%] h-[50%] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none"></div>
+                <div className="absolute -bottom-[20%] -left-[10%] w-[50%] h-[50%] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none"></div>
+
                 {/* Sidebar */}
-                <div className="w-64 border-r border-white/5 bg-black/20 p-6 flex flex-col">
-                    <div className="flex items-center mb-8 px-2">
-                        <CogIcon className="w-6 h-6 text-emerald-400 mr-3" />
-                        <h2 className="text-lg font-bold text-white tracking-tight">Settings</h2>
+                <div className="w-72 border-r border-white/5 bg-[#0a0c10]/80 backdrop-blur-xl p-8 flex flex-col relative overflow-hidden">
+                    {/* Decorative element */}
+                    <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-[0.02]">
+                        <div className="absolute -top-24 -left-24 w-64 h-64 bg-emerald-500 rounded-full blur-[80px]"></div>
+                        <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-blue-500 rounded-full blur-[80px]"></div>
                     </div>
 
-                    <nav className="flex-1 space-y-1">
+                    <div className="flex items-center mb-12 px-2 relative z-10">
+                        <div className="p-2.5 bg-gradient-to-br from-emerald-500/20 to-blue-500/10 rounded-2xl border border-white/10 shadow-inner mr-4">
+                            <CogIcon className="w-6 h-6 text-emerald-400" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-black text-white tracking-tight uppercase">Settings</h2>
+                            <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mt-0.5">Control Center</p>
+                        </div>
+                    </div>
+
+                    <nav className="flex-1 space-y-2 relative z-10">
                         {navItems.map(item => (
                             <button
                                 key={item.id}
                                 onClick={() => setActiveTab(item.id)}
-                                className={`w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${activeTab === item.id
-                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
-                                        : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+                                className={`w-full flex items-center px-5 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-500 group relative ${activeTab === item.id
+                                        ? 'bg-white/5 text-white border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.4)]'
+                                        : 'text-gray-500 hover:bg-white/[0.02] hover:text-gray-300'
                                     }`}
                             >
-                                <span className="mr-3">{item.icon}</span>
+                                <span className={`mr-4 transition-all duration-500 ${activeTab === item.id ? 'text-emerald-400 scale-110' : 'text-gray-600 group-hover:text-gray-400'}`}>
+                                    {item.icon}
+                                </span>
                                 {item.label}
+                                
+                                {activeTab === item.id && (
+                                    <div className="absolute left-0 w-1 h-6 bg-emerald-500 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.8)]"></div>
+                                )}
                             </button>
                         ))}
                     </nav>
 
-                    <button
-                        onClick={onClose}
-                        className="mt-auto flex items-center px-4 py-3 rounded-xl text-sm font-medium text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-all border border-transparent hover:border-red-500/20"
-                    >
-                        <XIcon className="w-4 h-4 mr-3" />
-                        Close Settings
-                    </button>
+                    <div className="mt-8 pt-8 border-t border-white/5 relative z-10">
+                        <button
+                            onClick={onClose}
+                            className="w-full flex items-center px-5 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-500 hover:bg-red-500/10 hover:text-red-400 transition-all border border-transparent hover:border-red-500/10 active:scale-95"
+                        >
+                            <XIcon className="w-4 h-4 mr-4" />
+                            Exit Terminal
+                        </button>
+                    </div>
                 </div>
 
                 {/* Content */}

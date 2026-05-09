@@ -90,33 +90,32 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
                 </div>
             </header>
 
-            {/* Architecture Style Section */}
             <section>
                 <div className="flex items-center space-x-3 mb-6 px-1">
                     <ChipIcon className="w-4 h-4 text-blue-400" />
-                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Taxonomy Architecture</h3>
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Taxonomy Architecture</h3>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                     {ARCHITECTURE_STYLES.map((style) => (
                         <button
                             key={style.id}
                             onClick={() => onStyleChange(style.id)}
-                            className={`relative flex flex-col items-start text-left p-5 rounded-2xl border transition-all duration-300 group overflow-hidden ${
+                            className={`relative flex flex-col items-start text-left p-6 rounded-[2rem] border transition-all duration-500 group overflow-hidden ${
                                 selectedStyle === style.id
-                                    ? 'bg-blue-600/10 border-blue-500 ring-2 ring-blue-500/20'
-                                    : 'bg-white/5 border-white/10 hover:border-white/20'
+                                    ? 'bg-blue-600/10 border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.1)]'
+                                    : 'bg-[#121418]/60 border-white/5 hover:border-white/10'
                             }`}
                         >
-                            <div className="flex justify-between w-full mb-3">
-                                <h3 className={`font-bold tracking-wider text-[11px] transition-colors uppercase ${
-                                    selectedStyle === style.id ? 'text-blue-400' : 'text-gray-200'
+                            <div className="flex justify-between w-full mb-4 relative z-10">
+                                <h3 className={`font-black tracking-widest text-[10px] transition-colors uppercase ${
+                                    selectedStyle === style.id ? 'text-blue-400' : 'text-gray-400'
                                 }`}>
                                     {style.name}
                                 </h3>
-                                <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
+                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
                                     selectedStyle === style.id 
-                                        ? 'border-blue-500 bg-blue-500' 
-                                        : 'border-white/20'
+                                        ? 'border-blue-500 bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]' 
+                                        : 'border-white/10 group-hover:border-white/20'
                                 }`}>
                                     {selectedStyle === style.id && (
                                         <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
@@ -124,75 +123,80 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
                                 </div>
                             </div>
                             
-                            <p className="text-[10px] text-gray-500 leading-relaxed line-clamp-2 group-hover:text-gray-400 transition-colors">
+                            <p className="text-[10px] text-gray-500 leading-relaxed group-hover:text-gray-300 transition-colors relative z-10">
                                 {style.longDescription}
                             </p>
 
-                            {selectedStyle === style.id && (
-                                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent pointer-events-none"></div>
-                            )}
+                            <div className={`absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent transition-opacity duration-500 ${selectedStyle === style.id ? 'opacity-100' : 'opacity-0'}`}></div>
                         </button>
                     ))}
                 </div>
             </section>
 
             {/* Global Tag Engine Section */}
-            <section className="bg-purple-500/5 border border-purple-500/10 rounded-3xl p-8 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
-                    <LayersIcon className="w-32 h-32 text-purple-400" />
+            <section className="bg-gradient-to-br from-purple-500/10 to-indigo-500/5 border border-purple-500/10 rounded-[2.5rem] p-10 relative overflow-hidden shadow-2xl shadow-purple-500/5">
+                <div className="absolute top-0 right-0 p-10 opacity-[0.05] pointer-events-none group-hover:scale-110 transition-transform duration-1000">
+                    <LayersIcon className="w-40 h-40 text-purple-400" />
                 </div>
 
-                <div className="flex items-center justify-between mb-8 relative z-10">
-                    <div className="flex items-center space-x-3">
-                        <LayersIcon className="w-5 h-5 text-purple-400" />
+                <div className="flex items-center justify-between mb-10 relative z-10">
+                    <div className="flex items-center space-x-4">
+                        <div className="p-3 bg-purple-500/20 rounded-2xl border border-purple-500/20 shadow-inner">
+                            <LayersIcon className="w-6 h-6 text-purple-400" />
+                        </div>
                         <div>
-                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Global Tag Engine</h3>
-                            <p className="text-[9px] text-gray-500 italic mt-0.5">Dual-phase classification: Extraction → Global Mapping</p>
+                            <h3 className="text-xs font-black text-white uppercase tracking-widest">Global Tag Engine</h3>
+                            <p className="text-[10px] text-gray-500 italic mt-0.5 font-medium">Dual-phase classification: Extraction → Global Mapping</p>
                         </div>
                     </div>
                     <button
                         onClick={() => onTagDrivenModeChange(!tagDrivenMode)}
-                        className={`w-14 h-7 rounded-full transition-all duration-300 relative shadow-inner ${tagDrivenMode ? 'bg-purple-600' : 'bg-gray-800'}`}
+                        className={`w-16 h-8 rounded-full transition-all duration-500 relative shadow-2xl ${tagDrivenMode ? 'bg-purple-600 shadow-purple-500/20' : 'bg-gray-800'}`}
                     >
-                        <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all duration-300 shadow-lg ${tagDrivenMode ? 'left-8' : 'left-1'}`} />
+                        <div className={`absolute top-1.5 w-5 h-5 bg-white rounded-full transition-all duration-500 shadow-lg ${tagDrivenMode ? 'left-9' : 'left-1.5'}`} />
                     </button>
                 </div>
 
-                <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 transition-all duration-500 ${tagDrivenMode ? 'opacity-100' : 'opacity-40 pointer-events-none grayscale'}`}>
-                    <div className="space-y-4">
-                        <div className="flex flex-col space-y-2">
+                <div className={`grid grid-cols-1 md:grid-cols-2 gap-10 transition-all duration-700 ${tagDrivenMode ? 'opacity-100 translate-y-0' : 'opacity-20 pointer-events-none grayscale translate-y-2'}`}>
+                    <div className="space-y-6">
+                        <div className="flex flex-col space-y-3">
                             <div className="flex justify-between items-center px-1">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Tags Per Bookmark</label>
-                                <span className="text-[10px] text-purple-400 font-mono font-black">{tagCount} TAGS</span>
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tags Per Bookmark</label>
+                                <span className="text-[11px] text-purple-400 font-mono font-black bg-purple-500/10 px-3 py-1 rounded-lg border border-purple-500/10">{tagCount} TAGS</span>
                             </div>
                             <input 
                                 type="range" min="1" max="10" step="1"
                                 value={tagCount} onChange={e => onTagCountChange(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-black/40 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                                className="w-full h-1.5 bg-black/40 rounded-lg appearance-none cursor-pointer accent-purple-500 hover:accent-purple-400 transition-all"
                             />
-                            <p className="text-[9px] text-gray-600 leading-relaxed italic">Higher counts improve discovery but increase folder complexity.</p>
+                            <p className="text-[9px] text-gray-600 leading-relaxed font-medium">Higher counts improve discovery but increase folder complexity.</p>
                         </div>
                     </div>
 
-                    <div className="space-y-4">
-                        <div className="flex flex-col space-y-2">
+                    <div className="space-y-6">
+                        <div className="flex flex-col space-y-3">
                             <div className="flex justify-between items-center px-1">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Semantic Language</label>
-                                <span className="text-[9px] text-blue-400 font-mono uppercase">Output Optimization</span>
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Semantic Language</label>
+                                <div className="flex items-center space-x-1.5">
+                                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
+                                    <span className="text-[9px] text-blue-400 font-black uppercase tracking-tighter">Output Tuning</span>
+                                </div>
                             </div>
                             <input 
                                 type="text" 
                                 value={tagLanguage} 
                                 onChange={e => onTagLanguageChange(e.target.value)}
                                 placeholder="e.g. English, Vietnamese, Tech Slang..."
-                                className="w-full bg-[#121418] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 outline-none transition-all font-medium"
+                                className="w-full bg-black/30 border border-white/5 rounded-2xl px-5 py-4 text-sm text-white focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 outline-none transition-all font-medium placeholder:text-gray-700 shadow-inner"
                             />
                         </div>
                     </div>
                 </div>
                 {!tagDrivenMode && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-[#1a1d23]/20 backdrop-blur-[1px] rounded-3xl z-20">
-                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Engine Offline</p>
+                    <div className="absolute inset-0 flex items-center justify-center bg-[#1a1d23]/40 backdrop-blur-[2px] rounded-3xl z-20 animate-fadeIn">
+                        <div className="px-6 py-2 bg-black/60 border border-white/10 rounded-full backdrop-blur-md">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Tag Engine Inactive</p>
+                        </div>
                     </div>
                 )}
             </section>
@@ -209,28 +213,30 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
             />
 
             {/* Prompt Modifiers Section */}
-            <section className="bg-white/5 border border-white/10 rounded-3xl p-8 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 opacity-[0.02] pointer-events-none">
-                    <FolderIcon className="w-32 h-32 text-white" />
+            <section className="bg-[#121418]/40 border border-white/5 rounded-[2.5rem] p-10 relative overflow-hidden shadow-xl">
+                <div className="absolute bottom-0 right-0 p-10 opacity-[0.03] pointer-events-none group-hover:scale-110 transition-transform duration-1000">
+                    <FolderIcon className="w-48 h-48 text-white" />
                 </div>
 
-                <div className="flex items-center space-x-3 mb-8 relative z-10">
-                    <SparklesIcon className="w-5 h-5 text-blue-400" />
+                <div className="flex items-center space-x-4 mb-10 relative z-10">
+                    <div className="p-3 bg-blue-500/10 rounded-2xl border border-blue-500/10">
+                        <SparklesIcon className="w-6 h-6 text-blue-400" />
+                    </div>
                     <div>
-                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Structural Requirements</h3>
-                        <p className="text-[9px] text-gray-500 italic mt-0.5">Prompt Modifiers for Folder Formatting</p>
+                        <h3 className="text-xs font-black text-white uppercase tracking-widest">Structural Requirements</h3>
+                        <p className="text-[10px] text-gray-500 italic mt-0.5 font-medium">Prompt Modifiers for Folder Formatting</p>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative z-10 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 relative z-10">
                     {/* Max Folder Depth Slider */}
-                    <div className="col-span-1 md:col-span-2 lg:col-span-3 p-5 bg-[#121418] border border-white/10 hover:border-blue-500/50 rounded-xl transition-all group">
-                        <div className="flex justify-between items-center mb-4">
+                    <div className="col-span-1 md:col-span-2 lg:col-span-3 p-8 bg-black/40 border border-white/5 hover:border-blue-500/30 rounded-[2rem] transition-all group shadow-inner">
+                        <div className="flex justify-between items-center mb-6">
                             <div>
-                                <h4 className="text-[11px] font-bold text-white uppercase tracking-wider">Max Folder Depth</h4>
-                                <p className="text-[9px] text-gray-500">Maximum allowed nesting levels (1 = completely flat)</p>
+                                <h4 className="text-[11px] font-black text-white uppercase tracking-wider">Max Taxonomy Depth</h4>
+                                <p className="text-[10px] text-gray-500 font-medium mt-1">Maximum allowed nesting levels (1 = completely flat)</p>
                             </div>
-                            <div className="text-blue-400 font-bold text-sm bg-blue-500/10 px-3 py-1 rounded-lg">
+                            <div className="text-blue-400 font-black text-base bg-blue-500/20 px-4 py-2 rounded-2xl border border-blue-500/20 shadow-xl">
                                 {promptModifiers.maxFolderDepth || 2}
                             </div>
                         </div>
@@ -240,35 +246,43 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
                             max="5" 
                             value={promptModifiers.maxFolderDepth || 2} 
                             onChange={(e) => onPromptModifierChange('maxFolderDepth', parseInt(e.target.value))}
-                            className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                            className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-all"
                         />
-                        <div className="flex justify-between text-[9px] text-gray-500 mt-2 px-1">
-                            <span>1 (Flat)</span>
-                            <span>2</span>
-                            <span>3</span>
-                            <span>4</span>
-                            <span>5 (Deep)</span>
+                        <div className="flex justify-between text-[10px] text-gray-600 mt-4 px-2 font-black tracking-widest">
+                            <span>FLAT (1)</span>
+                            <span>LEVEL 2</span>
+                            <span>LEVEL 3</span>
+                            <span>LEVEL 4</span>
+                            <span>MAX (5)</span>
                         </div>
                     </div>
 
                     {[
-                        { key: 'groupByDomain', label: 'Group by Domain', desc: 'Prioritize websites' },
-                        { key: 'useEmojis', label: 'Use Emojis', desc: 'Add icons to names' },
-                        { key: 'strictTechnical', label: 'Strict Technical', desc: 'Use standard dev terms' },
-                        { key: 'groupByPurpose', label: 'Group by Purpose', desc: 'E.g., Read Later, Tools' },
-                        { key: 'shortFolderNames', label: 'Short Folder Names', desc: 'Concise, 1-2 words max' },
+                        { key: 'groupByDomain', label: 'Group by Domain', desc: 'Prioritize hostnames' },
+                        { key: 'useEmojis', label: 'Use Emojis', desc: 'Visual folder icons' },
+                        { key: 'strictTechnical', label: 'Strict Technical', desc: 'Dev-centric naming' },
+                        { key: 'groupByPurpose', label: 'Group by Purpose', desc: 'Intent-based buckets' },
+                        { key: 'shortFolderNames', label: 'Short Naming', desc: '1-2 words maximum' },
                     ].map((mod) => {
                         const isChecked = promptModifiers[mod.key as keyof PromptModifiers] as boolean;
                         return (
-                            <label key={mod.key} className="flex items-center space-x-3 p-4 bg-[#121418] border border-white/10 hover:border-blue-500/50 rounded-xl cursor-pointer transition-all group">
-                                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
-                                    isChecked ? 'bg-blue-500 border-blue-500' : 'border-white/20 group-hover:border-white/40'
+                            <label key={mod.key} className={`flex items-center space-x-4 p-5 rounded-[1.5rem] cursor-pointer transition-all duration-300 border ${
+                                isChecked 
+                                ? 'bg-blue-600/10 border-blue-500/40 shadow-[0_0_20px_rgba(59,130,246,0.1)]' 
+                                : 'bg-black/30 border-white/5 hover:border-white/10'
+                            }`}>
+                                <div className={`w-6 h-6 rounded-xl border-2 flex items-center justify-center transition-all duration-500 shadow-inner ${
+                                    isChecked ? 'bg-blue-500 border-blue-500 scale-110' : 'border-white/10'
                                 }`}>
-                                    {isChecked && <div className="w-2 h-2 bg-white rounded-sm"></div>}
+                                    {isChecked && (
+                                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    )}
                                 </div>
                                 <div>
-                                    <h4 className="text-[11px] font-bold text-white uppercase tracking-wider">{mod.label}</h4>
-                                    <p className="text-[9px] text-gray-500">{mod.desc}</p>
+                                    <h4 className={`text-[11px] font-black uppercase tracking-wider transition-colors ${isChecked ? 'text-white' : 'text-gray-400'}`}>{mod.label}</h4>
+                                    <p className="text-[9px] text-gray-600 font-medium">{mod.desc}</p>
                                 </div>
                                 <input 
                                     type="checkbox" 

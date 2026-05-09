@@ -61,7 +61,8 @@ const App: React.FC = () => {
         activeProfileId,
         setActiveProfileId,
         handleDeleteProfile,
-        promptModifiers
+        promptModifiers,
+        userCorrections
     } = useApp();
 
     // UI Local State
@@ -112,7 +113,8 @@ const App: React.FC = () => {
         onNotificationsAdd: handleNotificationsAdd,
         onProcessingComplete: handleProcessingComplete,
         autoCleanupEmptyFolders,
-        activeProfile
+        activeProfile,
+        userHistory: userCorrections
     });
 
     const handleForceStopWrapper = useCallback(() => {

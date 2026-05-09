@@ -33,6 +33,7 @@ export interface Folder {
 export type CategorizedBookmark = Bookmark & {
   path: string[];
   tags: string[];
+  confidence?: number;
 };
 
 export type ApiKeyStatus = 'active' | 'inactive' | 'error';

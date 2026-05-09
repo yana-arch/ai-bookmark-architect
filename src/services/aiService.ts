@@ -101,6 +101,7 @@ CRITICAL INSTRUCTION:
    - "url": EXACT original URL (Do not modify!)
    - "path": Array of folder names (e.g., ["Tech", "React"])
    - "tags": Array of keywords
+   - "confidence": A number from 0 to 100 representing your certainty in this categorization.
 4. Folder names and tags MUST be written in the language specified: ${tagLanguage}.
 5. The JSON structure:
 {
@@ -109,7 +110,8 @@ CRITICAL INSTRUCTION:
       "title": "Example",
       "url": "https://example.com",
       "path": ["Folder"],
-      "tags": ["tag"]
+      "tags": ["tag"],
+      "confidence": 95
     }
   ]
 }

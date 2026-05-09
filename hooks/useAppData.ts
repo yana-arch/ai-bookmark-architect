@@ -258,6 +258,87 @@ export const useAppData = () => {
         }
     }, []);
 
+    const handleMoveBookmark = useCallback(async (bookmarkId: string, targetFolderId: string | 'root') => {
+        const bookmark = bookmarks.find(b => b.id === bookmarkId);
+        if (!bookmark) return;
+
+        const originalPath = bookmark.path || [];
+        
+        // Find target folder to get its path
+        let targetPath: string[] = [];
+        if (targetFolderId !== 'root') {
+            const findPath = (items: (Folder | Bookmark)[], id: string, currentPath: string[] = []): string[] | null => {
+                for (const item of items) {
+                    if ('url' in item) continue;
+                    const folder = item as Folder;
+                    const newPath = [...currentPath, folder.name];
+                    if (folder.id === id) return newPath;
+                    const subPath = findPath(folder.children, id, newPath);
+                    if (subPath) return subPath;
+                }
+                return null;
+            };
+            targetPath = findPath(folders, targetFolderId) || [];
+        }
+
+        // 1. Update bookmark in flat list
+        const updatedBookmarks = bookmarks.map(b => 
+            b.id === bookmarkId ? { ...b, parentId: targetFolderId === 'root' ? null : targetFolderId, path: targetPath } : b
+        );
+        setBookmarks(updatedBookmarks);
+        await db.saveBookmarks(updatedBookmarks);
+
+        // 2. Update folder tree
+        const removeBookmarkFromTree = (items: (Folder | Bookmark)[]): (Folder | Bookmark)[] => {
+            return items.filter(item => {
+                if ('url' in item) return (item as Bookmark).id !== bookmarkId;
+                (item as Folder).children = removeBookmarkFromTree((item as Folder).children);
+                return true;
+            });
+        };
+
+        const addBookmarkToTree = (items: (Folder | Bookmark)[], targetId: string | 'root', bookmarkToAdd: Bookmark): (Folder | Bookmark)[] => {
+            if (targetId === 'root') {
+                return [...items, bookmarkToAdd];
+            }
+            return items.map(item => {
+                if ('url' in item) return item;
+                const folder = item as Folder;
+                if (folder.id === targetId) {
+                    return { ...folder, children: [...folder.children, bookmarkToAdd] };
+                }
+                return { ...folder, children: addBookmarkToTree(folder.children, targetId, bookmarkToAdd) };
+            });
+        };
+
+        const treeWithoutBookmark = removeBookmarkFromTree(folders);
+        const updatedBookmark = updatedBookmarks.find(b => b.id === bookmarkId)!;
+        const finalTree = addBookmarkToTree(treeWithoutBookmark, targetFolderId, updatedBookmark);
+        
+        setFolders(finalTree);
+        await db.saveFolders(finalTree);
+
+        // 3. Record User Correction for AI Learning
+        const correction: UserCorrection = {
+            id: `corr-${Date.now()}`,
+            originalBookmarkUrl: bookmark.url,
+            originalPath,
+            correctedPath: targetPath,
+            timestamp: Date.now()
+        };
+
+        const updatedCorrections = [...userCorrections, correction];
+        setUserCorrections(updatedCorrections);
+        await db.saveUserCorrection(correction);
+
+        setNotifications(prev => [...prev, {
+            id: `move-${Date.now()}`,
+            message: `Đã di chuyển bookmark tới [${targetPath.join(' > ') || 'Root'}] và ghi nhận thay đổi.`,
+            type: 'success',
+            duration: 3000
+        }]);
+    }, [bookmarks, folders, userCorrections]);
+
     const refreshData = loadData;
 
     return {
@@ -281,6 +362,7 @@ export const useAppData = () => {
         notifications,
         setNotifications,
         handleClearData,
+        handleMoveBookmark,
         refreshData
     };
 };
