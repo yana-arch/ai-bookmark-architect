@@ -36,7 +36,7 @@ function buildModifiersBlock(modifiers?: PromptModifiers): string {
     if (modifiers.shortFolderNames) rules.push('- Short Folder Names: Keep folder names extremely concise (1-2 words maximum). Never use long phrases.');
 
     if (rules.length === 0) return '';
-    return `\nSTRUCTURAL REQUIREMENTS (MUST FOLLOW):\n${rules.join('\n')}\n`;
+    return `\nSTRUCTURAL REQUIREMENTS:\n${rules.join('\n')}\n`;
 }
 /**
  * Generates the full prompt for AI categorization
@@ -82,12 +82,11 @@ export function generateCategorizationPrompt(params: {
         historyContext = `\nRecent User Corrections (Learn from these):\n${recentCorrections}`;
     }
 
-    return `${userInstructionBlock}
-
-${domainKnowledge ? `Domain Knowledge:\n${domainKnowledge}\n` : ''}
+    return `${domainKnowledge ? `Domain Knowledge:\n${domainKnowledge}\n` : ''}
 
 ${historyContext}
 ${buildModifiersBlock(promptModifiers)}
+${userInstructionBlock ? `\nCRITICAL OVERRIDE: The user instructions below SUPERSEDE any conflicting rules from the general strategy or structural requirements above.\n${userInstructionBlock}\n` : ''}
 Current Folder Structure (Reuse these if suitable):
 ${treeContext}
 
@@ -185,12 +184,11 @@ export function generateTagMappingPrompt(params: {
     
     const tagsList = truncatedTags.join(', ');
 
-    return `${userInstructionBlock}
-
-Your task is to take a flat list of tags and map them into a logical, hierarchical folder structure.
+    return `Your task is to take a flat list of tags and map them into a logical, hierarchical folder structure.
 You MUST respect the Taxonomy Architecture defined in the system prompt above.
 Create a highly detailed, specific folder structure. Keep categories granular and visible at the top levels to provide a detailed taxonomy. Do not over-group independent topics into deep general folders.
 ${buildModifiersBlock(promptModifiers)}
+${userInstructionBlock ? `\nCRITICAL OVERRIDE: The user instructions below SUPERSEDE any conflicting rules from the general strategy or structural requirements above.\n${userInstructionBlock}\n` : ''}
 Current Folder Structure (Reuse these if suitable):
 ${treeContext}
 
@@ -247,11 +245,10 @@ export function generateTagAnalysisPrompt(params: {
     const treeContext = JSON.stringify(getFullTreeContext(currentTree));
     const tagsList = uniqueTags.join(', ');
 
-    return `${userInstructionBlock}
-
-Your task is to analyze a flat list of tags and determine how many batches you will need to map ALL of them into a detailed, hierarchical folder structure.
+    return `Your task is to analyze a flat list of tags and determine how many batches you will need to map ALL of them into a detailed, hierarchical folder structure.
 We will conduct a stateful chat session. In this first step, you just need to calculate the plan.
 ${buildModifiersBlock(promptModifiers)}
+${userInstructionBlock ? `\nCRITICAL OVERRIDE: The user instructions below SUPERSEDE any conflicting rules from the general strategy or structural requirements above.\n${userInstructionBlock}\n` : ''}
 Current Folder Structure (Reuse these if suitable):
 ${treeContext}
 
