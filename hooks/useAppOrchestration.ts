@@ -5,19 +5,21 @@ import * as db from '@db';
 import { perfMonitor } from '../src/performance';
 
 interface OrchestrationProps {
-    allCategorizedBookmarks: CategorizedBookmark[];
-    startProcessing: (initialProcessed: CategorizedBookmark[], currentFolders: any[], bookmarksToProcessList: any[]) => void;
+    processedBookmarks: CategorizedBookmark[];
+    startProcessing: (initialProcessed: CategorizedBookmark[], currentFolders: any[], overrideBookmarks?: Bookmark[]) => void;
     resetProcessingState: () => void;
     setLogs: (updater: (prev: string[]) => string[]) => void;
     setSelectedFolderId: (id: string | null) => void;
+    setProcessedBookmarks: (bookmarks: CategorizedBookmark[]) => void;
 }
 
 export const useAppOrchestration = ({
-    allCategorizedBookmarks,
+    processedBookmarks,
     startProcessing,
     resetProcessingState,
     setLogs,
-    setSelectedFolderId
+    setSelectedFolderId,
+    setProcessedBookmarks
 }: OrchestrationProps) => {
     const {
         bookmarks, setBookmarks,
@@ -29,20 +31,17 @@ export const useAppOrchestration = ({
         tagDrivenMode
     } = useApp();
 
-
     const [foldersSnapshot, setFoldersSnapshot] = useState<(Folder | Bookmark)[]>([]);
 
-    const startRestructuring = useCallback(async (isContinuation = false) => {
+    const handleStartRestructuring = useCallback(async (isContinuation = false) => {
         let initialProcessed: CategorizedBookmark[] = [];
-        let bookmarksToProcessList = bookmarks;
+        let bookmarksToProcessList: Bookmark[] | undefined = undefined;
 
         if (isContinuation) {
-            initialProcessed = allCategorizedBookmarks;
+            initialProcessed = processedBookmarks;
         } else {
-            // Snapshot current folders before starting a new process
             setFoldersSnapshot(folders);
             
-            // Apply Smart Classify rules
             const { classified, remaining } = applySmartClassify(bookmarks, [...smartClassifyRules, ...sessionRules]);
             
             if (classified.length > 0) {
@@ -50,7 +49,6 @@ export const useAppOrchestration = ({
                 const reorderedBookmarks = [...classified, ...remaining];
                 setBookmarks(reorderedBookmarks); 
                 bookmarksToProcessList = reorderedBookmarks;
-                
                 setLogs(prev => [...prev, `Smart Classify: Đã tự động phân loại ${classified.length} bookmark.`]);
             } else {
                 resetProcessingState();
@@ -61,45 +59,39 @@ export const useAppOrchestration = ({
         }
 
         startProcessing(initialProcessed, folders, bookmarksToProcessList);
-    }, [
-        bookmarks, allCategorizedBookmarks, applySmartClassify, smartClassifyRules, 
-        sessionRules, setBookmarks, setLogs, resetProcessingState, setAppState, 
-        startProcessing, folders
-    ]);
+    }, [processedBookmarks, folders, applySmartClassify, bookmarks, smartClassifyRules, sessionRules, setBookmarks, setLogs, resetProcessingState, setAppState, startProcessing]);
 
-    const applyChanges = useCallback(async () => {
+    const handleApplyChanges = useCallback(async () => {
         await perfMonitor.timeAsyncFunction('apply_changes', async () => {
-            const categorizedMap = new Map<string, CategorizedBookmark>(allCategorizedBookmarks.map(cb => [cb.url, cb]));
+            const categorizedMap = new Map<string, CategorizedBookmark>(processedBookmarks.map(cb => [cb.url, cb]));
             const finalBookmarks = bookmarks.map(bm => {
                 const categorized = categorizedMap.get(bm.url);
-                if (categorized) {
-                    return { ...bm, path: categorized.path, tags: categorized.tags };
-                }
-                return bm;
+                return categorized ? { ...bm, path: categorized.path, tags: categorized.tags } : bm;
             });
+
             await db.saveBookmarks(finalBookmarks);
             await db.saveFolders(folders);
+            
             setBookmarks(finalBookmarks);
             setAppState(AppState.STRUCTURED);
             setSessionRules([]);
             resetProcessingState();
             setSelectedFolderId('root');
         });
-    }, [allCategorizedBookmarks, bookmarks, folders, setBookmarks, setAppState, setSessionRules, resetProcessingState, setSelectedFolderId]);
+    }, [processedBookmarks, bookmarks, folders, setBookmarks, setAppState, setSessionRules, resetProcessingState, setSelectedFolderId]);
 
-    const discardChanges = useCallback(() => {
+    const handleDiscardChanges = useCallback(() => {
         setFolders(foldersSnapshot);
         setAppState(AppState.LOADED);
         setSessionRules([]);
         resetProcessingState();
     }, [setFolders, foldersSnapshot, setAppState, setSessionRules, resetProcessingState]);
     
-    const continueRestructuring = useCallback(() => {
-        startRestructuring(true);
-    }, [startRestructuring]);
+    const handleContinueRestructuring = useCallback(() => {
+        handleStartRestructuring(true);
+    }, [handleStartRestructuring]);
 
-    const restructureMissingBookmarks = useCallback(async () => {
-        // Find bookmarks that are at the root (no path or empty path)
+    const handleRestructureMissing = useCallback(async () => {
         const missingBookmarks = bookmarks.filter(bm => !bm.path || bm.path.length === 0);
         
         if (missingBookmarks.length === 0) {
@@ -109,15 +101,14 @@ export const useAppOrchestration = ({
 
         setFoldersSnapshot(folders);
         
-        // Apply Smart Classify rules to missing bookmarks
         const { classified, remaining } = applySmartClassify(missingBookmarks, [...smartClassifyRules, ...sessionRules]);
         
         let initialProcessed: CategorizedBookmark[] = [];
-        let bookmarksToProcessList = missingBookmarks;
+        let overrideBookmarks: Bookmark[] | undefined = undefined;
 
         if (classified.length > 0) {
             initialProcessed = classified;
-            bookmarksToProcessList = [...classified, ...remaining];
+            overrideBookmarks = [...classified, ...remaining];
             setLogs(prev => [...prev, `Smart Classify: Đã tự động phân loại ${classified.length} bookmark ở root.`]);
         } else {
             const modeText = tagDrivenMode ? 'chế độ Tag-driven' : 'gom batch';
@@ -125,16 +116,14 @@ export const useAppOrchestration = ({
         }
         
         setAppState(AppState.PROCESSING);
-        
-        // Start processing specifically these missing bookmarks
-        startProcessing(initialProcessed, folders, bookmarksToProcessList);
-    }, [bookmarks, folders, setLogs, setAppState, startProcessing, applySmartClassify, smartClassifyRules, sessionRules]);
+        startProcessing(initialProcessed, folders, overrideBookmarks || missingBookmarks);
+    }, [bookmarks, folders, setLogs, setAppState, startProcessing, applySmartClassify, smartClassifyRules, sessionRules, tagDrivenMode]);
 
     return {
-        startRestructuring,
-        applyChanges,
-        discardChanges,
-        continueRestructuring,
-        restructureMissingBookmarks
+        startRestructuring: handleStartRestructuring,
+        applyChanges: handleApplyChanges,
+        discardChanges: handleDiscardChanges,
+        continueRestructuring: handleContinueRestructuring,
+        restructureMissingBookmarks: handleRestructureMissing
     };
 };
