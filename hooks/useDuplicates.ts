@@ -3,7 +3,7 @@ import { Bookmark, DuplicateStats, AppState, Folder } from '../types';
 import { perfMonitor } from '../src/performance';
 import { normalizeURL } from '../src/utils/urlUtils';
 import { arrayToTree } from '../src/utils/treeUtils';
-import * as db from '../db';
+import * as db from '@db';
 
 export const useDuplicates = (
     bookmarks: Bookmark[],

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { InstructionPreset } from '../types';
-import * as db from '../db';
+import * as db from '@db';
 
 export const useInstructionPresets = (
     instructionPresets: InstructionPreset[],

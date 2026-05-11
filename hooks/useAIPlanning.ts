@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { Bookmark, Folder, ApiConfig, AppState } from '../types';
 import { normalizeURL } from '../src/utils/urlUtils';
 import { DEFAULT_PLANNING_PROMPT } from '../src/constants';
-import * as db from '../db';
+import * as db from '@db';
 import { GoogleGenAI } from '@google/genai';
 
 export const useAIPlanning = (

@@ -13,7 +13,7 @@ import {
 } from 'chart.js';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import type { Bookmark, Folder, AnalyticsData } from '@/types';
-import * as db from '@/db';
+import * as db from '@db';
 import { ChartIcon } from '../ui/Icons';
 import { perfMonitor } from '@/src/performance';
 

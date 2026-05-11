@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { ApiConfig, ApiKeyStatus } from '../types';
-import * as db from '../db';
+import * as db from '@db';
 
 export const useApiConfig = (
     apiConfigs: ApiConfig[],

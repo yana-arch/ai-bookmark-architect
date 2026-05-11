@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { Bookmark, BrokenLinkCheckState, AppState, Folder } from '../types';
 import { perfMonitor } from '../src/performance';
 import { arrayToTree } from '../src/utils/treeUtils';
-import * as db from '../db';
+import * as db from '@db';
 
 export const useBrokenLinks = (
     bookmarks: Bookmark[],

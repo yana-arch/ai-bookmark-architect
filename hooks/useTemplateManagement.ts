@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { FolderTemplate, TemplateSettings, ApiConfig, ArchitectureStyle } from '../types';
 import { DEFAULT_SYSTEM_PROMPT } from '../src/constants';
 import { ARCHITECTURE_STYLES } from '../src/architectureStyles';
-import * as db from '../db';
+import * as db from '@db';
 
 export const useTemplateManagement = (
     folderTemplates: FolderTemplate[],

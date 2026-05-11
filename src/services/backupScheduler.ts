@@ -1,5 +1,5 @@
 import type { Bookmark, Folder } from '@/types';
-import * as db from '@/db';
+import * as db from '@db';
 
 // Simplified backup scheduler - scheduled backups disabled since we use key-based system
 class BackupScheduler {

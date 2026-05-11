@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useApp } from '../src/context/AppContext';
 import { AppState, type CategorizedBookmark, type Folder, type Bookmark } from '../types';
-import * as db from '../db';
+import * as db from '@db';
 import { perfMonitor } from '../src/performance';
 
 interface OrchestrationProps {

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import * as db from '../db';
+import * as db from '@db';
 import { Bookmark, SmartClassifyRule, CategorizedBookmark } from '../types';
 
 export const useSmartClassify = () => {

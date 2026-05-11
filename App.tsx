@@ -9,7 +9,7 @@ import Header from './components/layout/Header';
 import AppModals from './components/layout/AppModals';
 import NotificationToast from './components/ui/NotificationToast';
 
-import * as db from './db';
+import * as db from '@db';
 import { perfMonitor } from './src/performance';
 import { findFolder, getBookmarksInFolder } from './src/utils/treeUtils';
 import { DEFAULT_SYSTEM_PROMPT } from './src/constants';

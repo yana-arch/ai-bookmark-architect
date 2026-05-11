@@ -2,7 +2,7 @@
 // src/analyticsWorker.ts
 
 import type { Bookmark, Folder, AnalyticsData } from '@/types';
-import * as db from '@/db';
+import * as db from '@db';
 
 // Helper function to count bookmarks in a folder iteratively
 function getBookmarksInFolder(folder: Folder, allBookmarks: Bookmark[]): Bookmark[] {

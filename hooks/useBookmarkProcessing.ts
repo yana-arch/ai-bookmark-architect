@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { type Bookmark, type Folder, type CategorizedBookmark, type ApiConfig, type DetailedLog, type AIProfile, type UserCorrection } from '../types';
 import { arrayToTree, removeEmptyFolders, distributeBookmarksByTagSchema } from '../src/utils/treeUtils';
 import { perfMonitor } from '../src/performance';
-import { saveLog } from '../db';
+import { saveLog } from '@db';
 
 interface UseBookmarkProcessingProps {
     bookmarks: Bookmark[];

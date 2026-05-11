@@ -8,7 +8,7 @@ import {
     parseDbConnectionString,
     exportToCloud,
     importFromCloud,
-} from '../../db';
+} from '@db';
 
 interface DbConnectionModalProps {
   isOpen: boolean;

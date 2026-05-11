@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import * as db from '../db';
+import * as db from '@db';
 import { perfMonitor } from '../src/performance';
 import { backupScheduler } from '../src/services/backupScheduler';
 import { createMockData } from '../src/utils/mockUtils';
@@ -263,7 +263,7 @@ export const useAppData = () => {
         if (!bookmark) return;
 
         const originalPath = bookmark.path || [];
-        
+
         // Find target folder to get its path
         let targetPath: string[] = [];
         if (targetFolderId !== 'root') {
@@ -282,7 +282,7 @@ export const useAppData = () => {
         }
 
         // 1. Update bookmark in flat list
-        const updatedBookmarks = bookmarks.map(b => 
+        const updatedBookmarks = bookmarks.map(b =>
             b.id === bookmarkId ? { ...b, parentId: targetFolderId === 'root' ? null : targetFolderId, path: targetPath } : b
         );
         setBookmarks(updatedBookmarks);
@@ -314,7 +314,7 @@ export const useAppData = () => {
         const treeWithoutBookmark = removeBookmarkFromTree(folders);
         const updatedBookmark = updatedBookmarks.find(b => b.id === bookmarkId)!;
         const finalTree = addBookmarkToTree(treeWithoutBookmark, targetFolderId, updatedBookmark);
-        
+
         setFolders(finalTree);
         await db.saveFolders(finalTree);
 

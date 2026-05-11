@@ -263,7 +263,7 @@ export const distributeBookmarksByTagSchema = (
 
         return {
             ...bm,
-            path: assignedPath
+            path: assignedPath.length > 0 ? assignedPath : ['[Unmapped Tags]']
         };
     });
 };

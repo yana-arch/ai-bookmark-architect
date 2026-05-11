@@ -3,7 +3,7 @@ import { Bookmark, Folder, AppState } from '../types';
 import { perfMonitor } from '../src/performance';
 import { normalizeURL } from '../src/utils/urlUtils';
 import { parseHTMLBookmarks, parseCSVBookmarks, exportBookmarksToCSV } from '../src/services/bookmarkParser';
-import * as db from '../db';
+import * as db from '@db';
 
 export const useImportExport = (
     bookmarks: Bookmark[],
