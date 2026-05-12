@@ -84,7 +84,7 @@ class PerformanceMonitor {
                 min: Math.min(...values),
                 max: Math.max(...values),
                 last: values[values.length - 1],
-                trend: values.length > 1 ?
+                trend: (values.length > 1 && values[values.length - 2] !== 0) ?
                     (values[values.length - 1] - values[values.length - 2]) / values[values.length - 2] * 100 : 0
             };
         });

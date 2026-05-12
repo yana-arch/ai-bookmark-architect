@@ -27,8 +27,10 @@ export class TokenAwareSplitter {
                     onLog(`Token count (${totalTokens}) exceeds limit (${tokenLimit}). Splitting batch of ${subBatch.length} into ${left.length} and ${right.length}.`);
                 }
 
-                const leftResults = await processSubBatch(left);
-                const rightResults = await processSubBatch(right);
+                const [leftResults, rightResults] = await Promise.all([
+                    processSubBatch(left),
+                    processSubBatch(right)
+                ]);
                 return [...leftResults, ...rightResults];
             }
 

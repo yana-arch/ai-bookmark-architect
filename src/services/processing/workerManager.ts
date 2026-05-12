@@ -38,6 +38,23 @@ export class WorkerManager {
     createWorker(): Worker {
         const worker = new Worker(new URL('../../aiWorker.ts', import.meta.url), { type: 'module' });
         worker.addEventListener('message', (e) => this.handleMessage(e.data));
+        
+        worker.addEventListener('error', (e) => {
+            console.error('Worker error:', e);
+            this.handleMessage({
+                type: 'batch_error',
+                error: `Worker error: ${e.message || 'Unknown error'}`
+            });
+        });
+
+        worker.addEventListener('messageerror', (e) => {
+            console.error('Worker message error:', e);
+            this.handleMessage({
+                type: 'batch_error',
+                error: 'Worker message serialization error'
+            });
+        });
+
         this.workers.push(worker);
         return worker;
     }

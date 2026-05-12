@@ -47,7 +47,7 @@ export function generateCategorizationPrompt(params: {
         promptModifiers
     } = params;
 
-    const bookmarksList = batch.map(b => `- ${b.title} (${b.url})`).join('\n');
+    const bookmarksList = batch.map(b => `- ID: ${b.id} | ${b.title} (${b.url})`).join('\n');
     
     
     const treeContext = (promptModifiers?.includeHierarchy && currentTree.length > 0)
@@ -77,6 +77,7 @@ CRITICAL INSTRUCTION:
 1. Respond ONLY with a valid JSON object containing a "bookmarks" array.
 2. You MUST return exactly ${batch.length} items in the "bookmarks" array. Do not skip any bookmark.
 3. For each item, provide:
+   - "id": The EXACT internal ID provided in the list (CRITICAL for matching)
    - "title": Original title
    - "url": EXACT original URL (Do not modify!)
    - "path": Array of folder names (e.g., ["Tech", "React"])
@@ -87,6 +88,7 @@ CRITICAL INSTRUCTION:
 {
   "bookmarks": [
     {
+      "id": "original-id",
       "title": "Example",
       "url": "https://example.com",
       "path": ["Folder"],
@@ -107,7 +109,7 @@ export function generateTagExtractionPrompt(params: {
     tagLanguage?: string;
 }): string {
     const { batch, tagCount = 3, tagLanguage = 'Vietnamese and Technical Terms' } = params;
-    const bookmarksList = batch.map(b => `- ${b.title} (${b.url})`).join('\n');
+    const bookmarksList = batch.map(b => `- ID: ${b.id} | ${b.title} (${b.url})`).join('\n');
 
     return `You are an AI specialized in analyzing web pages based on title and URL to extract concise, relevant tags.
 Your goal is to generate ${tagCount} tags for each bookmark.
@@ -121,12 +123,14 @@ CRITICAL INSTRUCTION:
 1. Respond ONLY with a valid JSON object containing a "bookmarks" array.
 2. You MUST return exactly ${batch.length} items. Do not skip any bookmark.
 3. For each item, provide:
+   - "id": The EXACT internal ID provided in the list
    - "url": EXACT original URL (Do not modify!)
    - "tags": Array of ${tagCount} keywords
 4. The JSON structure:
 {
   "bookmarks": [
     {
+      "id": "original-id",
       "url": "https://example.com",
       "tags": ["tag1", "tag2"]
     }

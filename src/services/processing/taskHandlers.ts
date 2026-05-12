@@ -1,3 +1,4 @@
+import { SYSTEM_FOLDERS } from '@/types';
 import { AIClient, type ChatMessage } from '../aiClient';
 import { 
     generateCategorizationPrompt,
@@ -98,7 +99,7 @@ export class TaskHandlers {
                 
                 const parsedData = parseAIResponse(responseText);
                 return parsedData.map(cbm => {
-                    const original = subBatch.find(b => b.url === cbm.url);
+                    const original = subBatch.find(b => b.id === cbm.id) || subBatch.find(b => b.url === cbm.url);
                     return {
                         ...cbm,
                         id: original ? original.id : cbm.id,
@@ -145,7 +146,13 @@ export class TaskHandlers {
                 const parsedData = parseTagExtractionResponse(text);
                 if (parsedData.length === 0) throw new Error('Failed to parse tag extraction response');
                 
-                return parsedData;
+                return parsedData.map(cbm => {
+                    const original = subBatch.find(b => b.id === cbm.id) || subBatch.find(b => b.url === cbm.url);
+                    return {
+                        ...cbm,
+                        id: original ? original.id : cbm.id
+                    };
+                });
             },
             onLog
         });
@@ -165,7 +172,7 @@ export class TaskHandlers {
         const history: ChatMessage[] = [];
         
         // Filter out fallback folders
-        const filteredTree = currentTree.filter(f => f.name !== '[Unmapped Tags]' && f.name !== '[Uncategorized]');
+        const filteredTree = currentTree.filter(f => f.name !== SYSTEM_FOLDERS.UNMAPPED_TAGS && f.name !== SYSTEM_FOLDERS.UNCATEGORIZED);
 
         const analysisPrompt = generateTagAnalysisPrompt({
             userInstructionBlock,

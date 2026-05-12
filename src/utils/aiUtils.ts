@@ -110,15 +110,16 @@ export function parseAIResponse(content: string): Bookmark[] {
 }
 
 // Parse response for Tag Extraction
-export function parseTagExtractionResponse(content: string): { url: string, tags: string[] }[] {
+export function parseTagExtractionResponse(content: string): { id?: string, url: string, tags: string[] }[] {
     const parsed = parseJsonResponse<any>(content, {});
     const bookmarks = Array.isArray(parsed) ? parsed : (parsed.bookmarks || []);
     
     if (Array.isArray(bookmarks)) {
         return bookmarks.map(bm => ({
+            id: bm.id,
             url: bm.url || '',
             tags: Array.isArray(bm.tags) ? bm.tags : []
-        })).filter(bm => bm.url);
+        })).filter(bm => bm.url || bm.id);
     }
     return [];
 }

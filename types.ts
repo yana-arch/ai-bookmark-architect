@@ -8,6 +8,11 @@ export enum AppState {
   ERROR = 'ERROR',
 }
 
+export const SYSTEM_FOLDERS = {
+  UNCATEGORIZED: '[Uncategorized]',
+  UNMAPPED_TAGS: '[Unmapped Tags]'
+};
+
 export enum BrokenLinkCheckState {
   IDLE = 'IDLE',
   CHECKING = 'CHECKING',

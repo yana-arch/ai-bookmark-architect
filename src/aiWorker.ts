@@ -60,13 +60,6 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             promptModifiers
         } = data;
 
-        const availableConfigs = apiConfigs.filter(c => c.status === 'active');
-
-        if (availableConfigs.length === 0) {
-            self.postMessage({ type: 'batch_error', error: 'No active API key found.', batchIndex } as WorkerResponse);
-            return;
-        }
-        
         try {
             const result = await AIExecutionManager.executeWithRetry(
                 `Batch ${batchIndex}`,

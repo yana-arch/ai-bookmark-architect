@@ -27,18 +27,20 @@ export class AIExecutionManager {
         let currentConfigIndex = Math.floor(Math.random() * availableConfigs.length);
         let attempts = 0;
 
-        while (attempts <= maxRetries) {
+        const totalAttempts = Math.max(maxRetries + 1, availableConfigs.length);
+        
+        while (attempts < totalAttempts) {
             const activeConfig = availableConfigs[currentConfigIndex];
             const client = new AIClient(activeConfig, activeProfile || undefined);
             
             try {
                 attempts++;
-                onLog(`${taskName}: Attempt ${attempts}/${maxRetries + 1} using [${activeConfig.name}]`);
+                onLog(`${taskName}: Attempt ${attempts}/${totalAttempts} using [${activeConfig.name}]`);
                 return await task(client);
             } catch (error: any) {
                 console.error(`${taskName} attempt ${attempts} failed with [${activeConfig.name}]:`, error);
                 
-                if (attempts > maxRetries) {
+                if (attempts >= totalAttempts) {
                     throw error;
                 }
 
@@ -51,6 +53,6 @@ export class AIExecutionManager {
             }
         }
 
-        throw new Error(`${taskName} failed after ${maxRetries + 1} attempts.`);
+        throw new Error(`${taskName} failed after ${attempts} attempts.`);
     }
 }
