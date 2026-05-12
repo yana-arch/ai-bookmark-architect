@@ -1,4 +1,4 @@
-import type { Bookmark, Folder, UserCorrection, ApiConfig, AIProfile, CategorizedBookmark } from '../../types';
+import type { Bookmark, Folder, UserCorrection, ApiConfig, AIProfile, CategorizedBookmark } from '@/types';
 import { AIClient } from './aiClient';
 import { 
     parseAIResponse, 
@@ -8,7 +8,8 @@ import {
     parseTagExtractionResponse,
     parseTagMappingResponse,
     type TagFolderSchema
-} from '../utils/aiUtils';
+} from '@/src/utils/aiUtils';
+import { getFullTreeContext, buildModifiersBlock } from '@/src/utils/promptUtils';
 
 export { 
     parseAIResponse, 
@@ -20,26 +21,8 @@ export {
     type TagFolderSchema
 };
 
-import type { PromptModifiers } from '../../types';
+import type { PromptModifiers } from '@/types';
 
-/**
- * Helper to build the prompt modifiers block
- */
-function buildModifiersBlock(modifiers?: PromptModifiers): string {
-    if (!modifiers) return '';
-    const rules: string[] = [];
-    if (modifiers.maxFolderDepth) rules.push(`- Folder Depth Limit: Ensure the generated folder structure does NOT exceed ${modifiers.maxFolderDepth} levels of depth. Limit nesting strictly to ${modifiers.maxFolderDepth} levels.`);
-    if (modifiers.groupByDomain) rules.push('- Group by Domain: Prioritize grouping bookmarks by their website/domain name first (e.g., "github.com", "youtube.com").');
-    if (modifiers.useEmojis) rules.push('- Use Emojis: Prepend a relevant emoji to EVERY generated folder name (e.g., "🚀 Startup", "💻 Programming").');
-    if (modifiers.strictTechnical) rules.push('- Strict Technical: Strictly use standard, professional technical terminology for categories. Avoid slang or vague terms.');
-    if (modifiers.groupByPurpose) rules.push('- Group by Purpose: Categorize based on user intent (e.g., "Read Later", "Tools", "Documentation", "Tutorials").');
-    if (modifiers.shortFolderNames) rules.push('- Short Folder Names: Keep folder names extremely concise (1-2 words maximum). Never use long phrases.');
-    if (modifiers.maintainContext) rules.push('- Maintain Context: You are part of a multi-batch process. Strive for consistency with previous decisions.');
-    if (modifiers.includeHierarchy) rules.push('- Use Existing Hierarchy: Strictly follow and reuse the provided "Current Folder Structure" where possible to ensure structural continuity.');
-
-    if (rules.length === 0) return '';
-    return `\nSTRUCTURAL REQUIREMENTS:\n${rules.join('\n')}\n`;
-}
 /**
  * Generates the full prompt for AI categorization
  */
@@ -66,15 +49,6 @@ export function generateCategorizationPrompt(params: {
 
     const bookmarksList = batch.map(b => `- ${b.title} (${b.url})`).join('\n');
     
-    // Recursive helper to get full tree context (with depth limit to save tokens)
-    const getFullTreeContext = (folders: any[], depth: number = 0): any[] => {
-        if (depth > 4) return []; // Limit depth to 4 levels to keep prompt size manageable
-        
-        return folders.map(f => ({
-            name: f.name,
-            children: f.children && f.children.length > 0 ? getFullTreeContext(f.children, depth + 1) : []
-        }));
-    };
     
     const treeContext = (promptModifiers?.includeHierarchy && currentTree.length > 0)
         ? JSON.stringify(getFullTreeContext(currentTree))
@@ -173,14 +147,6 @@ export function generateTagMappingPrompt(params: {
 }): string {
     const { userInstructionBlock, uniqueTags, currentTree, tagLanguage = 'English', promptModifiers } = params;
 
-    // Recursive helper to get full tree context (with depth limit)
-    const getFullTreeContext = (folders: any[], depth: number = 0): any[] => {
-        if (depth > 4) return []; 
-        return folders.map(f => ({
-            name: f.name,
-            children: f.children && f.children.length > 0 ? getFullTreeContext(f.children, depth + 1) : []
-        }));
-    };
     
     const treeContext = JSON.stringify(getFullTreeContext(currentTree));
     
@@ -242,13 +208,6 @@ export function generateTagAnalysisPrompt(params: {
 }): string {
     const { userInstructionBlock, uniqueTags, currentTree, tagLanguage = 'English', promptModifiers } = params;
 
-    const getFullTreeContext = (folders: any[], depth: number = 0): any[] => {
-        if (depth > 4) return []; 
-        return folders.map(f => ({
-            name: f.name,
-            children: f.children && f.children.length > 0 ? getFullTreeContext(f.children, depth + 1) : []
-        }));
-    };
     
     const treeContext = JSON.stringify(getFullTreeContext(currentTree));
     const tagsList = uniqueTags.join(', ');

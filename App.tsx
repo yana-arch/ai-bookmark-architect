@@ -1,15 +1,15 @@
 import React from 'react';
 
 import { AppState } from './types';
-import Sidebar from './components/layout/Sidebar';
-import BookmarkList from './components/features/BookmarkList';
-import RestructurePanel from './components/features/RestructurePanel';
-import FileDropzone from './components/ui/FileDropzone';
-import Header from './components/layout/Header';
-import AppModals from './components/layout/AppModals';
-import NotificationToast from './components/ui/NotificationToast';
+import Sidebar from './src/components/layout/Sidebar';
+import BookmarkList from './src/components/features/BookmarkList';
+import RestructurePanel from './src/components/features/RestructurePanel';
+import FileDropzone from './src/components/ui/FileDropzone';
+import Header from './src/components/layout/Header';
+import AppModals from './src/components/layout/AppModals';
+import NotificationToast from './src/components/ui/NotificationToast';
 
-import { useAppLogic } from './hooks/useAppLogic';
+import { useAppLogic } from './src/hooks/useAppLogic';
 
 const App: React.FC = () => {
     const {

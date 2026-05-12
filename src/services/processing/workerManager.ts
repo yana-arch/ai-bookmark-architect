@@ -1,4 +1,4 @@
-import { type ApiConfig, type AIProfile, type PromptModifiers, type UserCorrection, type Bookmark, type Folder } from '../../../types';
+import { type ApiConfig, type AIProfile, type PromptModifiers, type UserCorrection, type Bookmark, type Folder } from '@/types';
 
 export interface WorkerMessage {
     type: 'log' | 'detailed_log' | 'batch_result' | 'batch_error';

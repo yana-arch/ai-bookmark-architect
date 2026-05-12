@@ -1,5 +1,5 @@
 import { AIClient } from './aiClient';
-import { ApiConfig } from '../../types';
+import { ApiConfig } from '@/types';
 
 // Helper to pick the best available API config
 export const getActiveApiConfig = (apiConfigs: ApiConfig[]): ApiConfig | null => {

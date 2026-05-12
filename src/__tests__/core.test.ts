@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { repairJson, parseAIResponse } from '../services/aiService';
-import { arrayToTree } from '../utils/treeUtils';
+import { repairJson, parseAIResponse } from '@/src/services/aiService';
+import { arrayToTree } from '@/src/utils/treeUtils';
 
 describe('Core Logic', () => {
     describe('repairJson', () => {

@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { generateHash, cacheStats, CachedOperation, MemoryCache } from '../cache';
-import { perfMonitor } from '../performance';
-import { repairJson, parseAIResponse } from '../services/aiService';
-import { arrayToTree, removeEmptyFolders, distributeBookmarksByTagSchema } from '../utils/treeUtils';
-import type { Bookmark, Folder, CategorizedBookmark } from '../../types';
-import type { TagFolderSchema } from '../utils/aiUtils';
+import { generateHash, cacheStats, CachedOperation, MemoryCache } from '@/src/cache';
+import { perfMonitor } from '@/src/performance';
+import { repairJson, parseAIResponse } from '@/src/services/aiService';
+import { arrayToTree, removeEmptyFolders, distributeBookmarksByTagSchema } from '@/src/utils/treeUtils';
+import type { Bookmark, Folder, CategorizedBookmark } from '@/types';
+import type { TagFolderSchema } from '@/src/utils/aiUtils';
 
 describe('Integration Tests (Ported from src/tests.ts)', () => {
     

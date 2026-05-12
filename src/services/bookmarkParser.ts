@@ -1,4 +1,4 @@
-import type { Bookmark } from '../../types';
+import type { Bookmark } from '@/types';
 
 /**
  * Parses HTML bookmark file content

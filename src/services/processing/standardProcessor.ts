@@ -1,4 +1,4 @@
-import { type Bookmark, type CategorizedBookmark, type ApiConfig, type AIProfile, type PromptModifiers, type UserCorrection, type Folder } from '../../../types';
+import { type Bookmark, type CategorizedBookmark, type ApiConfig, type AIProfile, type PromptModifiers, type UserCorrection, type Folder } from '@/types';
 import { WorkerManager } from './workerManager';
 
 interface StandardProcessorOptions {

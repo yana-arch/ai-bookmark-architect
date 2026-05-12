@@ -1,4 +1,4 @@
-import type { Bookmark } from '../../types';
+import type { Bookmark } from '@/types';
 
 // Sub-helper: Basic JSON repair
 export function repairJson(json: string): string {
@@ -53,48 +53,16 @@ export function extractBookmarksByRegex(content: string): Bookmark[] {
     return bookmarks;
 }
 
-// Helper function to parse and validate AI response content (Optimized)
-export function parseAIResponse(content: string): Bookmark[] {
-    let cleanedContent = content.trim();
-
-    if (!cleanedContent) return [];
-
-    if (cleanedContent.includes('```')) {
-        cleanedContent = cleanedContent.replace(/```(?:json)?\s*([\s\S]*?)\s*```/g, '$1').trim();
-    }
-
-    try {
-        const parsed = JSON.parse(cleanedContent);
-        const bookmarks = Array.isArray(parsed) ? parsed : (parsed.bookmarks || []);
-        if (Array.isArray(bookmarks)) return validateBookmarks(bookmarks);
-    } catch (e) {
-        // Fallback to more aggressive extraction
-    }
-
-    const jsonStart = cleanedContent.indexOf('{');
-    const jsonEnd = cleanedContent.lastIndexOf('}');
-    if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
-        const jsonCandidate = cleanedContent.substring(jsonStart, jsonEnd + 1);
-        try {
-            const parsed = JSON.parse(repairJson(jsonCandidate));
-            const bookmarks = Array.isArray(parsed) ? parsed : (parsed.bookmarks || []);
-            if (Array.isArray(bookmarks)) return validateBookmarks(bookmarks);
-        } catch (e) {
-            // Failed to parse extracted object
-        }
-    }
-
-    return extractBookmarksByRegex(cleanedContent);
-}
-
-// Helper to extract JSON content from text (Robust)
-function extractJsonBlock(content: string): string {
+/**
+ * Helper to extract JSON content from text (Robust).
+ * Handles markdown blocks and finds the first occurrence of { or [.
+ */
+export function extractJsonBlock(content: string): string {
     let cleaned = content.trim();
     if (cleaned.includes('```')) {
         cleaned = cleaned.replace(/```(?:json)?\s*([\s\S]*?)\s*```/g, '$1').trim();
     }
     
-    // If it still doesn't parse, try finding the first { or [
     try {
         JSON.parse(repairJson(cleaned));
         return cleaned;
@@ -114,21 +82,43 @@ function extractJsonBlock(content: string): string {
     return cleaned;
 }
 
-// Parse response for Tag Extraction
-export function parseTagExtractionResponse(content: string): { url: string, tags: string[] }[] {
+/**
+ * Generic helper to parse JSON responses with repair logic.
+ */
+export function parseJsonResponse<T>(content: string, fallback: T): T {
+    const cleaned = extractJsonBlock(content);
+    try {
+        return JSON.parse(repairJson(cleaned)) as T;
+    } catch (e) {
+        return fallback;
+    }
+}
+
+// Helper function to parse and validate AI response content (Optimized)
+export function parseAIResponse(content: string): Bookmark[] {
     const cleanedContent = extractJsonBlock(content);
-    
+
     try {
         const parsed = JSON.parse(repairJson(cleanedContent));
         const bookmarks = Array.isArray(parsed) ? parsed : (parsed.bookmarks || []);
-        if (Array.isArray(bookmarks)) {
-            return bookmarks.map(bm => ({
-                url: bm.url || '',
-                tags: Array.isArray(bm.tags) ? bm.tags : []
-            })).filter(bm => bm.url);
-        }
+        if (Array.isArray(bookmarks)) return validateBookmarks(bookmarks);
     } catch (e) {
-        console.error("Failed to parse tag extraction response", e);
+        // Fallback to more aggressive extraction if structured JSON fails
+    }
+
+    return extractBookmarksByRegex(content);
+}
+
+// Parse response for Tag Extraction
+export function parseTagExtractionResponse(content: string): { url: string, tags: string[] }[] {
+    const parsed = parseJsonResponse<any>(content, {});
+    const bookmarks = Array.isArray(parsed) ? parsed : (parsed.bookmarks || []);
+    
+    if (Array.isArray(bookmarks)) {
+        return bookmarks.map(bm => ({
+            url: bm.url || '',
+            tags: Array.isArray(bm.tags) ? bm.tags : []
+        })).filter(bm => bm.url);
     }
     return [];
 }
@@ -141,24 +131,18 @@ export interface TagFolderSchema {
 }
 
 export function parseTagMappingResponse(content: string): TagFolderSchema[] {
-    const cleanedContent = extractJsonBlock(content);
+    const parsed = parseJsonResponse<any>(content, {});
+    const schema = Array.isArray(parsed) ? parsed : (parsed.tagSchema || []);
     
-    try {
-        const parsed = JSON.parse(repairJson(cleanedContent));
-        const schema = Array.isArray(parsed) ? parsed : (parsed.tagSchema || []);
-        if (Array.isArray(schema)) {
-            // Helper to recursively validate schema
-            const validateSchema = (nodes: any[]): TagFolderSchema[] => {
-                return nodes.map(node => ({
-                    name: node.name || 'Untitled',
-                    mappedTags: Array.isArray(node.mappedTags) ? node.mappedTags : [],
-                    children: Array.isArray(node.children) ? validateSchema(node.children) : []
-                }));
-            };
-            return validateSchema(schema);
-        }
-    } catch (e) {
-        console.error("Failed to parse tag mapping response", e);
+    if (Array.isArray(schema)) {
+        const validateSchema = (nodes: any[]): TagFolderSchema[] => {
+            return nodes.map(node => ({
+                name: node.name || 'Untitled',
+                mappedTags: Array.isArray(node.mappedTags) ? node.mappedTags : [],
+                children: Array.isArray(node.children) ? validateSchema(node.children) : []
+            }));
+        };
+        return validateSchema(schema);
     }
     return [];
 }

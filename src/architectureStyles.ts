@@ -1,4 +1,4 @@
-import { ArchitectureStyleConfig } from '../types';
+import { ArchitectureStyleConfig } from '@/types';
 
 export const ARCHITECTURE_STYLES: ArchitectureStyleConfig[] = [
     {

@@ -1,4 +1,4 @@
-import type { DbConnection, Bookmark } from '../../types';
+import type { DbConnection, Bookmark } from '@/types';
 import { getBookmarks, saveBookmarks, saveFolders, saveDbConnection } from './local';
 
 export class NeonHttpClient {

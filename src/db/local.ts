@@ -9,7 +9,7 @@ import type {
     Bookmark, Folder, ApiConfig, InstructionPreset, FolderTemplate, EmptyFolderTree,
     DetailedLog, UserCorrection, BackupMetadata, SyncStatus, AnalyticsData, OAuthToken,
     SmartClassifyRule, DbConnection, AIProfile
-} from '../../types';
+} from '@/types';
 
 /**
  * Generic BaseStore for standard IndexedDB operations

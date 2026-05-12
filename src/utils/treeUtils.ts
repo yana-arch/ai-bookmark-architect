@@ -1,4 +1,4 @@
-import type { Bookmark, Folder, FolderStructureNode } from '../../types';
+import type { Bookmark, Folder, FolderStructureNode } from '@/types';
 import { getAllExistingPaths, standardizePath } from './pathUtils';
 import type { TagFolderSchema } from './aiUtils';
 

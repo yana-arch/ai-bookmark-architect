@@ -1,9 +1,9 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useBookmarkProcessing } from '../../hooks/useBookmarkProcessing';
+import { useBookmarkProcessing } from '@/src/hooks/useBookmarkProcessing';
 
 // Mock the services
-vi.mock('../src/services/processing/workerManager', () => ({
+vi.mock('../services/processing/workerManager', () => ({
     WorkerManager: vi.fn().mockImplementation(() => ({
         terminateAll: vi.fn(),
         createWorker: vi.fn(),
@@ -12,13 +12,13 @@ vi.mock('../src/services/processing/workerManager', () => ({
     }))
 }));
 
-vi.mock('../src/services/processing/tagDrivenProcessor', () => ({
+vi.mock('../services/processing/tagDrivenProcessor', () => ({
     TagDrivenProcessor: vi.fn().mockImplementation(() => ({
         process: vi.fn()
     }))
 }));
 
-vi.mock('../src/services/processing/standardProcessor', () => ({
+vi.mock('../services/processing/standardProcessor', () => ({
     StandardProcessor: vi.fn().mockImplementation(() => ({
         process: vi.fn()
     }))

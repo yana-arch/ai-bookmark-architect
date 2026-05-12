@@ -1,4 +1,4 @@
-import type { ApiConfig, AIProfile } from '../../types';
+import type { ApiConfig, AIProfile } from '@/types';
 
 /**
  * Interface representing a standardized AI response.

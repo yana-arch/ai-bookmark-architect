@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { WorkerManager } from '../services/processing/workerManager';
+import { WorkerManager } from '@/src/services/processing/workerManager';
 
 // Mock Worker
 class MockWorker {

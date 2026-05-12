@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { TagDrivenProcessor } from '../services/processing/tagDrivenProcessor';
+import { TagDrivenProcessor } from '@/src/services/processing/tagDrivenProcessor';
 
 describe('TagDrivenProcessor', () => {
     let mockWorkerManager: any;

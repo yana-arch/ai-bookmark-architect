@@ -1,6 +1,6 @@
-import { type Bookmark, type CategorizedBookmark, type ApiConfig, type AIProfile, type PromptModifiers, type UserCorrection, type Folder } from '../../../types';
+import { type Bookmark, type CategorizedBookmark, type ApiConfig, type AIProfile, type PromptModifiers, type UserCorrection, type Folder } from '@/types';
 import { WorkerManager, WorkerBatchData } from './workerManager';
-import { distributeBookmarksByTagSchema } from '../../utils/treeUtils';
+import { distributeBookmarksByTagSchema } from '@/src/utils/treeUtils';
 
 interface TagDrivenProcessorOptions {
     workerManager: WorkerManager;

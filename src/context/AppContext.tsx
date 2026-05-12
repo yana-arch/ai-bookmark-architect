@@ -3,16 +3,16 @@ import type {
     Bookmark, Folder, ApiConfig, AppState as AppStateType, Notification, 
     InstructionPreset, FolderTemplate, SmartClassifyRule, CategorizedBookmark, UserCorrection,
     TemplateSettings, ArchitectureStyle, ApiKeyStatus, AIProfile, PromptModifiers
-} from '../../types';
+} from '@/types';
 
-import { useAppData } from '../../hooks/useAppData';
-import { useAISettings } from '../../hooks/useAISettings';
-import { useSmartClassify } from '../../hooks/useSmartClassify';
-import { useApiConfig } from '../../hooks/useApiConfig';
-import { useInstructionPresets } from '../../hooks/useInstructionPresets';
-import { useTemplateManagement } from '../../hooks/useTemplateManagement';
-import { useAIProfiles } from '../../hooks/useAIProfiles';
-import { removeEmptyFolders } from '../utils/treeUtils';
+import { useAppData } from '@/src/hooks/useAppData';
+import { useAISettings } from '@/src/hooks/useAISettings';
+import { useSmartClassify } from '@/src/hooks/useSmartClassify';
+import { useApiConfig } from '@/src/hooks/useApiConfig';
+import { useInstructionPresets } from '@/src/hooks/useInstructionPresets';
+import { useTemplateManagement } from '@/src/hooks/useTemplateManagement';
+import { useAIProfiles } from '@/src/hooks/useAIProfiles';
+import { removeEmptyFolders } from '@/src/utils/treeUtils';
 
 // --- Data Context (Changes with user data) ---
 interface DataContextType {

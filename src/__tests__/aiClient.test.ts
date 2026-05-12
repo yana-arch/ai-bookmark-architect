@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { AIClient } from '../services/aiClient';
-import { ApiConfig } from '../../types';
+import { AIClient } from '@/src/services/aiClient';
+import { ApiConfig } from '@/types';
 
 describe('AIClient', () => {
     const mockConfig: ApiConfig = {
