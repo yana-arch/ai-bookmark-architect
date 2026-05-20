@@ -37,7 +37,7 @@ export const arrayToTree = (bookmarks: (Bookmark & { path?: string[] })[], exist
 
     const getOrCreateFolder = (path: string[]): Folder => {
         let currentLevel = root;
-        let currentPath: string[] = [];
+        const currentPath: string[] = [];
 
         for (const folderName of path) {
             currentPath.push(folderName);

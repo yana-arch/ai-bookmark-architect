@@ -38,7 +38,7 @@ export class TaskHandlers {
         tokenLimit: number = 16000
     ): Promise<{ data: any[], usage: any }> {
         const { client, systemPrompt, userInstructionBlock, currentTree, userHistory, domainKnowledge, tagCount, tagLanguage, promptModifiers, onLog } = options;
-        let totalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+        const totalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
         const history: ChatMessage[] = [];
 
         const results = await TokenAwareSplitter.splitAndExecute<Bookmark, any>({
@@ -122,7 +122,7 @@ export class TaskHandlers {
         tokenLimit: number = 16000
     ): Promise<{ data: any[], usage: any }> {
         const { client, tagCount, tagLanguage, onLog } = options;
-        let totalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+        const totalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
         const results = await TokenAwareSplitter.splitAndExecute<Bookmark, any>({
             batch,
@@ -168,7 +168,7 @@ export class TaskHandlers {
         options: TaskOptions
     ): Promise<{ data: any[], usage: any }> {
         const { client, systemPrompt, userInstructionBlock, currentTree, tagLanguage, promptModifiers, onLog } = options;
-        let totalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+        const totalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
         const history: ChatMessage[] = [];
         
         // Filter out fallback folders

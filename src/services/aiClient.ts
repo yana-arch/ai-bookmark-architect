@@ -135,7 +135,7 @@ export class AIClient {
     private async callGeminiChat(systemPrompt: string, messages: ChatMessage[]): Promise<AIResponse> {
         const { apiKey, model, apiUrl, provider } = this.config;
         
-        let endpoint = this.resolveGeminiEndpoint(provider, model || 'gemini-1.5-flash', apiKey, apiUrl);
+        const endpoint = this.resolveGeminiEndpoint(provider, model || 'gemini-1.5-flash', apiKey, apiUrl);
 
         // Map ChatMessage to Gemini format
         const contents = messages.map(msg => ({
