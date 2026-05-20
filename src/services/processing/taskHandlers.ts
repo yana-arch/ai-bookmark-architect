@@ -107,7 +107,8 @@ export class TaskHandlers {
                     };
                 });
             },
-            onLog
+            onLog,
+            sequential: !!promptModifiers?.maintainContext
         });
 
         return { data: results, usage: totalUsage };

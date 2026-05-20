@@ -4,6 +4,7 @@ export interface SplitterOptions<T, R> {
     calculateTokens: (subBatch: T[]) => number;
     executeTask: (subBatch: T[]) => Promise<R[]>;
     onLog?: (message: string) => void;
+    sequential?: boolean;
 }
 
 export class TokenAwareSplitter {
@@ -11,7 +12,7 @@ export class TokenAwareSplitter {
      * Recursively splits a batch of items if the calculated tokens exceed the limit.
      */
     static async splitAndExecute<T, R>(options: SplitterOptions<T, R>): Promise<R[]> {
-        const { batch, tokenLimit, calculateTokens, executeTask, onLog } = options;
+        const { batch, tokenLimit, calculateTokens, executeTask, onLog, sequential } = options;
 
         const processSubBatch = async (subBatch: T[]): Promise<R[]> => {
             if (subBatch.length === 0) return [];
@@ -27,10 +28,18 @@ export class TokenAwareSplitter {
                     onLog(`Token count (${totalTokens}) exceeds limit (${tokenLimit}). Splitting batch of ${subBatch.length} into ${left.length} and ${right.length}.`);
                 }
 
-                const [leftResults, rightResults] = await Promise.all([
-                    processSubBatch(left),
-                    processSubBatch(right)
-                ]);
+                let leftResults: R[];
+                let rightResults: R[];
+
+                if (sequential) {
+                    leftResults = await processSubBatch(left);
+                    rightResults = await processSubBatch(right);
+                } else {
+                    [leftResults, rightResults] = await Promise.all([
+                        processSubBatch(left),
+                        processSubBatch(right)
+                    ]);
+                }
                 return [...leftResults, ...rightResults];
             }
 

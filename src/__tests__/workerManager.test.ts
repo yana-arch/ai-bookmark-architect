@@ -96,4 +96,22 @@ describe('WorkerManager', () => {
         expect(worker.terminate).toHaveBeenCalled();
         expect(manager.getWorkerCount()).toBe(0);
     });
+
+    it('should propagate worker error events and clear active batches', () => {
+        const worker = manager.createWorker();
+        const batchData: any = { batchIndex: 42, batch: [] };
+        manager.dispatchBatch(worker, batchData);
+        
+        expect(manager.getActiveBatchCount()).toBe(1);
+
+        // Simulate an error event on the worker
+        (worker as any).dispatchEvent({ type: 'error', message: 'Test worker crash' });
+
+        expect(mockOnMessage).toHaveBeenCalledWith({
+            type: 'batch_error',
+            error: 'Worker error: Test worker crash',
+            batchIndex: 42
+        });
+        expect(manager.getActiveBatchCount()).toBe(0);
+    });
 });

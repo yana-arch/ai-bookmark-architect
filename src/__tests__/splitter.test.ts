@@ -71,4 +71,39 @@ describe('TokenAwareSplitter', () => {
         expect(results).toEqual([]);
         expect(executeTask).not.toHaveBeenCalled();
     });
+
+    it('should split sequentially if sequential is true', async () => {
+        const batch = [1, 2, 3, 4];
+        const executionOrder: string[] = [];
+        const executeTask = vi.fn().mockImplementation(async (b) => {
+            executionOrder.push(`start-${b.join(',')}`);
+            await new Promise(resolve => setTimeout(resolve, 10));
+            executionOrder.push(`end-${b.join(',')}`);
+            return b;
+        });
+        
+        // Return > 100 for full batch, but < 100 for sub-batches
+        const calculateTokens = vi.fn()
+            .mockReturnValueOnce(150) // Full batch [1,2,3,4]
+            .mockReturnValueOnce(50)  // Left sub-batch [1,2]
+            .mockReturnValueOnce(50); // Right sub-batch [3,4]
+        
+        const results = await TokenAwareSplitter.splitAndExecute({
+            batch,
+            tokenLimit: 100,
+            calculateTokens,
+            executeTask,
+            sequential: true
+        });
+
+        expect(results).toEqual([1, 2, 3, 4]);
+        expect(executeTask).toHaveBeenCalledTimes(2);
+        // Under sequential mode, [1,2] must start and end before [3,4] starts
+        expect(executionOrder).toEqual([
+            'start-1,2',
+            'end-1,2',
+            'start-3,4',
+            'end-3,4'
+        ]);
+    });
 });

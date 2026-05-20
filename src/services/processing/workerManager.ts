@@ -29,6 +29,7 @@ export interface WorkerBatchData {
 export class WorkerManager {
     private workers: Worker[] = [];
     private activeBatchIndices: Set<number> = new Set();
+    private workerActiveBatches: Map<Worker, number> = new Map();
     private onMessage: (message: WorkerMessage) => void;
 
     constructor(onMessage: (message: WorkerMessage) => void) {
@@ -41,17 +42,21 @@ export class WorkerManager {
         
         worker.addEventListener('error', (e) => {
             console.error('Worker error:', e);
+            const batchIndex = this.workerActiveBatches.get(worker);
             this.handleMessage({
                 type: 'batch_error',
-                error: `Worker error: ${e.message || 'Unknown error'}`
+                error: `Worker error: ${e.message || 'Unknown error'}`,
+                batchIndex
             });
         });
 
         worker.addEventListener('messageerror', (e) => {
             console.error('Worker message error:', e);
+            const batchIndex = this.workerActiveBatches.get(worker);
             this.handleMessage({
                 type: 'batch_error',
-                error: 'Worker message serialization error'
+                error: 'Worker message serialization error',
+                batchIndex
             });
         });
 
@@ -63,6 +68,13 @@ export class WorkerManager {
         if (message.type === 'batch_result' || message.type === 'batch_error') {
             if (message.batchIndex !== undefined) {
                 this.activeBatchIndices.delete(message.batchIndex);
+                // Clean up worker association mapping
+                for (const [w, bIdx] of this.workerActiveBatches.entries()) {
+                    if (bIdx === message.batchIndex) {
+                        this.workerActiveBatches.delete(w);
+                        break;
+                    }
+                }
             }
         }
         this.onMessage(message);
@@ -70,6 +82,7 @@ export class WorkerManager {
 
     dispatchBatch(worker: Worker, data: WorkerBatchData) {
         this.activeBatchIndices.add(data.batchIndex);
+        this.workerActiveBatches.set(worker, data.batchIndex);
         worker.postMessage({
             type: 'process_batch',
             data
@@ -80,11 +93,13 @@ export class WorkerManager {
         this.workers.forEach(worker => worker.terminate());
         this.workers = [];
         this.activeBatchIndices.clear();
+        this.workerActiveBatches.clear();
     }
 
     removeWorker(worker: Worker) {
         worker.terminate();
         this.workers = this.workers.filter(w => w !== worker);
+        this.workerActiveBatches.delete(worker);
     }
 
     getActiveBatchCount(): number {
