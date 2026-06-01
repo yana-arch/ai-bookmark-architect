@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import * as db from '@db';
+import { libraryRepo } from '@/src/db/repositories/library';
+import { settingsRepo } from '@/src/db/repositories/settings';
+import { systemRepo } from '@/src/db/repositories/system';
 import { perfMonitor } from '@/src/performance';
 import { backupScheduler } from '@/src/services/backupScheduler';
 import { createMockData } from '@/src/utils/mockUtils';
+import { DEFAULT_TEMPLATES, DEFAULT_PROFILES } from '@/src/constants/defaults';
 import { AppState, Bookmark, Folder, ApiConfig, InstructionPreset, FolderTemplate, UserCorrection, AIProfile } from '@/types';
 
 export const useAppData = () => {
@@ -18,210 +21,40 @@ export const useAppData = () => {
     const [notifications, setNotifications] = useState<{ id: string, message: string, type: 'info' | 'error' | 'success' | 'warning', duration?: number, action?: { label: string, onClick: () => void } }[]>([]);
 
     // Function to initialize default templates
-    const initializeDefaultTemplates = useCallback(async () => {
-        const defaultTemplates: FolderTemplate[] = [
-            {
-                id: 'template-web-dev',
-                name: 'Phát triển Web',
-                description: 'Cấu trúc thư mục cho các bookmark liên quan đến phát triển web',
-                structure: [
-                    {
-                        id: 'web-frontend',
-                        name: 'Frontend',
-                        children: [
-                            { id: 'web-react', name: 'React', children: [], parentId: 'web-frontend' },
-                            { id: 'web-vue', name: 'Vue.js', children: [], parentId: 'web-frontend' },
-                            { id: 'web-angular', name: 'Angular', children: [], parentId: 'web-frontend' },
-                            { id: 'web-html-css', name: 'HTML/CSS', children: [], parentId: 'web-frontend' },
-                        ],
-                        parentId: null,
-                    },
-                    {
-                        id: 'web-backend',
-                        name: 'Backend',
-                        children: [
-                            { id: 'web-nodejs', name: 'Node.js', children: [], parentId: 'web-backend' },
-                            { id: 'web-python', name: 'Python', children: [], parentId: 'web-backend' },
-                            { id: 'web-php', name: 'PHP', children: [], parentId: 'web-backend' },
-                            { id: 'web-database', name: 'Database', children: [], parentId: 'web-backend' },
-                        ],
-                        parentId: null,
-                    },
-                    {
-                        id: 'web-tools',
-                        name: 'Công cụ & Tiện ích',
-                        children: [
-                            { id: 'web-build-tools', name: 'Build Tools', children: [], parentId: 'web-tools' },
-                            { id: 'web-editors', name: 'Editors', children: [], parentId: 'web-tools' },
-                            { id: 'web-version-control', name: 'Version Control', children: [], parentId: 'web-tools' },
-                        ],
-                        parentId: null,
-                    },
-                ],
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-                isDefault: true,
-                customPrompt: 'Act as a specialized Web Development Architect. Focus on grouping technical documentation and frameworks into the provided structure.',
-                tagDrivenPrompt: "Focus on technical tags like 'react', 'nodejs', 'api', 'frontend', 'backend'. Group these tags logically into the Web Development taxonomy."
-            },
-            {
-                id: 'template-ai-ml',
-                name: 'AI & Machine Learning',
-                description: 'Cấu trúc thư mục cho các bookmark liên quan đến AI và Machine Learning',
-                structure: [
-                    {
-                        id: 'ai-fundamentals',
-                        name: 'Kiến thức cơ bản',
-                        children: [
-                            { id: 'ai-math', name: 'Toán học', children: [], parentId: 'ai-fundamentals' },
-                            { id: 'ai-algorithms', name: 'Thuật toán', children: [], parentId: 'ai-fundamentals' },
-                            { id: 'ai-concepts', name: 'Khái niệm cơ bản', children: [], parentId: 'ai-fundamentals' },
-                        ],
-                        parentId: null,
-                    },
-                    {
-                        id: 'ai-frameworks',
-                        name: 'Frameworks & Libraries',
-                        children: [
-                            { id: 'ai-tensorflow', name: 'TensorFlow', children: [], parentId: 'ai-frameworks' },
-                            { id: 'ai-pytorch', name: 'PyTorch', children: [], parentId: 'ai-frameworks' },
-                            { id: 'ai-keras', name: 'Keras', children: [], parentId: 'ai-frameworks' },
-                            { id: 'ai-scikit-learn', name: 'Scikit-learn', children: [], parentId: 'ai-frameworks' },
-                        ],
-                        parentId: null,
-                    },
-                    {
-                        id: 'ai-applications',
-                        name: 'Ứng dụng',
-                        children: [
-                            { id: 'ai-nlp', name: 'Xử lý ngôn ngữ tự nhiên', children: [], parentId: 'ai-applications' },
-                            { id: 'ai-computer-vision', name: 'Computer Vision', children: [], parentId: 'ai-applications' },
-                            { id: 'ai-robotics', name: 'Robotics', children: [], parentId: 'ai-applications' },
-                        ],
-                        parentId: null,
-                    },
-                ],
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-                isDefault: true,
-                customPrompt: 'Act as an AI Research Librarian. Categorize highly technical papers and tools into the ML hierarchy.',
-                tagDrivenPrompt: "Extract specific AI tags like 'LLM', 'neural-networks', 'transformers'. Map them to the AI/ML folder structure."
-            },
-            {
-                id: 'template-general',
-                name: 'Tổng hợp',
-                description: 'Cấu trúc thư mục tổng hợp cho nhiều loại bookmark khác nhau',
-                structure: [
-                    {
-                        id: 'general-tech',
-                        name: 'Công nghệ',
-                        children: [
-                            { id: 'general-programming', name: 'Lập trình', children: [], parentId: 'general-tech' },
-                            { id: 'general-ai', name: 'Trí tuệ nhân tạo', children: [], parentId: 'general-tech' },
-                            { id: 'general-web', name: 'Web', children: [], parentId: 'general-tech' },
-                        ],
-                        parentId: null,
-                    },
-                    {
-                        id: 'general-learning',
-                        name: 'Học tập',
-                        children: [
-                            { id: 'general-tutorials', name: 'Hướng dẫn', children: [], parentId: 'general-learning' },
-                            { id: 'general-courses', name: 'Khóa học', children: [], parentId: 'general-learning' },
-                            { id: 'general-documentation', name: 'Tài liệu', children: [], parentId: 'general-learning' },
-                        ],
-                        parentId: null,
-                    },
-                    {
-                        id: 'general-tools',
-                        name: 'Công cụ',
-                        children: [
-                            { id: 'general-development', name: 'Phát triển', children: [], parentId: 'general-tools' },
-                            { id: 'general-design', name: 'Thiết kế', children: [], parentId: 'general-tools' },
-                            { id: 'general-productivity', name: 'Năng suất', children: [], parentId: 'general-tools' },
-                        ],
-                        parentId: null,
-                    },
-                ],
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-                isDefault: true,
-                customPrompt: 'General organizer mode. Balance the categorization across Tech, Learning and Tools.',
-                tagDrivenPrompt: 'Identify broad tags and distribute them across the three main pillars: Tech, Learning, and Tools.'
-            },
-        ];
-
-        await Promise.all(defaultTemplates.map(template => db.saveFolderTemplate(template)));
-        setFolderTemplates(defaultTemplates);
-    }, []);
-
-    const initializeDefaultAIProfiles = useCallback(async () => {
-        const defaultProfiles: AIProfile[] = [
-            {
-                id: 'profile-default',
-                name: 'Cơ bản (Khuyên dùng)',
-                isDefault: true,
-                systemInstruction: 'You are an intelligent bookmark organizer. Categorize bookmarks into a clean, hierarchical folder structure in VIETNAMESE.',
-                temperature: 0.2,
-                topK: 40,
-                topP: 0.95,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-            },
-            {
-                id: 'profile-creative',
-                name: 'Sáng tạo (Thư mục mới)',
-                isDefault: true,
-                systemInstruction: 'You are an intelligent bookmark organizer. You are encouraged to create new and creative folder categories based on the content of the bookmarks.',
-                temperature: 0.7,
-                topK: 40,
-                topP: 0.95,
-                presencePenalty: 0.1,
-                frequencyPenalty: 0.1,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-            },
-            {
-                id: 'profile-strict',
-                name: 'Nghiêm ngặt (Gộp nhóm)',
-                isDefault: true,
-                systemInstruction: 'You are a strict taxonomy organizer. Do NOT create new folders unless absolutely necessary. Consolidate bookmarks into the most suitable existing folders.',
-                temperature: 0.0,
-                topK: 1,
-                topP: 0.1,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-            }
-        ];
-
-        await Promise.all(defaultProfiles.map(profile => db.saveAIProfile(profile)));
-        setAiProfiles(defaultProfiles);
+    const initializeDefaults = useCallback(async () => {
+        await Promise.all([
+            ...DEFAULT_TEMPLATES.map(t => settingsRepo.saveTemplate(t)),
+            ...DEFAULT_PROFILES.map(p => settingsRepo.saveProfile(p))
+        ]);
+        
+        setFolderTemplates(DEFAULT_TEMPLATES);
+        setAiProfiles(DEFAULT_PROFILES);
     }, []);
 
     const loadData = useCallback(async () => {
         await perfMonitor.timeAsyncFunction('app_load_data', async () => {
             setIsLoading(true);
-            const savedFolders = await db.getFolders();
-            const savedBookmarks = await db.getBookmarks();
-            const savedApiConfigs = await db.getApiConfigs();
-            const savedInstructionPresets = await db.getInstructionPresets();
-            const savedFolderTemplates = await db.getFolderTemplates();
-            const savedUserCorrections = await db.getUserCorrections();
-            const savedAIProfiles = await db.getAIProfiles();
+            const [
+                savedFolders, savedBookmarks, savedApiConfigs,
+                savedPresets, savedTemplates, savedCorrections, savedProfiles
+            ] = await Promise.all([
+                libraryRepo.getTree(),
+                libraryRepo.getBookmarks(),
+                settingsRepo.getApiConfigs(),
+                settingsRepo.getPresets(),
+                settingsRepo.getTemplates(),
+                libraryRepo.getCorrections(),
+                settingsRepo.getProfiles()
+            ]);
 
             setApiConfigs(savedApiConfigs || []);
-            setInstructionPresets(savedInstructionPresets || []);
-            setFolderTemplates(savedFolderTemplates || []);
-            setUserCorrections(savedUserCorrections || []);
-            setAiProfiles(savedAIProfiles || []);
+            setInstructionPresets(savedPresets || []);
+            setFolderTemplates(savedTemplates || []);
+            setUserCorrections(savedCorrections || []);
+            setAiProfiles(savedProfiles || []);
 
-            // Initialize default templates if none exist
-            if (!savedFolderTemplates || savedFolderTemplates.length === 0) {
-                await initializeDefaultTemplates();
-            }
-
-            if (!savedAIProfiles || savedAIProfiles.length === 0) {
-                await initializeDefaultAIProfiles();
+            if (!savedTemplates || savedTemplates.length === 0 || !savedProfiles || savedProfiles.length === 0) {
+                await initializeDefaults();
             }
 
             // Initialize backup scheduler
@@ -237,13 +70,13 @@ export const useAppData = () => {
             } else {
                 // No data, let's load mock data
                 const mockBookmarks = createMockData();
-                await db.saveBookmarks(mockBookmarks);
+                await libraryRepo.syncBookmarks(mockBookmarks);
                 setBookmarks(mockBookmarks);
                 setAppState(AppState.LOADED);
             }
             setIsLoading(false);
         });
-    }, [initializeDefaultTemplates, initializeDefaultAIProfiles]);
+    }, [initializeDefaults]);
 
     useEffect(() => {
         loadData();
@@ -251,7 +84,7 @@ export const useAppData = () => {
 
     const handleClearData = useCallback(async () => {
         if (window.confirm('Bạn có chắc chắn muốn xóa tất cả dữ liệu bookmarks không? Hành động này không thể hoàn tác.')) {
-            await db.clearAllData();
+            await systemRepo.factoryReset();
             setBookmarks([]);
             setFolders([]);
             setAppState(AppState.EMPTY);
@@ -286,7 +119,7 @@ export const useAppData = () => {
             b.id === bookmarkId ? { ...b, parentId: targetFolderId === 'root' ? null : targetFolderId, path: targetPath } : b
         );
         setBookmarks(updatedBookmarks);
-        await db.saveBookmarks(updatedBookmarks);
+        await libraryRepo.syncBookmarks(updatedBookmarks);
 
         // 2. Update folder tree
         const removeBookmarkFromTree = (items: (Folder | Bookmark)[]): (Folder | Bookmark)[] => {
@@ -316,7 +149,7 @@ export const useAppData = () => {
         const finalTree = addBookmarkToTree(treeWithoutBookmark, targetFolderId, updatedBookmark);
 
         setFolders(finalTree);
-        await db.saveFolders(finalTree);
+        await libraryRepo.saveTree(finalTree);
 
         // 3. Record User Correction for AI Learning
         const correction: UserCorrection = {
@@ -329,7 +162,7 @@ export const useAppData = () => {
 
         const updatedCorrections = [...userCorrections, correction];
         setUserCorrections(updatedCorrections);
-        await db.saveUserCorrection(correction);
+        await libraryRepo.addCorrection(correction);
 
         setNotifications(prev => [...prev, {
             id: `move-${Date.now()}`,
