@@ -282,8 +282,8 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
                         return (
                             <label key={mod.key} className={`flex items-center space-x-4 p-5 rounded-[1.5rem] cursor-pointer transition-all duration-300 border ${
                                 isChecked 
-                                ? 'bg-blue-600/10 border-blue-500/40 shadow-[0_0_20px_rgba(59,130,246,0.1)]' 
-                                : 'bg-black/30 border-white/5 hover:border-white/10'
+                                    ? 'bg-blue-600/10 border-blue-500/40 shadow-[0_0_20px_rgba(59,130,246,0.1)]' 
+                                    : 'bg-black/30 border-white/5 hover:border-white/10'
                             }`}>
                                 <div className={`w-6 h-6 rounded-xl border-2 flex items-center justify-center transition-all duration-500 shadow-inner ${
                                     isChecked ? 'bg-blue-500 border-blue-500 scale-110' : 'border-white/10'
@@ -357,8 +357,8 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
                         onClick={() => setIsAddingRule(!isAddingRule)}
                         className={`text-[10px] font-black uppercase tracking-widest transition-all flex items-center px-4 py-2 rounded-xl border ${
                             isAddingRule 
-                            ? 'bg-red-500/10 border-red-500/20 text-red-400' 
-                            : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20'
+                                ? 'bg-red-500/10 border-red-500/20 text-red-400' 
+                                : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20'
                         }`}
                     >
                         {isAddingRule ? (

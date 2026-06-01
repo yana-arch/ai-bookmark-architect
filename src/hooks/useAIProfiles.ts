@@ -45,7 +45,7 @@ export const useAIProfiles = (
             setNotifications(prev => [...prev, {
                 id: Date.now().toString(),
                 type: 'success',
-                message: `Đã xóa cấu hình AI`
+                message: 'Đã xóa cấu hình AI'
             }]);
         } catch (error: any) {
             setNotifications(prev => [...prev, {

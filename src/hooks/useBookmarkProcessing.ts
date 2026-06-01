@@ -208,10 +208,12 @@ export const useBookmarkProcessing = ({
                         setProcessedBookmarksWithRef(prev => [...prev, ...results]);
                         updateFolderTree(results, autoCleanupEmptyFolders, true);
                     },
-                    onComplete: (hasError) => {
+                    onComplete: (failedCount) => {
                         setIsProcessing(false);
-                        if (!hasError) addDetailedLog('success', 'Hoàn tất phân loại', 'Phân loại tag-driven thành công.');
-                        if (onProcessingComplete) onProcessingComplete(hasError);
+                        if (failedCount === 0) {
+                            addDetailedLog('success', 'Hoàn tất phân loại', 'Phân loại tag-driven thành công.');
+                        }
+                        if (onProcessingComplete) onProcessingComplete(failedCount > 0);
                     }
                 });
                 activeProcessorRef.current = processor;

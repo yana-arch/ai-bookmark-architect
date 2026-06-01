@@ -38,7 +38,7 @@ const FolderItem: React.FC<{
             <div
                 onClick={() => onSelectFolder(folder.id)}
                 className={`flex items-center p-2 rounded-md cursor-pointer transition-colors duration-150 ${isSelected ? 'bg-emerald-500/20 text-emerald-400' : 'hover:bg-gray-700/50'
-                    }`}
+                }`}
                 style={{ paddingLeft: `${level * 1.5 + 0.5}rem` }}
             >
                 <ChevronRightIcon
@@ -124,7 +124,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <div
                     onClick={() => onSelectFolder('root')}
                     className={`flex items-center p-2 rounded-md cursor-pointer transition-colors duration-150 ${selectedFolderId === 'root' ? 'bg-emerald-500/20 text-emerald-400' : 'hover:bg-gray-700/50'
-                        }`}
+                    }`}
                 >
                     <FolderIcon className="w-5 h-5 mr-3 text-sky-400 flex-shrink-0" />
                     <span className="truncate font-medium flex-1">Tất cả Bookmarks</span>

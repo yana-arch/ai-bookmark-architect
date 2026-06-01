@@ -100,9 +100,9 @@ export const AIProfilesManager: React.FC<AIProfilesManagerProps> = ({
                         key={profile.id}
                         onClick={() => handleSelectProfile(profile.id)}
                         className={`p-4 rounded-xl cursor-pointer border transition-all ${editingProfile.id === profile.id
-                                ? 'bg-emerald-500/10 border-emerald-500/50 ring-1 ring-emerald-500/20'
-                                : 'bg-[#121418] border-white/10 hover:border-white/20'
-                            }`}
+                            ? 'bg-emerald-500/10 border-emerald-500/50 ring-1 ring-emerald-500/20'
+                            : 'bg-[#121418] border-white/10 hover:border-white/20'
+                        }`}
                     >
                         <div className="flex justify-between items-start">
                             <div>

@@ -63,8 +63,8 @@ export const TemplatesTab: React.FC<TemplatesTabProps> = ({
                                     onClick={() => setEditingTemplateId(editingTemplateId === template.id ? null : template.id)}
                                     className={`px-10 py-3 rounded-2xl transition-all duration-500 uppercase tracking-[0.2em] text-[9px] font-black border active:scale-[0.97] ${
                                         editingTemplateId === template.id 
-                                        ? 'bg-orange-500/10 border-orange-500/30 text-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.1)]' 
-                                        : 'bg-white/5 border-white/5 hover:bg-white/10 text-gray-500 hover:text-gray-300'
+                                            ? 'bg-orange-500/10 border-orange-500/30 text-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.1)]' 
+                                            : 'bg-white/5 border-white/5 hover:bg-white/10 text-gray-500 hover:text-gray-300'
                                     }`}
                                 >
                                     {editingTemplateId === template.id ? 'Close Directives' : 'Refine Directives'}

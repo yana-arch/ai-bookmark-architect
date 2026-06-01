@@ -8,7 +8,11 @@ import {
     parseAIResponse
 } from '../aiService';
 import { extractJsonBlock } from '@/src/utils/aiUtils';
-import type { Bookmark, Folder, UserCorrection, AIProfile, PromptModifiers } from '@/types';
+import type { 
+    Bookmark, Folder, UserCorrection, AIProfile, PromptModifiers, 
+    CategorizedBookmark, ProcessingResult, AIUsage 
+} from '@/types';
+import { type TagFolderSchema } from '@/src/utils/aiUtils';
 
 import { TokenAwareSplitter } from './tokenAwareSplitter';
 
@@ -34,12 +38,12 @@ export class TaskHandlers {
         batch: Bookmark[],
         options: TaskOptions,
         tokenLimit: number = 16000
-    ): Promise<{ data: any[], usage: any }> {
+    ): Promise<ProcessingResult<CategorizedBookmark>> {
         const { client, systemPrompt, userInstructionBlock, currentTree, userHistory, domainKnowledge, tagCount, tagLanguage, promptModifiers, signal, onLog } = options;
-        const totalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+        const totalUsage: AIUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
         const maintainContext = !!promptModifiers?.maintainContext;
 
-        const results = await TokenAwareSplitter.splitAndExecute<Bookmark, any>({
+        const results = await TokenAwareSplitter.splitAndExecute<Bookmark, CategorizedBookmark>({
             batch,
             tokenLimit,
             signal,
@@ -68,7 +72,7 @@ export class TaskHandlers {
 
                 if (!text) throw new Error('AI returned empty response');
 
-                const parsedData = parseAIResponse(text);
+                const parsedData = parseAIResponse(text) as CategorizedBookmark[];
                 return parsedData.map(cbm => {
                     const original = subBatch.find(b => b.id === cbm.id) || subBatch.find(b => b.url === cbm.url);
                     return { ...cbm, id: original ? original.id : cbm.id, parentId: null };
@@ -88,11 +92,11 @@ export class TaskHandlers {
         batch: Bookmark[],
         options: TaskOptions,
         tokenLimit: number = 16000
-    ): Promise<{ data: any[], usage: any }> {
+    ): Promise<ProcessingResult<{ id?: string, url: string, tags: string[] }>> {
         const { client, tagCount, tagLanguage, signal, onLog } = options;
-        const totalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+        const totalUsage: AIUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
-        const results = await TokenAwareSplitter.splitAndExecute<Bookmark, any>({
+        const results = await TokenAwareSplitter.splitAndExecute<Bookmark, { id?: string, url: string, tags: string[] }>({
             batch,
             tokenLimit,
             signal,
@@ -132,9 +136,9 @@ export class TaskHandlers {
     static async handleTagMapping(
         uniqueTags: string[],
         options: TaskOptions
-    ): Promise<{ data: any[], usage: any }> {
+    ): Promise<ProcessingResult<TagFolderSchema>> {
         const { client, systemPrompt, userInstructionBlock, currentTree, tagLanguage, promptModifiers, signal, onLog } = options;
-        const totalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+        const totalUsage: AIUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
         const filteredTree = currentTree.filter(f => f.name !== SYSTEM_FOLDERS.UNMAPPED_TAGS && f.name !== SYSTEM_FOLDERS.UNCATEGORIZED);
 
@@ -165,7 +169,7 @@ export class TaskHandlers {
         totalBatches = Math.max(1, Math.min(totalBatches, 10));
         onLog(`AI determined it needs ${totalBatches} batches for the complete schema.`);
 
-        let resultData: any[] = [];
+        let resultData: TagFolderSchema[] = [];
 
         for (let i = 1; i <= totalBatches; i++) {
             if (signal?.aborted) throw new Error('Mapping aborted during batch processing.');

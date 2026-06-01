@@ -18,7 +18,7 @@ import type {
 } from '@/types';
 import {
     CogIcon, XIcon, AILogoIcon, TerminalIcon, LayersIcon,
-    CloudIcon, DatabaseIcon, ShieldCheckIcon, ChipIcon
+    CloudIcon, DatabaseIcon, ShieldCheckIcon
 } from '@/src/components/ui/Icons';
 import { postgresqlService } from '@/src/services/postgresqlService';
 
@@ -116,6 +116,8 @@ interface UnifiedSettingsModalProps {
     onRestoreSuccess?: () => void;
     onUploadCloudData?: (key: string) => Promise<void>;
     onImportCloudData?: (key: string) => Promise<void>;
+    onDeleteBackup?: (id: string) => Promise<void>;
+    onOpenAuth?: () => void;
     initialTab?: TabType;
 }
 
@@ -217,6 +219,20 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
         setApiProvider('gemini');
     };
 
+    const handleDeleteBackup = async (id: string) => {
+        if (!window.confirm('Delete this architecture snapshot permanently?')) return;
+        try {
+            await postgresqlService.deleteBackup(id);
+            await checkCloudAuth(); // Refresh list
+        } catch (e) {
+            console.error('Delete error:', e);
+        }
+    };
+
+    const handleRefreshBackups = async () => {
+        await checkCloudAuth();
+    };
+
     if (!isOpen) return null;
 
     const navItems: { id: TabType; label: string; icon: React.ReactNode }[] = [
@@ -260,9 +276,9 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
                                 key={item.id}
                                 onClick={() => setActiveTab(item.id)}
                                 className={`w-full flex items-center px-5 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-500 group relative ${activeTab === item.id
-                                        ? 'bg-white/5 text-white border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.4)]'
-                                        : 'text-gray-500 hover:bg-white/[0.02] hover:text-gray-300'
-                                    }`}
+                                    ? 'bg-white/5 text-white border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.4)]'
+                                    : 'text-gray-500 hover:bg-white/[0.02] hover:text-gray-300'
+                                }`}
                             >
                                 <span className={`mr-4 transition-all duration-500 ${activeTab === item.id ? 'text-emerald-400 scale-110' : 'text-gray-600 group-hover:text-gray-400'}`}>
                                     {item.icon}
@@ -379,6 +395,9 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
                                 backups={backups}
                                 onImportCloudData={onImportCloudData}
                                 onUploadCloudData={onUploadCloudData}
+                                onDeleteBackup={handleDeleteBackup}
+                                onRefreshBackups={handleRefreshBackups}
+                                onOpenAuth={props.onOpenAuth}
                             />
                         )}
 

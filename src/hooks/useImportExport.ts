@@ -329,6 +329,27 @@ ${bookmarksHtml}</DL><p>`;
         });
     }, [setBookmarks, setFolders, setAppState, setNotifications]);
 
+    const handleDeleteBackup = useCallback(async (id: string) => {
+        await perfMonitor.timeAsyncFunction('delete_backup', async () => {
+            try {
+                const { keyBasedService } = await import('../services/postgresqlService');
+                await keyBasedService.deleteBackup(id);
+                setNotifications(prev => [...prev, {
+                    id: `delete-success-${Date.now()}`,
+                    message: 'Đã xóa bản sao lưu thành công.',
+                    type: 'success'
+                }]);
+            } catch (error: any) {
+                setNotifications(prev => [...prev, {
+                    id: `delete-error-${Date.now()}`,
+                    message: `Lỗi khi xóa: ${error.message}`,
+                    type: 'error'
+                }]);
+                throw error;
+            }
+        });
+    }, [setNotifications]);
+
     return {
         showImportModal,
         setShowImportModal,
@@ -347,6 +368,7 @@ ${bookmarksHtml}</DL><p>`;
         handleExportBookmarks,
         handleUploadData,
         handleImportData,
+        handleDeleteBackup,
         handleFileLoaded,
         importFile,
         handleFileSelect

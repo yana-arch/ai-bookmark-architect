@@ -118,7 +118,7 @@ export const useAISettings = () => {
             try {
                 return JSON.parse(saved);
             } catch (e) {
-                console.error("Failed to parse promptModifiers", e);
+                console.error('Failed to parse promptModifiers', e);
             }
         }
         return {

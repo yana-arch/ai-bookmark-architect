@@ -110,6 +110,8 @@ interface UIContextType {
     setIsLogModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     isGlobalSettingsModalOpen: boolean;
     setIsGlobalSettingsModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isAuthModalOpen: boolean;
+    setIsAuthModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     settingsTab: 'providers' | 'intelligence' | 'templates' | 'data' | 'health' | 'backup' | 'config';
     setSettingsTab: React.Dispatch<React.SetStateAction<'providers' | 'intelligence' | 'templates' | 'data' | 'health' | 'backup' | 'config'>>;
     openSettings: (tab?: 'providers' | 'intelligence' | 'templates' | 'data' | 'health' | 'backup' | 'config') => void;
@@ -139,6 +141,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [isAnalyticsDashboardOpen, setIsAnalyticsDashboardOpen] = useState(false);
     const [isLogModalOpen, setIsLogModalOpen] = useState(false);
     const [isGlobalSettingsModalOpen, setIsGlobalSettingsModalOpen] = useState(false);
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [settingsTab, setSettingsTab] = useState<UIContextType['settingsTab']>('providers');
 
     const openSettings = useCallback((tab: UIContextType['settingsTab'] = 'providers') => {
@@ -218,6 +221,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAnalyticsDashboardOpen, setIsAnalyticsDashboardOpen,
         isLogModalOpen, setIsLogModalOpen,
         isGlobalSettingsModalOpen, setIsGlobalSettingsModalOpen,
+        isAuthModalOpen, setIsAuthModalOpen,
         settingsTab, setSettingsTab,
         openSettings,
     };

@@ -127,20 +127,20 @@ export const ProvidersTab: React.FC<ProvidersTabProps> = ({
                             <div className="flex items-center space-x-6 relative z-10">
                                 <div className={`p-4 rounded-[1.2rem] shadow-inner transition-all duration-500 group-hover:scale-110 ${
                                     config.provider.includes('gemini') ? 'bg-blue-500/20 text-blue-400 border border-blue-500/10' : 
-                                    config.provider.includes('openai') ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/10' : 
-                                    'bg-purple-500/20 text-purple-400 border border-purple-500/10'
+                                        config.provider.includes('openai') ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/10' : 
+                                            'bg-purple-500/20 text-purple-400 border border-purple-500/10'
                                 }`}>
                                     {config.provider.includes('gemini') ? <SparklesIcon className="w-6 h-6" /> : 
-                                     config.provider.includes('openai') ? <AILogoIcon className="w-6 h-6" /> : 
-                                     <BoltIcon className="w-6 h-6" />}
+                                        config.provider.includes('openai') ? <AILogoIcon className="w-6 h-6" /> : 
+                                            <BoltIcon className="w-6 h-6" />}
                                 </div>
                                 <div>
                                     <div className="flex items-center space-x-3">
                                         <p className="text-sm font-black text-white tracking-widest uppercase">{config.name}</p>
                                         <div className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest border ${
                                             config.status === 'active' 
-                                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]' 
-                                            : 'bg-red-500/10 text-red-400 border-red-500/20'
+                                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]' 
+                                                : 'bg-red-500/10 text-red-400 border-red-500/20'
                                         }`}>
                                             {config.status}
                                         </div>
@@ -164,8 +164,8 @@ export const ProvidersTab: React.FC<ProvidersTabProps> = ({
                                     onClick={() => onToggleApiConfigStatus(config.id, config.status === 'active' ? 'inactive' : 'active')} 
                                     className={`p-3 rounded-xl border transition-all duration-300 ${
                                         config.status === 'active' 
-                                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]' 
-                                        : 'bg-white/5 border-white/10 text-gray-600'
+                                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]' 
+                                            : 'bg-white/5 border-white/10 text-gray-600'
                                     }`}
                                     title={config.status === 'active' ? 'Deactivate Node' : 'Activate Node'}
                                 >
