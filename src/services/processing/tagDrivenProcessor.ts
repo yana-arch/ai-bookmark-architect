@@ -230,5 +230,7 @@ export class TagDrivenProcessor {
 
     abort() {
         this.isAborted = true;
+        this.options.workerManager.cancelAll();
+        this.options.onLog('Đã dừng xử lý tag-driven.');
     }
 }

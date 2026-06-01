@@ -269,9 +269,18 @@ export const useBookmarkProcessing = ({
         setSessionTokenUsage({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
     }, []);
 
+    /**
+     * Clean entry point: process bookmarks from scratch.
+     * Wraps startProcessing with sensible defaults so callers don't need to
+     * manage initialProcessed / currentFolders manually for the common case.
+     */
+    const process = useCallback((overrideBookmarks?: Bookmark[]) => {
+        return startProcessing([], latestFoldersRef.current, overrideBookmarks);
+    }, [startProcessing]);
+
     return {
         isProcessing, progress, logs, detailedLogs, errorDetails, sessionTokenUsage, processedBookmarks,
-        startProcessing, stopProcessing, forceStop, resetProcessingState,
+        process, startProcessing, stopProcessing, forceStop, resetProcessingState,
         setLogs, setDetailedLogs, setErrorDetails, setSessionTokenUsage, setProcessedBookmarks: setProcessedBookmarksWithRef, addDetailedLog
     };
 };

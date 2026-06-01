@@ -1,11 +1,8 @@
 import { SYSTEM_FOLDERS } from '@/types';
-import { AIClient, type ChatMessage } from '../aiClient';
+import { AIClient } from '../aiClient';
+import { PromptBuilder } from '../promptBuilder';
 import { 
-    generateCategorizationPrompt,
-    generateTagExtractionPrompt,
     parseTagExtractionResponse,
-    generateTagAnalysisPrompt,
-    generateTagBatchRequestPrompt,
     parseTagMappingResponse,
     calculateRequestTokens,
     parseAIResponse
@@ -25,6 +22,7 @@ export interface TaskOptions {
     tagCount?: number;
     tagLanguage?: string;
     promptModifiers?: PromptModifiers;
+    signal?: AbortSignal;
     onLog: (message: string) => void;
 }
 
@@ -37,78 +35,47 @@ export class TaskHandlers {
         options: TaskOptions,
         tokenLimit: number = 16000
     ): Promise<{ data: any[], usage: any }> {
-        const { client, systemPrompt, userInstructionBlock, currentTree, userHistory, domainKnowledge, tagCount, tagLanguage, promptModifiers, onLog } = options;
+        const { client, systemPrompt, userInstructionBlock, currentTree, userHistory, domainKnowledge, tagCount, tagLanguage, promptModifiers, signal, onLog } = options;
         const totalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-        const history: ChatMessage[] = [];
+        const maintainContext = !!promptModifiers?.maintainContext;
 
         const results = await TokenAwareSplitter.splitAndExecute<Bookmark, any>({
             batch,
             tokenLimit,
+            signal,
             calculateTokens: (subBatch) => {
-                const userPrompt = generateCategorizationPrompt({
-                    userInstructionBlock,
-                    currentTree,
-                    batch: subBatch,
-                    userHistory,
-                    domainKnowledge,
-                    tagLanguage,
-                    tagCount,
-                    promptModifiers
+                const userPrompt = PromptBuilder.build({
+                    type: 'categorization',
+                    userInstructionBlock, currentTree, batch: subBatch,
+                    userHistory, domainKnowledge, tagLanguage, tagCount, promptModifiers
                 });
                 return calculateRequestTokens({ systemPrompt, userPrompt });
             },
             executeTask: async (subBatch) => {
-                const userPrompt = generateCategorizationPrompt({
-                    userInstructionBlock,
-                    currentTree,
-                    batch: subBatch,
-                    userHistory,
-                    domainKnowledge,
-                    tagLanguage,
-                    tagCount,
-                    promptModifiers
+                const userPrompt = PromptBuilder.build({
+                    type: 'categorization',
+                    userInstructionBlock, currentTree, batch: subBatch,
+                    userHistory, domainKnowledge, tagLanguage, tagCount, promptModifiers
                 });
 
-                let responseText = '';
-                let responseUsage: any = null;
-                if (promptModifiers?.maintainContext) {
-                    const { text, usage } = await client.generateChatContent(systemPrompt, [
-                        ...history,
-                        { role: 'user', content: userPrompt }
-                    ]);
-                    responseText = text;
-                    responseUsage = usage;
-                    if (responseText) {
-                        history.push({ role: 'user', content: userPrompt });
-                        history.push({ role: 'assistant', content: responseText });
-                        if (history.length > 10) history.splice(0, 2);
-                    }
-                } else {
-                    const { text, usage } = await client.generateContent(systemPrompt, userPrompt);
-                    responseText = text;
-                    responseUsage = usage;
+                const { text, usage } = await client.complete(systemPrompt, userPrompt, { maintainContext, signal });
+
+                if (usage) {
+                    totalUsage.promptTokens += usage.promptTokens || 0;
+                    totalUsage.completionTokens += usage.completionTokens || 0;
+                    totalUsage.totalTokens += usage.totalTokens || 0;
                 }
 
-                if (responseUsage) {
-                    totalUsage.promptTokens += responseUsage.promptTokens || 0;
-                    totalUsage.completionTokens += responseUsage.completionTokens || 0;
-                    totalUsage.totalTokens += responseUsage.totalTokens || 0;
-                }
+                if (!text) throw new Error('AI returned empty response');
 
-                if (!responseText) throw new Error('AI returned empty response');
-                
-                const parsedData = parseAIResponse(responseText);
+                const parsedData = parseAIResponse(text);
                 return parsedData.map(cbm => {
                     const original = subBatch.find(b => b.id === cbm.id) || subBatch.find(b => b.url === cbm.url);
-                    return {
-                        ...cbm,
-                        id: original ? original.id : cbm.id,
-                        parentId: null
-                    };
+                    return { ...cbm, id: original ? original.id : cbm.id, parentId: null };
                 });
             },
             onLog,
-            sequential: !!promptModifiers?.maintainContext
+            sequential: maintainContext
         });
 
         return { data: results, usage: totalUsage };
@@ -122,37 +89,35 @@ export class TaskHandlers {
         options: TaskOptions,
         tokenLimit: number = 16000
     ): Promise<{ data: any[], usage: any }> {
-        const { client, tagCount, tagLanguage, onLog } = options;
+        const { client, tagCount, tagLanguage, signal, onLog } = options;
         const totalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
         const results = await TokenAwareSplitter.splitAndExecute<Bookmark, any>({
             batch,
             tokenLimit,
+            signal,
             calculateTokens: (subBatch) => {
-                const userPrompt = generateTagExtractionPrompt({ batch: subBatch, tagCount, tagLanguage });
+                const userPrompt = PromptBuilder.build({ type: 'tagExtraction', batch: subBatch, tagCount, tagLanguage });
                 return calculateRequestTokens({ systemPrompt: '', userPrompt });
             },
             executeTask: async (subBatch) => {
-                const userPrompt = generateTagExtractionPrompt({ batch: subBatch, tagCount, tagLanguage });
-                const { text, usage } = await client.generateContent('', userPrompt);
-                
+                const userPrompt = PromptBuilder.build({ type: 'tagExtraction', batch: subBatch, tagCount, tagLanguage });
+                const { text, usage } = await client.complete('', userPrompt, { signal });
+
                 if (!text) throw new Error('AI returned empty response for tag extraction');
-                
+
                 if (usage) {
                     totalUsage.promptTokens += usage.promptTokens || 0;
                     totalUsage.completionTokens += usage.completionTokens || 0;
                     totalUsage.totalTokens += usage.totalTokens || 0;
                 }
-                
+
                 const parsedData = parseTagExtractionResponse(text);
                 if (parsedData.length === 0) throw new Error('Failed to parse tag extraction response');
-                
+
                 return parsedData.map(cbm => {
                     const original = subBatch.find(b => b.id === cbm.id) || subBatch.find(b => b.url === cbm.url);
-                    return {
-                        ...cbm,
-                        id: original ? original.id : cbm.id
-                    };
+                    return { ...cbm, id: original ? original.id : cbm.id };
                 });
             },
             onLog
@@ -168,23 +133,19 @@ export class TaskHandlers {
         uniqueTags: string[],
         options: TaskOptions
     ): Promise<{ data: any[], usage: any }> {
-        const { client, systemPrompt, userInstructionBlock, currentTree, tagLanguage, promptModifiers, onLog } = options;
+        const { client, systemPrompt, userInstructionBlock, currentTree, tagLanguage, promptModifiers, signal, onLog } = options;
         const totalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-        const history: ChatMessage[] = [];
-        
-        // Filter out fallback folders
+
         const filteredTree = currentTree.filter(f => f.name !== SYSTEM_FOLDERS.UNMAPPED_TAGS && f.name !== SYSTEM_FOLDERS.UNCATEGORIZED);
 
-        const analysisPrompt = generateTagAnalysisPrompt({
-            userInstructionBlock,
-            uniqueTags,
-            currentTree: filteredTree,
-            tagLanguage,
-            promptModifiers
+        const analysisPrompt = PromptBuilder.build({
+            type: 'tagAnalysis',
+            userInstructionBlock, uniqueTags, currentTree: filteredTree, tagLanguage, promptModifiers
         });
 
         onLog('Analyzing tags and creating batching plan...');
-        const { text: planText, usage: planUsage } = await client.generateChatContent(systemPrompt, [{ role: 'user', content: analysisPrompt }]);
+        client.resetHistory();
+        const { text: planText, usage: planUsage } = await client.complete(systemPrompt, analysisPrompt, { maintainContext: true, signal });
 
         if (planUsage) {
             totalUsage.promptTokens += planUsage.promptTokens || 0;
@@ -204,24 +165,20 @@ export class TaskHandlers {
         totalBatches = Math.max(1, Math.min(totalBatches, 10));
         onLog(`AI determined it needs ${totalBatches} batches for the complete schema.`);
 
-        history.push({ role: 'user', content: analysisPrompt });
-        history.push({ role: 'assistant', content: planText });
-
         let resultData: any[] = [];
-        
-        for (let i = 1; i <= totalBatches; i++) {
-            onLog(`Requesting Tag Schema batch ${i}/${totalBatches}...`);
-            const batchRequestPrompt = generateTagBatchRequestPrompt(i, totalBatches, tagLanguage, promptModifiers);
-            history.push({ role: 'user', content: batchRequestPrompt });
 
-            const { text: batchText, usage: batchUsage } = await client.generateChatContent(systemPrompt, history);
-            
+        for (let i = 1; i <= totalBatches; i++) {
+            if (signal?.aborted) throw new Error('Mapping aborted during batch processing.');
+
+            onLog(`Requesting Tag Schema batch ${i}/${totalBatches}...`);
+            const batchRequestPrompt = PromptBuilder.build({ type: 'tagBatchRequest', batchIndex: i, totalBatches, tagLanguage, promptModifiers });
+            const { text: batchText, usage: batchUsage } = await client.complete(systemPrompt, batchRequestPrompt, { maintainContext: true, signal });
+
             if (batchUsage) {
                 totalUsage.promptTokens += batchUsage.promptTokens || 0;
                 totalUsage.completionTokens += batchUsage.completionTokens || 0;
                 totalUsage.totalTokens += batchUsage.totalTokens || 0;
             }
-            history.push({ role: 'assistant', content: batchText });
 
             const batchSchema = parseTagMappingResponse(batchText);
             if (batchSchema && batchSchema.length > 0) {

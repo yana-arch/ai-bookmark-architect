@@ -35,13 +35,26 @@ interface WorkerResponse {
   usage?: any;
 }
 
+let currentAbortController: AbortController | null = null;
+
 // Main worker logic
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     const { type, data } = e.data;
 
-    if (type === 'cancel' || !data) return;
+    if (type === 'cancel') {
+        if (currentAbortController) {
+            currentAbortController.abort();
+            currentAbortController = null;
+        }
+        return;
+    }
+
+    if (!data) return;
 
     if (type === 'process_batch') {
+        currentAbortController = new AbortController();
+        const signal = currentAbortController.signal;
+        
         const { 
             batch, 
             apiConfigs, 
@@ -75,6 +88,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                         tagCount,
                         tagLanguage,
                         promptModifiers,
+                        signal,
                         onLog: (msg: string) => self.postMessage({ type: 'log', log: { message: `Batch ${batchIndex}: ${msg}` }, batchIndex } as WorkerResponse)
                     };
 
@@ -90,6 +104,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                     apiConfigs,
                     maxRetries,
                     activeProfile,
+                    signal,
                     onLog: (msg) => self.postMessage({ type: 'log', log: { message: msg }, batchIndex } as WorkerResponse)
                 }
             );
@@ -102,7 +117,13 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             } as WorkerResponse);
 
         } catch (error: any) {
-            self.postMessage({ type: 'batch_error', error: error.message || 'Unknown error during AI processing', batchIndex } as WorkerResponse);
+            if (error.name === 'AbortError' || signal.aborted) {
+                self.postMessage({ type: 'log', log: { message: `Batch ${batchIndex} was cancelled.` }, batchIndex } as WorkerResponse);
+            } else {
+                self.postMessage({ type: 'batch_error', error: error.message || 'Unknown error during AI processing', batchIndex } as WorkerResponse);
+            }
+        } finally {
+            currentAbortController = null;
         }
     }
 };

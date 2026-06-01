@@ -116,6 +116,12 @@ export class StandardProcessor {
         if (this.completedBatches + this.failedBatches >= this.totalBatches) {
             this.options.workerManager.removeWorker(worker);
             if (!this.isAborted) this.options.onComplete(this.failedBatches);
+        } else if (this.isAborted) {
+            this.options.workerManager.removeWorker(worker);
+            // If we are aborted and this was the last active worker, call onComplete
+            if (this.options.workerManager.getActiveBatchCount() === 0) {
+                this.options.onComplete(this.failedBatches);
+            }
         } else {
             this.startNextBatch(worker);
         }
@@ -123,5 +129,8 @@ export class StandardProcessor {
 
     abort() {
         this.isAborted = true;
+        this.options.workerManager.cancelAll();
+        this.options.onLog('Đã hủy tất cả các batch đang chạy.');
+        this.options.onComplete(this.failedBatches);
     }
 }
