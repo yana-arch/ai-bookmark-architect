@@ -47,7 +47,15 @@ export const useImportExport = (
                     } else if (file.name.endsWith('.csv')) {
                         parsedBookmarks = parseCSVBookmarks(content);
                     } else if (file.name.endsWith('.json')) {
-                        parsedBookmarks = JSON.parse(content);
+                        const raw = JSON.parse(content);
+                        const arr = Array.isArray(raw) ? raw : (raw.bookmarks || []);
+                        if (!Array.isArray(arr)) {
+                            throw new Error('JSON file must contain an array of bookmarks or have a "bookmarks" array.');
+                        }
+                        if (arr.some((item: any) => !item.title || !item.url)) {
+                            throw new Error('Each bookmark must have "title" and "url" fields.');
+                        }
+                        parsedBookmarks = arr;
                     }
                     setImportFileName(file.name);
                     setPreviewBookmarks(parsedBookmarks);

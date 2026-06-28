@@ -3,7 +3,6 @@ import { libraryRepo } from '@/src/db/repositories/library';
 import { settingsRepo } from '@/src/db/repositories/settings';
 import { systemRepo } from '@/src/db/repositories/system';
 import { perfMonitor } from '@/src/performance';
-import { backupScheduler } from '@/src/services/backupScheduler';
 import { createMockData } from '@/src/utils/mockUtils';
 import { DEFAULT_TEMPLATES, DEFAULT_PROFILES } from '@/src/constants/defaults';
 import { AppState, Bookmark, Folder, ApiConfig, InstructionPreset, FolderTemplate, UserCorrection, AIProfile } from '@/types';
@@ -56,9 +55,6 @@ export const useAppData = () => {
             if (!savedTemplates || savedTemplates.length === 0 || !savedProfiles || savedProfiles.length === 0) {
                 await initializeDefaults();
             }
-
-            // Initialize backup scheduler
-            await backupScheduler.initialize();
 
             if (savedFolders && savedFolders.length > 0) {
                 setFolders(savedFolders);

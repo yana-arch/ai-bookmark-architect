@@ -8,6 +8,7 @@ import FileDropzone from './src/components/ui/FileDropzone';
 import Header from './src/components/layout/Header';
 import AppModals from './src/components/layout/AppModals';
 import NotificationToast from './src/components/ui/NotificationToast';
+import { ErrorBoundary } from './src/components/features/ErrorBoundary';
 
 import { useAppLogic } from './src/hooks/useAppLogic';
 import { useAuth } from './src/hooks/useAuth';
@@ -39,8 +40,9 @@ const App: React.FC = () => {
     }
 
     return (
-        <div className="flex h-screen w-full bg-[#1E2127] text-gray-300 font-sans">
-            <AppModals 
+        <ErrorBoundary>
+            <div className="flex h-screen w-full bg-[#1E2127] text-gray-300 font-sans">
+                <AppModals 
                 isGlobalSettingsModalOpen={ui.isGlobalSettingsModalOpen}
                 setIsGlobalSettingsModalOpen={ui.setIsGlobalSettingsModalOpen}
                 isAuthModalOpen={ui.isAuthModalOpen}
@@ -146,8 +148,9 @@ const App: React.FC = () => {
                         )}
                     </div>
                 </main>
+                </div>
             </div>
-        </div>
+        </ErrorBoundary>
     );
 };
 
