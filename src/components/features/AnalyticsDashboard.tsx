@@ -13,7 +13,7 @@ import {
 } from 'chart.js';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import type { Bookmark, Folder, AnalyticsData } from '@/types';
-import * as db from '@db';
+import { systemRepo } from '@/src/db/repositories/system';
 import { ChartIcon } from '@/src/components/ui/Icons';
 import { perfMonitor } from '@/src/performance';
 
@@ -52,7 +52,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         worker.onmessage = async (e: MessageEvent<AnalyticsData>) => {
             await perfMonitor.timeAsyncFunction('set_analytics_data', async () => {
                 setAnalyticsData(e.data);
-                await db.saveAnalyticsData(e.data);
+                await systemRepo.saveAnalytics(e.data);
                 setIsLoading(false);
             });
         };

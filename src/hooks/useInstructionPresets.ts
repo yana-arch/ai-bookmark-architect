@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { InstructionPreset } from '@/types';
-import * as db from '@db';
+import { settingsRepo } from '@/src/db/repositories/settings';
 
 export const useInstructionPresets = (
     instructionPresets: InstructionPreset[],
@@ -11,7 +11,7 @@ export const useInstructionPresets = (
     const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
 
     const handleSaveInstructionPreset = useCallback(async (preset: InstructionPreset) => {
-        await db.saveInstructionPreset(preset);
+        await settingsRepo.savePreset(preset);
         setInstructionPresets(prev => {
             const existingIndex = prev.findIndex(p => p.id === preset.id);
             if (existingIndex > -1) {
@@ -24,7 +24,7 @@ export const useInstructionPresets = (
     }, [setInstructionPresets]);
 
     const handleDeleteInstructionPreset = useCallback(async (id: string) => {
-        await db.deleteInstructionPreset(id);
+        await settingsRepo.deletePreset(id);
         setInstructionPresets(prev => prev.filter(p => p.id !== id));
         if (selectedPresetId === id) {
             setSelectedPresetId(null);

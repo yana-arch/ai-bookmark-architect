@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import type { DbConnection } from '@/types';
+import { systemRepo } from '@/src/db/repositories/system';
 import {
-    saveDbConnection,
-    getDbConnections,
-    deleteDbConnection,
     testDbConnection,
     parseDbConnectionString,
     exportToCloud,
     importFromCloud,
-} from '@db';
+} from '@/src/db/cloud';
 
 interface DbConnectionModalProps {
   isOpen: boolean;
@@ -43,7 +41,7 @@ const DbConnectionModal: React.FC<DbConnectionModalProps> = ({
 
     const loadConnections = async () => {
         try {
-            const conns = await getDbConnections();
+            const conns = await systemRepo.getDbConnections();
             setConnections(conns);
         } catch (error) {
             console.error('Failed to load connections:', error);
@@ -75,7 +73,7 @@ const DbConnectionModal: React.FC<DbConnectionModalProps> = ({
                 createdAt: Date.now(),
             };
 
-            await saveDbConnection(connection);
+            await systemRepo.saveDbConnection(connection);
             await loadConnections();
             setNewConnection({ name: '', connectionString: '' });
             setShowNewForm(false);
@@ -99,7 +97,7 @@ const DbConnectionModal: React.FC<DbConnectionModalProps> = ({
     const handleDeleteConnection = async (connectionId: string) => {
         if (window.confirm('Bạn có chắc chắn muốn xóa kết nối này?')) {
             try {
-                await deleteDbConnection(connectionId);
+                await systemRepo.deleteDbConnection(connectionId);
                 await loadConnections();
             } catch (error: any) {
                 alert(`Lỗi khi xóa kết nối: ${error.message}`);
@@ -114,7 +112,7 @@ const DbConnectionModal: React.FC<DbConnectionModalProps> = ({
             alert(result.message);
             if (result.success) {
                 connection.isActive = true;
-                await saveDbConnection(connection);
+                await systemRepo.saveDbConnection(connection);
                 await loadConnections();
             }
         } catch (error: any) {

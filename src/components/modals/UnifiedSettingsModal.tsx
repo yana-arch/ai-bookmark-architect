@@ -20,7 +20,7 @@ import {
     CogIcon, XIcon, AILogoIcon, TerminalIcon, LayersIcon,
     CloudIcon, DatabaseIcon, ShieldCheckIcon
 } from '@/src/components/ui/Icons';
-import { postgresqlService } from '@/src/services/postgresqlService';
+import { supabaseBackupService } from '@/src/services/supabaseBackupService';
 
 // Sub-components
 import { ProvidersTab } from './settings/ProvidersTab';
@@ -176,11 +176,11 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
 
     const checkCloudAuth = useCallback(async () => {
         try {
-            await postgresqlService.initialize();
-            const auth = await postgresqlService.isSignedIn();
+            await supabaseBackupService.initialize();
+            const auth = await supabaseBackupService.isSignedIn();
             setIsAuthenticated(auth);
             if (auth) {
-                const list = await postgresqlService.listBackups();
+                const list = await supabaseBackupService.listBackups();
                 setBackups(list);
             }
         } catch (e) {
@@ -195,12 +195,12 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
 
         void (async () => {
             try {
-                await postgresqlService.initialize();
-                const auth = await postgresqlService.isSignedIn();
+                await supabaseBackupService.initialize();
+                const auth = await supabaseBackupService.isSignedIn();
                 if (cancelled) return;
                 setIsAuthenticated(auth);
                 if (auth) {
-                    const list = await postgresqlService.listBackups();
+                    const list = await supabaseBackupService.listBackups();
                     if (!cancelled) setBackups(list);
                 }
             } catch (e) {
@@ -249,7 +249,7 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
     const handleDeleteBackup = async (id: string) => {
         if (!window.confirm('Delete this architecture snapshot permanently?')) return;
         try {
-            await postgresqlService.deleteBackup(id);
+            await supabaseBackupService.deleteBackup(id);
             await checkCloudAuth(); // Refresh list
         } catch (e) {
             console.error('Delete error:', e);

@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { AppState, type Bookmark, type Folder, type ApiConfig, type CategorizedBookmark, type Notification, type SmartClassifyRule } from '@/types';
 import { normalizeURL } from '@/src/utils/urlUtils';
 import { DEFAULT_PLANNING_PROMPT } from '@/src/constants';
-import * as db from '@db';
+import { libraryRepo } from '@/src/db/repositories/library';
 import { GoogleGenAI } from '@google/genai';
 
 export const useAIPlanning = (
@@ -220,7 +220,7 @@ export const useAIPlanning = (
 
     const confirmProposedStructure = async () => {
         setFolders(proposedStructure);
-        await db.saveFolders(proposedStructure);
+        await libraryRepo.saveTree(proposedStructure);
 
         // Feed the confirmed structure into the system prompt as a rigid guide
         const availableFolders = getStructureGuide(proposedStructure);

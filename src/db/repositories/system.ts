@@ -1,5 +1,13 @@
-import { logStore, backupMetadataStore, oauthTokenStore, dbConnectionStore, clearAllData } from '../local';
-import type { DetailedLog, BackupMetadata, OAuthToken, DbConnection } from '@/types';
+import {
+    logStore,
+    backupMetadataStore,
+    oauthTokenStore,
+    dbConnectionStore,
+    clearAllData,
+    saveAnalyticsData,
+    getAnalyticsData,
+} from '../local';
+import type { DetailedLog, BackupMetadata, OAuthToken, DbConnection, AnalyticsData } from '@/types';
 
 /**
  * SystemRepository: Deep module for operational metadata and system actions.
@@ -35,6 +43,26 @@ export class SystemRepository {
 
     async getDbConnections(): Promise<DbConnection[]> {
         return dbConnectionStore.getAll();
+    }
+
+    async getDbConnection(id: string): Promise<DbConnection | undefined> {
+        return dbConnectionStore.get(id);
+    }
+
+    async saveDbConnection(connection: DbConnection): Promise<void> {
+        await dbConnectionStore.put(connection);
+    }
+
+    async deleteDbConnection(id: string): Promise<void> {
+        await dbConnectionStore.delete(id);
+    }
+
+    async saveAnalytics(analytics: AnalyticsData): Promise<void> {
+        await saveAnalyticsData(analytics);
+    }
+
+    async getAnalytics(): Promise<AnalyticsData | undefined> {
+        return getAnalyticsData();
     }
 
     /**

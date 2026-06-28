@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { getFullTreeContext } from '@/src/utils/promptUtils';
 import { arrayToTree, removeEmptyFolders } from '@/src/utils/treeUtils';
 import { perfMonitor } from '@/src/performance';
-import { saveLog } from '@db';
+import { systemRepo } from '@/src/db/repositories/system';
 import { AIOrchestrator } from '@/src/services/aiOrchestrator';
 import type { Bookmark, Folder, CategorizedBookmark, ApiConfig, DetailedLog, AIProfile, UserCorrection, PromptModifiers } from '@/types';
 
@@ -95,7 +95,7 @@ export const useBookmarkProcessing = ({
         };
         setDetailedLogs(prev => [...prev, newLog]);
         try {
-            await saveLog(newLog);
+            await systemRepo.addLog(newLog);
         } catch (e) {
             console.error('Failed to save log', e);
         }

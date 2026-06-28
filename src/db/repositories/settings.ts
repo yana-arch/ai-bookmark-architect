@@ -54,6 +54,18 @@ export class SettingsRepository {
     async getPresets(): Promise<InstructionPreset[]> {
         return instructionPresetStore.getAll();
     }
+
+    async savePreset(preset: InstructionPreset): Promise<void> {
+        await instructionPresetStore.put(preset);
+    }
+
+    async deletePreset(id: string): Promise<void> {
+        await instructionPresetStore.delete(id);
+    }
+
+    async deleteTemplate(id: string): Promise<void> {
+        await folderTemplateStore.delete(id);
+    }
 }
 
 export const settingsRepo = new SettingsRepository();
