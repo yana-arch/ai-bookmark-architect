@@ -58,7 +58,9 @@ interface AppModalsProps {
 
 const AppModals: React.FC<AppModalsProps> = (props) => {
     const {
+        bookmarks,
         folders, setFolders,
+        handleClearData,
         apiConfigs,
         instructionPresets,
         folderTemplates,
