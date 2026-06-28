@@ -21,10 +21,10 @@ export default defineConfig({
             include: ['src/**/*.ts', 'src/**/*.tsx'],
             exclude: ['src/__tests__/**', 'src/performance.ts', 'src/db/index.ts', 'src/db/local.ts', 'src/db/cloud.ts', 'src/db/schema.ts'],
             thresholds: {
-                statements: 9,
-                branches: 50,
-                functions: 35,
-                lines: 9,
+                statements: 12,
+                branches: 60,
+                functions: 45,
+                lines: 12,
             },
         }
     },
