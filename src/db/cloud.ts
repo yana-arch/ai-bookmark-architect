@@ -9,10 +9,6 @@ export class NeonHttpClient {
         const url = new URL(connection.connectionString);
         if (url.hostname.includes('neon.tech') || url.hostname.includes('aws.neon.tech')) {
             this.baseUrl = `https://${url.hostname}/v1/sql`;
-            console.log('Neon HTTP connection details:', {
-                fullHostname: url.hostname,
-                baseUrl: this.baseUrl
-            });
         } else {
             this.baseUrl = `https://${url.hostname}/v1/sql`;
         }

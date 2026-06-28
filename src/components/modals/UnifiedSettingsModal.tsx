@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type {
     FolderTemplate,
     ApiConfig,
@@ -30,6 +30,13 @@ import { DataTab } from './settings/DataTab';
 import { HealthTab } from './settings/HealthTab';
 import { BackupTab } from './settings/BackupTab';
 import { ConfigTab } from './settings/ConfigTab';
+
+function createApiConfigId(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return `key-${crypto.randomUUID()}`;
+    }
+    return 'key-new';
+}
 
 interface UnifiedSettingsModalProps {
     isOpen: boolean;
@@ -167,13 +174,7 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
     const [cloudKey, setCloudKey] = useState('');
     const [showKeyInput, setShowKeyInput] = useState(false);
 
-    useEffect(() => {
-        if (isOpen && activeTab === 'backup') {
-            checkCloudAuth();
-        }
-    }, [isOpen, activeTab]);
-
-    const checkCloudAuth = async () => {
+    const checkCloudAuth = useCallback(async () => {
         try {
             await postgresqlService.initialize();
             const auth = await postgresqlService.isSignedIn();
@@ -185,7 +186,32 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
         } catch (e) {
             console.error('Cloud auth error:', e);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        if (!isOpen || activeTab !== 'backup') return;
+
+        let cancelled = false;
+
+        void (async () => {
+            try {
+                await postgresqlService.initialize();
+                const auth = await postgresqlService.isSignedIn();
+                if (cancelled) return;
+                setIsAuthenticated(auth);
+                if (auth) {
+                    const list = await postgresqlService.listBackups();
+                    if (!cancelled) setBackups(list);
+                }
+            } catch (e) {
+                if (!cancelled) console.error('Cloud auth error:', e);
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isOpen, activeTab]);
 
     const handleEditApiConfig = (config: ApiConfig) => {
         setApiEditingId(config.id);
@@ -198,8 +224,9 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
 
     const handleAddApiKey = (e: React.FormEvent) => {
         e.preventDefault();
+        const newId = apiEditingId ?? createApiConfigId();
         onSaveApiConfig({
-            id: apiEditingId || `key-${Date.now()}`,
+            id: newId,
             name: apiName,
             provider: apiProvider,
             apiKey,

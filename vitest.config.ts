@@ -20,6 +20,12 @@ export default defineConfig({
             reporter: ['text', 'json', 'html'],
             include: ['src/**/*.ts', 'src/**/*.tsx'],
             exclude: ['src/__tests__/**', 'src/performance.ts', 'src/db/index.ts', 'src/db/local.ts', 'src/db/cloud.ts', 'src/db/schema.ts'],
+            thresholds: {
+                statements: 9,
+                branches: 50,
+                functions: 35,
+                lines: 9,
+            },
         }
     },
 });

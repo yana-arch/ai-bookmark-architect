@@ -68,7 +68,7 @@ export const IntelligenceTab: React.FC<IntelligenceTabProps> = ({
             name: newRulePattern,
             type: newRuleType,
             pattern: newRulePattern,
-            targetPath: newRulePath.split(/[\/\\]|>|→/).map(s => s.trim()).filter(Boolean),
+            targetPath: newRulePath.split(/[/\\]|>|→/).map(s => s.trim()).filter(Boolean),
             enabled: true,
             createdAt: Date.now()
         });
