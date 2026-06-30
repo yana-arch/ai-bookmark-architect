@@ -1,46 +1,26 @@
-import { type Bookmark, type CategorizedBookmark, type ApiConfig, type AIProfile, type PromptModifiers, type UserCorrection, type Folder } from '@/types';
-import { WorkerManager, WorkerBatchData } from './workerManager';
+import { type Bookmark, type CategorizedBookmark, type Folder } from '@/types';
+import { WorkerManager } from './workerManager';
 import { distributeBookmarksByTagSchema } from '@/src/utils/treeUtils';
+import { BaseProcessor, CommonProcessorOptions } from './baseProcessor';
 
-interface TagDrivenProcessorOptions {
-    workerManager: WorkerManager;
-    bookmarks: Bookmark[];
-    apiConfigs: ApiConfig[];
-    batchSize: number;
-    maxRetries: number;
+interface TagDrivenProcessorOptions extends CommonProcessorOptions {
     tagCount: number;
-    tagLanguage: string;
-    activeProfile: AIProfile | null;
-    promptModifiers: PromptModifiers;
-    userHistory: UserCorrection[];
-    systemPrompt: string;
-    customInstructions: string;
     currentFolders: (Folder | Bookmark)[];
-    onProgress: (progress: { current: number, total: number }) => void;
-    onLog: (message: string) => void;
-    onDetailedLog: (type: 'info' | 'error' | 'success' | 'warning', title: string, content: string | object, usage?: any) => void;
-    onTokenUsage: (usage: { promptTokens: number, completionTokens: number, totalTokens: number }) => void;
     onResult: (bookmarks: CategorizedBookmark[], folders: (Folder | Bookmark)[]) => void;
     onError: (error: string) => void;
-    onComplete: (hasError: boolean) => void;
 }
 
-export class TagDrivenProcessor {
-    private options: TagDrivenProcessorOptions;
+export class TagDrivenProcessor extends BaseProcessor<TagDrivenProcessorOptions> {
     private extractedTagsMap = new Map<string, string[]>();
-    private completedBatches = 0;
-    private failedBatches = 0;
-    private nextBatchToStart = 0;
-    private actualTotalBatches = 0;
     private bookmarksNeedingTagging: Bookmark[] = [];
-    private isAborted = false;
 
     constructor(options: TagDrivenProcessorOptions) {
-        this.options = options;
+        super(options);
+        // totalBatches will be recalculated in process() because it depends on bookmarksNeedingTagging
     }
 
     async process() {
-        const { bookmarks, batchSize, onLog } = this.options;
+        const { bookmarks, onLog } = this.options;
 
         const bookmarksWithExistingTags = bookmarks.filter(bm => bm.tags && bm.tags.length > 0);
         this.bookmarksNeedingTagging = bookmarks.filter(bm => !bm.tags || bm.tags.length === 0);
@@ -52,95 +32,82 @@ export class TagDrivenProcessor {
             onLog(`Đã tìm thấy ${bookmarksWithExistingTags.length} bookmark có sẵn tags. Bỏ qua bước trích xuất cho các mục này.`);
         }
 
-        this.actualTotalBatches = Math.ceil(this.bookmarksNeedingTagging.length / batchSize);
+        this.totalBatches = Math.ceil(this.bookmarksNeedingTagging.length / this.options.batchSize);
 
         if (this.bookmarksNeedingTagging.length === 0) {
             await this.finalizeTagDrivenProcessing();
         } else {
             const maxWorkers = WorkerManager.getMaxWorkers();
-            const workersToStart = Math.min(maxWorkers, this.actualTotalBatches);
+            const workersToStart = Math.min(maxWorkers, this.totalBatches);
 
             for (let i = 0; i < workersToStart; i++) {
                 const worker = this.options.workerManager.createWorker();
-                this.setupTaggingListener(worker);
-                this.startNextTaggingBatch(worker);
+                this.setupWorkerListener(worker);
+                this.startNextBatch(worker);
             }
         }
     }
 
-    private setupTaggingListener(worker: Worker) {
-        worker.addEventListener('message', (e) => {
-            const { type, data, error, usage, batchIndex } = e.data;
+    protected handleWorkerMessage(e: MessageEvent, worker: Worker) {
+        const { type, data, error, batchIndex } = e.data;
 
-            if (type === 'log') {
-                this.options.onLog(`[Worker ${batchIndex}] ${e.data.log?.message || data || ''}`);
-            } else if (type === 'batch_result') {
-                this.completedBatches++;
-                if (usage) this.options.onTokenUsage(usage);
+        if (type === 'batch_result') {
+            this.completedBatches++;
 
-                const batchResults: CategorizedBookmark[] = [];
-                if (Array.isArray(data) && batchIndex !== undefined) {
-                    const start = batchIndex * this.options.batchSize;
-                    const end = Math.min(start + this.options.batchSize, this.bookmarksNeedingTagging.length);
-                    const batch = this.bookmarksNeedingTagging.slice(start, end);
+            const batchResults: CategorizedBookmark[] = [];
+            if (Array.isArray(data) && batchIndex !== undefined) {
+                const start = batchIndex * this.options.batchSize;
+                const end = Math.min(start + this.options.batchSize, this.bookmarksNeedingTagging.length);
+                const batch = this.bookmarksNeedingTagging.slice(start, end);
 
-                    data.forEach(item => {
-                        if (item.url && item.tags) {
-                            this.extractedTagsMap.set(item.url, item.tags);
-                            const original = batch.find(b => b.url === item.url);
-                            if (original) {
-                                batchResults.push({
-                                    ...original,
-                                    tags: item.tags,
-                                    path: [] // Path not known yet in tagging phase
-                                });
-                            }
+                data.forEach(item => {
+                    if (item.url && item.tags) {
+                        this.extractedTagsMap.set(item.url, item.tags);
+                        const original = batch.find(b => b.url === item.url);
+                        if (original) {
+                            batchResults.push({
+                                ...original,
+                                tags: item.tags,
+                                path: []
+                            });
                         }
-                    });
-                }
-
-                // Incremental update: notify that we have tags for these bookmarks
-                if (batchResults.length > 0) {
-                    this.options.onResult(batchResults, []);
-                }
-
-                this.updateTaggingProgress();
-                this.checkTaggingCompletion(worker);
-            } else if (type === 'batch_error') {
-                this.failedBatches++;
-                this.options.onLog(`[Worker] Batch ${batchIndex} thất bại: ${error}`);
-                this.checkTaggingCompletion(worker);
+                    }
+                });
             }
-        });
+
+            if (batchResults.length > 0) {
+                this.options.onResult(batchResults, []);
+            }
+
+            this.updateTaggingProgress();
+            this.checkTaggingCompletion(worker);
+        } else if (type === 'batch_error') {
+            this.failedBatches++;
+            this.options.onLog(`[Worker] Batch ${batchIndex} thất bại: ${error}`);
+            this.checkTaggingCompletion(worker);
+        }
     }
 
-    private startNextTaggingBatch(worker: Worker) {
-        if (this.isAborted || this.nextBatchToStart >= this.actualTotalBatches) return;
+    protected startNextBatch(worker: Worker) {
+        if (this.isAborted || this.nextBatchToStart >= this.totalBatches) return;
 
         const batchIndex = this.nextBatchToStart++;
         const start = batchIndex * this.options.batchSize;
         const end = Math.min(start + this.options.batchSize, this.bookmarksNeedingTagging.length);
         const batch = this.bookmarksNeedingTagging.slice(start, end);
 
-        this.options.onLog(`[Tagging] Batch ${batchIndex + 1}/${this.actualTotalBatches}...`);
+        this.options.onLog(`[Tagging] Batch ${batchIndex + 1}/${this.totalBatches}...`);
 
         this.options.workerManager.dispatchBatch(worker, {
-            batch,
-            batchIndex,
-            apiConfigs: this.options.apiConfigs,
-            maxRetries: this.options.maxRetries,
+            ...this.getCommonBatchData(batch, batchIndex),
             taskType: 'extract_tags',
             tagCount: this.options.tagCount,
-            tagLanguage: this.options.tagLanguage,
-            activeProfile: this.options.activeProfile,
-            promptModifiers: this.options.promptModifiers,
-            userHistory: this.options.userHistory
         });
     }
 
     private updateTaggingProgress() {
         const taggingProgress = Math.min(
-            Math.floor((this.completedBatches / this.actualTotalBatches) * 90),
+            Math.floor((this.completedBatches / this.totalBatches) * 90),
             90
         );
         this.options.onProgress({
@@ -150,11 +117,11 @@ export class TagDrivenProcessor {
     }
 
     private async checkTaggingCompletion(worker: Worker) {
-        if (this.completedBatches + this.failedBatches >= this.actualTotalBatches) {
+        if (this.completedBatches + this.failedBatches >= this.totalBatches) {
             this.options.workerManager.removeWorker(worker);
             if (!this.isAborted) await this.finalizeTagDrivenProcessing();
         } else {
-            this.startNextTaggingBatch(worker);
+            this.startNextBatch(worker);
         }
     }
 
@@ -167,7 +134,7 @@ export class TagDrivenProcessor {
 
         if (this.extractedTagsMap.size === 0) {
             this.options.onLog('Không tìm thấy tag nào để phân tích.');
-            this.options.onComplete(true);
+            this.options.onComplete(1); // Signifies error
             return;
         }
 
@@ -179,7 +146,7 @@ export class TagDrivenProcessor {
 
         if (uniqueTags.length === 0) {
             this.options.onLog('Không tìm thấy tag nào để phân tích.');
-            this.options.onComplete(true);
+            this.options.onComplete(1);
             return;
         }
 
@@ -198,37 +165,27 @@ export class TagDrivenProcessor {
                 }));
 
                 const distributedBookmarks = distributeBookmarksByTagSchema(bookmarksWithTags, data) as CategorizedBookmark[];
-                this.options.onResult(distributedBookmarks, []); // arrayToTree will be called in hook
-                this.options.onComplete(false);
+                this.options.onResult(distributedBookmarks, []);
+                this.options.onComplete(0);
                 this.options.workerManager.removeWorker(mappingWorker);
             } else if (type === 'batch_error') {
                 this.options.onError(`Lỗi tạo thư mục: ${error}`);
-                this.options.onComplete(true);
+                this.options.onComplete(1);
                 this.options.workerManager.removeWorker(mappingWorker);
             }
         });
 
-        const userInstructionBlock = this.options.customInstructions.trim()
-            ? `\n\nUSER'S CUSTOM INSTRUCTIONS:\n- ${this.options.customInstructions.trim().replace(/\n/g, '\n- ')}`
-            : '';
-
         this.options.workerManager.dispatchBatch(mappingWorker, {
-            batch: [],
-            batchIndex: 0,
-            systemPrompt: this.options.systemPrompt,
-            userInstructionBlock,
-            apiConfigs: this.options.apiConfigs,
-            maxRetries: this.options.maxRetries,
+            ...this.getCommonBatchData([], 0),
             taskType: 'map_tags_to_tree',
             uniqueTags,
-            tagLanguage: this.options.tagLanguage,
-            activeProfile: this.options.activeProfile,
-            promptModifiers: this.options.promptModifiers,
-            userHistory: this.options.userHistory
         });
     }
 
     abort() {
         this.isAborted = true;
+        this.options.workerManager.cancelAll();
+        this.options.onLog('Đã dừng xử lý tag-driven.');
+        this.options.onComplete(this.failedBatches || 1);
     }
 }

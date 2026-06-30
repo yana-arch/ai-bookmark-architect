@@ -3,7 +3,7 @@ import { Bookmark, DuplicateStats, AppState, Folder } from '@/types';
 import { perfMonitor } from '@/src/performance';
 import { normalizeURL } from '@/src/utils/urlUtils';
 import { arrayToTree } from '@/src/utils/treeUtils';
-import * as db from '@db';
+import { libraryRepo } from '@/src/db/repositories/library';
 
 export const useDuplicates = (
     bookmarks: Bookmark[],
@@ -74,17 +74,17 @@ export const useDuplicates = (
             }
 
             const cleanedBookmarks = uniqueBookmarks.reverse(); // Restore original order
-            await db.saveBookmarks(cleanedBookmarks);
+            await libraryRepo.syncBookmarks(cleanedBookmarks);
             setBookmarks(cleanedBookmarks);
 
             // If the current structure exists, rebuild it with remaining bookmarks
             if (appState === AppState.STRUCTURED) {
                 const updatedFolders = arrayToTree(cleanedBookmarks);
-                await db.saveFolders(updatedFolders);
+                await libraryRepo.saveTree(updatedFolders);
                 setFolders(updatedFolders);
             } else if (appState === AppState.REVIEW || appState === AppState.ERROR) {
                 // Clear temporary structure for non-applied changes
-                await db.saveFolders([]);
+                await libraryRepo.saveTree([]);
                 setFolders([]);
                 setAppState(AppState.LOADED);
             }

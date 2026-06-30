@@ -1,4 +1,18 @@
 import { supabase } from './supabaseClient';
+import type { Bookmark, Folder, BackupMetadata } from '@/types';
+
+interface BackupData {
+    bookmarks: Bookmark[];
+    folders: (Folder | Bookmark)[];
+}
+
+interface BackupResponse {
+    id: string;
+    key: string;
+    data: BackupData;
+    metadata: Omit<BackupMetadata, 'id' | 'timestamp'>;
+    createdAt: number;
+}
 
 class SupabaseApiClient {
     private async getCurrentUserId(): Promise<string> {
@@ -10,14 +24,18 @@ class SupabaseApiClient {
     }
 
     // Create backup with key (user authentication required)
-    async createBackup(key: string, data: { bookmarks: any[]; folders: any[] }, metadata: any): Promise<any> {
-    // const userId = await this.getCurrentUserId();
+    async createBackup(
+        key: string, 
+        data: BackupData, 
+        metadata: Partial<BackupMetadata>
+    ): Promise<{ success: boolean; id: string; key: string }> {
+        const userId = await this.getCurrentUserId();
 
         // Check if key already exists for this user
         const { data: existing, error: checkError } = await supabase
             .from('backups')
             .select('id')
-        // .eq('user_id', userId)
+            .eq('user_id', userId)
             .eq('name', key) // Using name field to store the key
             .single();
 
@@ -33,7 +51,7 @@ class SupabaseApiClient {
         const { data: backup, error } = await supabase
             .from('backups')
             .insert({
-                // user_id: userId,
+                user_id: userId,
                 name: key, // Store the key in the name field
                 description: metadata.description || null,
                 data: data,
@@ -53,13 +71,13 @@ class SupabaseApiClient {
         return { success: true, id: backup.id, key };
     }
 
-    async getBackup(key: string): Promise<any> {
-    // const userId = await this.getCurrentUserId();
+    async getBackup(key: string): Promise<BackupResponse> {
+        const userId = await this.getCurrentUserId();
 
         const { data: backup, error } = await supabase
             .from('backups')
             .select('*')
-        // .eq('user_id', userId)
+            .eq('user_id', userId)
             .eq('name', key) // Key is stored in name field
             .single();
 
@@ -73,7 +91,7 @@ class SupabaseApiClient {
         return {
             id: backup.id,
             key: backup.name,
-            data: backup.data,
+            data: backup.data as BackupData,
             metadata: {
                 name: backup.name,
                 description: backup.description,
@@ -87,13 +105,13 @@ class SupabaseApiClient {
         };
     }
 
-    async listBackups(): Promise<any[]> {
-    // const userId = await this.getCurrentUserId();
+    async listBackups(): Promise<Omit<BackupResponse, 'data' | 'id'>[]> {
+        const userId = await this.getCurrentUserId();
 
         const { data: backups, error } = await supabase
             .from('backups')
             .select('*')
-        // .eq('user_id', userId)
+            .eq('user_id', userId)
             .order('created_at', { ascending: false });
 
         if (error) {
@@ -116,12 +134,12 @@ class SupabaseApiClient {
     }
 
     async deleteBackup(key: string): Promise<void> {
-    // const userId = await this.getCurrentUserId();
+        const userId = await this.getCurrentUserId();
 
         const { error } = await supabase
             .from('backups')
             .delete()
-        // .eq('user_id', userId)
+            .eq('user_id', userId)
             .eq('name', key);
 
         if (error) {
@@ -130,12 +148,12 @@ class SupabaseApiClient {
     }
 
     async checkKeyExists(key: string): Promise<boolean> {
-    // const userId = await this.getCurrentUserId();
+        const userId = await this.getCurrentUserId();
 
         const { data, error } = await supabase
             .from('backups')
             .select('id')
-        // .eq('user_id', userId)
+            .eq('user_id', userId)
             .eq('name', key)
             .single();
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type {
     FolderTemplate,
     ApiConfig,
@@ -18,9 +18,9 @@ import type {
 } from '@/types';
 import {
     CogIcon, XIcon, AILogoIcon, TerminalIcon, LayersIcon,
-    CloudIcon, DatabaseIcon, ShieldCheckIcon, ChipIcon
+    CloudIcon, DatabaseIcon, ShieldCheckIcon
 } from '@/src/components/ui/Icons';
-import { postgresqlService } from '@/src/services/postgresqlService';
+import { supabaseBackupService } from '@/src/services/supabaseBackupService';
 
 // Sub-components
 import { ProvidersTab } from './settings/ProvidersTab';
@@ -30,6 +30,13 @@ import { DataTab } from './settings/DataTab';
 import { HealthTab } from './settings/HealthTab';
 import { BackupTab } from './settings/BackupTab';
 import { ConfigTab } from './settings/ConfigTab';
+
+function createApiConfigId(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return `key-${crypto.randomUUID()}`;
+    }
+    return 'key-new';
+}
 
 interface UnifiedSettingsModalProps {
     isOpen: boolean;
@@ -116,6 +123,8 @@ interface UnifiedSettingsModalProps {
     onRestoreSuccess?: () => void;
     onUploadCloudData?: (key: string) => Promise<void>;
     onImportCloudData?: (key: string) => Promise<void>;
+    onDeleteBackup?: (id: string) => Promise<void>;
+    onOpenAuth?: () => void;
     initialTab?: TabType;
 }
 
@@ -165,25 +174,44 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
     const [cloudKey, setCloudKey] = useState('');
     const [showKeyInput, setShowKeyInput] = useState(false);
 
-    useEffect(() => {
-        if (isOpen && activeTab === 'backup') {
-            checkCloudAuth();
-        }
-    }, [isOpen, activeTab]);
-
-    const checkCloudAuth = async () => {
+    const checkCloudAuth = useCallback(async () => {
         try {
-            await postgresqlService.initialize();
-            const auth = await postgresqlService.isSignedIn();
+            await supabaseBackupService.initialize();
+            const auth = await supabaseBackupService.isSignedIn();
             setIsAuthenticated(auth);
             if (auth) {
-                const list = await postgresqlService.listBackups();
+                const list = await supabaseBackupService.listBackups();
                 setBackups(list);
             }
         } catch (e) {
             console.error('Cloud auth error:', e);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        if (!isOpen || activeTab !== 'backup') return;
+
+        let cancelled = false;
+
+        void (async () => {
+            try {
+                await supabaseBackupService.initialize();
+                const auth = await supabaseBackupService.isSignedIn();
+                if (cancelled) return;
+                setIsAuthenticated(auth);
+                if (auth) {
+                    const list = await supabaseBackupService.listBackups();
+                    if (!cancelled) setBackups(list);
+                }
+            } catch (e) {
+                if (!cancelled) console.error('Cloud auth error:', e);
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isOpen, activeTab]);
 
     const handleEditApiConfig = (config: ApiConfig) => {
         setApiEditingId(config.id);
@@ -196,8 +224,9 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
 
     const handleAddApiKey = (e: React.FormEvent) => {
         e.preventDefault();
+        const newId = apiEditingId ?? createApiConfigId();
         onSaveApiConfig({
-            id: apiEditingId || `key-${Date.now()}`,
+            id: newId,
             name: apiName,
             provider: apiProvider,
             apiKey,
@@ -215,6 +244,20 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
         setApiModel('');
         setApiUrl('');
         setApiProvider('gemini');
+    };
+
+    const handleDeleteBackup = async (id: string) => {
+        if (!window.confirm('Delete this architecture snapshot permanently?')) return;
+        try {
+            await supabaseBackupService.deleteBackup(id);
+            await checkCloudAuth(); // Refresh list
+        } catch (e) {
+            console.error('Delete error:', e);
+        }
+    };
+
+    const handleRefreshBackups = async () => {
+        await checkCloudAuth();
     };
 
     if (!isOpen) return null;
@@ -260,9 +303,9 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
                                 key={item.id}
                                 onClick={() => setActiveTab(item.id)}
                                 className={`w-full flex items-center px-5 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-500 group relative ${activeTab === item.id
-                                        ? 'bg-white/5 text-white border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.4)]'
-                                        : 'text-gray-500 hover:bg-white/[0.02] hover:text-gray-300'
-                                    }`}
+                                    ? 'bg-white/5 text-white border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.4)]'
+                                    : 'text-gray-500 hover:bg-white/[0.02] hover:text-gray-300'
+                                }`}
                             >
                                 <span className={`mr-4 transition-all duration-500 ${activeTab === item.id ? 'text-emerald-400 scale-110' : 'text-gray-600 group-hover:text-gray-400'}`}>
                                     {item.icon}
@@ -379,6 +422,9 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
                                 backups={backups}
                                 onImportCloudData={onImportCloudData}
                                 onUploadCloudData={onUploadCloudData}
+                                onDeleteBackup={handleDeleteBackup}
+                                onRefreshBackups={handleRefreshBackups}
+                                onOpenAuth={props.onOpenAuth}
                             />
                         )}
 

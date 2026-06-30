@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { ApiConfig, ApiKeyStatus } from '@/types';
-import * as db from '@db';
+import { settingsRepo } from '@/src/db/repositories/settings';
 
 export const useApiConfig = (
     apiConfigs: ApiConfig[],
@@ -9,7 +9,7 @@ export const useApiConfig = (
     const [isApiModalOpen, setIsApiModalOpen] = useState(false);
 
     const handleSaveApiConfig = useCallback(async (config: ApiConfig) => {
-        await db.saveApiConfig(config);
+        await settingsRepo.saveApiConfig(config);
         setApiConfigs(prev => {
             const existingIndex = prev.findIndex(c => c.id === config.id);
             if (existingIndex > -1) {
@@ -22,7 +22,7 @@ export const useApiConfig = (
     }, [setApiConfigs]);
 
     const handleDeleteApiConfig = useCallback(async (id: string) => {
-        await db.deleteApiConfig(id);
+        await settingsRepo.deleteApiConfig(id);
         setApiConfigs(prev => prev.filter(c => c.id !== id));
     }, [setApiConfigs]);
 

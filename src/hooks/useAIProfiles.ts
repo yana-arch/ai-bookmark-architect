@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import type { AIProfile, Notification } from '@/types';
-import * as db from '../db/local';
+import { settingsRepo } from '@/src/db/repositories/settings';
 
 export const useAIProfiles = (
     aiProfiles: AIProfile[],
@@ -11,7 +11,7 @@ export const useAIProfiles = (
 
     const handleSaveProfile = useCallback(async (profile: AIProfile) => {
         try {
-            await db.saveAIProfile(profile);
+            await settingsRepo.saveProfile(profile);
             setAiProfiles(prev => {
                 const existing = prev.findIndex(p => p.id === profile.id);
                 if (existing >= 0) {
@@ -37,7 +37,7 @@ export const useAIProfiles = (
 
     const handleDeleteProfile = useCallback(async (id: string) => {
         try {
-            await db.deleteAIProfile(id);
+            await settingsRepo.deleteProfile(id);
             setAiProfiles(prev => prev.filter(p => p.id !== id));
             if (activeProfileId === id) {
                 setActiveProfileId(null);
@@ -45,7 +45,7 @@ export const useAIProfiles = (
             setNotifications(prev => [...prev, {
                 id: Date.now().toString(),
                 type: 'success',
-                message: `Đã xóa cấu hình AI`
+                message: 'Đã xóa cấu hình AI'
             }]);
         } catch (error: any) {
             setNotifications(prev => [...prev, {

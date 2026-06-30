@@ -3,7 +3,7 @@ import { Bookmark, Folder, AppState, Notification, ExportOptions } from '@/types
 import { perfMonitor } from '@/src/performance';
 import { normalizeURL } from '@/src/utils/urlUtils';
 import { parseHTMLBookmarks, parseCSVBookmarks, exportBookmarksToCSV } from '@/src/services/bookmarkParser';
-import * as db from '@db';
+import { libraryRepo } from '@/src/db/repositories/library';
 
 export const useImportExport = (
     bookmarks: Bookmark[],
@@ -47,7 +47,15 @@ export const useImportExport = (
                     } else if (file.name.endsWith('.csv')) {
                         parsedBookmarks = parseCSVBookmarks(content);
                     } else if (file.name.endsWith('.json')) {
-                        parsedBookmarks = JSON.parse(content);
+                        const raw = JSON.parse(content);
+                        const arr = Array.isArray(raw) ? raw : (raw.bookmarks || []);
+                        if (!Array.isArray(arr)) {
+                            throw new Error('JSON file must contain an array of bookmarks or have a "bookmarks" array.');
+                        }
+                        if (arr.some((item: any) => !item.title || !item.url)) {
+                            throw new Error('Each bookmark must have "title" and "url" fields.');
+                        }
+                        parsedBookmarks = arr;
                     }
                     setImportFileName(file.name);
                     setPreviewBookmarks(parsedBookmarks);
@@ -104,8 +112,8 @@ export const useImportExport = (
                 combinedBookmarks = previewBookmarks;
             }
 
-            await db.saveBookmarks(combinedBookmarks);
-            await db.saveFolders([]); // Clear structure on any import
+            await libraryRepo.syncBookmarks(combinedBookmarks);
+            await libraryRepo.saveTree([]); // Clear structure on any import
             setBookmarks(combinedBookmarks);
             setFolders([]);
             setAppState(AppState.LOADED);
@@ -256,7 +264,7 @@ ${bookmarksHtml}</DL><p>`;
         await perfMonitor.timeAsyncFunction('upload_data', async () => {
             try {
                 // Dynamic import to split code
-                const { keyBasedService } = await import('../services/postgresqlService');
+                const { supabaseKeyBackupService } = await import('../services/supabaseBackupService');
                 const metadata = {
                     name: `Backup ${new Date().toLocaleString('vi-VN')}`,
                     description: `Manual backup with ${bookmarks.length} bookmarks`,
@@ -268,7 +276,7 @@ ${bookmarksHtml}</DL><p>`;
                     status: 'completed' as const,
                 };
 
-                await keyBasedService.uploadBackup(key, { bookmarks, folders: folders as Folder[] }, metadata, (progress) => {
+                await supabaseKeyBackupService.uploadBackup(key, { bookmarks, folders: folders as Folder[] }, metadata, (progress) => {
                     setNotifications(prev => [...prev, {
                         id: `upload-progress-${Date.now()}-${Math.random()}`,
                         message: `Upload progress: ${progress}%`,
@@ -295,8 +303,8 @@ ${bookmarksHtml}</DL><p>`;
     const handleImportData = useCallback(async (key: string) => {
         await perfMonitor.timeAsyncFunction('import_data', async () => {
             try {
-                const { keyBasedService } = await import('../services/postgresqlService');
-                const result = await keyBasedService.downloadBackup(key, (progress) => {
+                const { supabaseKeyBackupService } = await import('../services/supabaseBackupService');
+                const result = await supabaseKeyBackupService.downloadBackup(key, (progress) => {
                     setNotifications(prev => [...prev, {
                         id: `import-progress-${Date.now()}-${Math.random()}`,
                         message: `Import progress: ${progress}%`,
@@ -305,8 +313,8 @@ ${bookmarksHtml}</DL><p>`;
                 });
 
                 // Save imported data
-                await db.saveBookmarks(result.data.bookmarks);
-                await db.saveFolders(result.data.folders);
+                await libraryRepo.syncBookmarks(result.data.bookmarks);
+                await libraryRepo.saveTree(result.data.folders);
 
                 // Update state
                 setBookmarks(result.data.bookmarks);
@@ -329,6 +337,27 @@ ${bookmarksHtml}</DL><p>`;
         });
     }, [setBookmarks, setFolders, setAppState, setNotifications]);
 
+    const handleDeleteBackup = useCallback(async (id: string) => {
+        await perfMonitor.timeAsyncFunction('delete_backup', async () => {
+            try {
+                const { supabaseKeyBackupService } = await import('../services/supabaseBackupService');
+                await supabaseKeyBackupService.deleteBackup(id);
+                setNotifications(prev => [...prev, {
+                    id: `delete-success-${Date.now()}`,
+                    message: 'Đã xóa bản sao lưu thành công.',
+                    type: 'success'
+                }]);
+            } catch (error: any) {
+                setNotifications(prev => [...prev, {
+                    id: `delete-error-${Date.now()}`,
+                    message: `Lỗi khi xóa: ${error.message}`,
+                    type: 'error'
+                }]);
+                throw error;
+            }
+        });
+    }, [setNotifications]);
+
     return {
         showImportModal,
         setShowImportModal,
@@ -347,6 +376,7 @@ ${bookmarksHtml}</DL><p>`;
         handleExportBookmarks,
         handleUploadData,
         handleImportData,
+        handleDeleteBackup,
         handleFileLoaded,
         importFile,
         handleFileSelect

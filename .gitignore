@@ -31,3 +31,5 @@ package-lock.json
 GEMINI.md
 plans/
 AGENTS.md
+coverage/*
+.opencode/

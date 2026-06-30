@@ -28,35 +28,66 @@ export interface ChatMessage {
 export class AIClient {
     private config: ApiConfig;
     private profile?: AIProfile;
+    private history: ChatMessage[] = [];
 
-    /**
-     * Initializes the AIClient with a specific configuration.
-     * @param config The API configuration including provider, key, and model.
-     * @param profile The AI Profile containing model parameters.
-     */
     constructor(config: ApiConfig, profile?: AIProfile) {
         this.config = config;
         this.profile = profile;
     }
 
     /**
+     * Single entry point for AI completion. When maintainContext is true the
+     * client manages chat history internally; callers never touch ChatMessage[].
+     */
+    async complete(
+        systemPrompt: string,
+        userPrompt: string,
+        options: { maintainContext?: boolean; maxHistory?: number; signal?: AbortSignal } = {}
+    ): Promise<AIResponse> {
+        const { maintainContext = false, maxHistory = 10, signal } = options;
+
+        if (!maintainContext) {
+            return this.generateContent(systemPrompt, userPrompt, signal);
+        }
+
+        this.history.push({ role: 'user', content: userPrompt });
+        const response = await this.generateChatContent(systemPrompt, this.history, signal);
+        if (response.text) {
+            this.history.push({ role: 'assistant', content: response.text });
+            if (this.history.length > maxHistory) this.history.splice(0, 2);
+        }
+        return response;
+    }
+
+    /** Seed the internal history (e.g. for tag-mapping analysis/plan priming). */
+    primeHistory(messages: ChatMessage[]): void {
+        this.history = [...messages];
+    }
+
+    /** Clear internal chat history. */
+    resetHistory(): void {
+        this.history = [];
+    }
+
+    /**
      * Generates content using the configured AI provider.
      * @param systemPrompt The system instructions for the AI.
      * @param userPrompt The user-specific input/bookmarks to process.
+     * @param signal Optional AbortSignal to cancel the request.
      * @returns A promise resolving to a standardized AIResponse.
      * @throws Error if the provider is unsupported or the API request fails.
      */
-    async generateContent(systemPrompt: string, userPrompt: string): Promise<AIResponse> {
+    async generateContent(systemPrompt: string, userPrompt: string, signal?: AbortSignal): Promise<AIResponse> {
         const { provider } = this.config;
 
         switch (provider) {
             case 'gemini':
             case 'custom-gemini':
-                return this.callGemini(systemPrompt, userPrompt);
+                return this.callGemini(systemPrompt, userPrompt, signal);
             case 'openai':
             case 'openrouter':
             case 'custom-openai':
-                return this.callOpenAI(systemPrompt, userPrompt);
+                return this.callOpenAI(systemPrompt, userPrompt, signal);
             default:
                 throw new Error(`Unsupported provider: ${provider}`);
         }
@@ -65,17 +96,17 @@ export class AIClient {
     /**
      * Generates content using a stateful chat session approach.
      */
-    async generateChatContent(systemPrompt: string, messages: ChatMessage[]): Promise<AIResponse> {
+    async generateChatContent(systemPrompt: string, messages: ChatMessage[], signal?: AbortSignal): Promise<AIResponse> {
         const { provider } = this.config;
 
         switch (provider) {
             case 'gemini':
             case 'custom-gemini':
-                return this.callGeminiChat(systemPrompt, messages);
+                return this.callGeminiChat(systemPrompt, messages, signal);
             case 'openai':
             case 'openrouter':
             case 'custom-openai':
-                return this.callOpenAIChat(systemPrompt, messages);
+                return this.callOpenAIChat(systemPrompt, messages, signal);
             default:
                 throw new Error(`Unsupported provider: ${provider}`);
         }
@@ -84,16 +115,17 @@ export class AIClient {
     /**
      * Internal method to call Google Gemini or compatible custom endpoints.
      */
-    private async callGemini(systemPrompt: string, userPrompt: string): Promise<AIResponse> {
+    private async callGemini(systemPrompt: string, userPrompt: string, signal?: AbortSignal): Promise<AIResponse> {
         const { apiKey, model, apiUrl, provider } = this.config;
         
-        let endpoint = this.resolveGeminiEndpoint(provider, model || 'gemini-1.5-flash', apiKey, apiUrl);
+        const endpoint = this.resolveGeminiEndpoint(provider, model || 'gemini-1.5-flash', apiKey, apiUrl);
 
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
+            signal,
             body: JSON.stringify({
                 contents: [{
                     parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }]
@@ -132,7 +164,7 @@ export class AIClient {
     /**
      * Internal method to call Google Gemini with chat history.
      */
-    private async callGeminiChat(systemPrompt: string, messages: ChatMessage[]): Promise<AIResponse> {
+    private async callGeminiChat(systemPrompt: string, messages: ChatMessage[], signal?: AbortSignal): Promise<AIResponse> {
         const { apiKey, model, apiUrl, provider } = this.config;
         
         const endpoint = this.resolveGeminiEndpoint(provider, model || 'gemini-1.5-flash', apiKey, apiUrl);
@@ -148,6 +180,7 @@ export class AIClient {
             headers: {
                 'Content-Type': 'application/json',
             },
+            signal,
             body: JSON.stringify({
                 systemInstruction: {
                     parts: [{ text: systemPrompt }]
@@ -187,14 +220,14 @@ export class AIClient {
     /**
      * Internal method to call OpenAI, OpenRouter, or compatible custom endpoints.
      */
-    private async callOpenAI(systemPrompt: string, userPrompt: string): Promise<AIResponse> {
-        return this.callOpenAIChat(systemPrompt, [{ role: 'user', content: userPrompt }]);
+    private async callOpenAI(systemPrompt: string, userPrompt: string, signal?: AbortSignal): Promise<AIResponse> {
+        return this.callOpenAIChat(systemPrompt, [{ role: 'user', content: userPrompt }], signal);
     }
 
     /**
      * Internal method to call OpenAI-compatible endpoints with chat history.
      */
-    private async callOpenAIChat(systemPrompt: string, messages: ChatMessage[]): Promise<AIResponse> {
+    private async callOpenAIChat(systemPrompt: string, messages: ChatMessage[], signal?: AbortSignal): Promise<AIResponse> {
         const { provider, apiKey, model, apiUrl } = this.config;
         
         const endpoint = this.resolveOpenAIEndpoint(provider, apiUrl);
@@ -212,6 +245,7 @@ export class AIClient {
                 'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://ai-bookmark-architect.vercel.app',
                 'X-Title': 'AI Bookmark Architect',
             },
+            signal,
             body: JSON.stringify({
                 model: model,
                 messages: apiMessages,

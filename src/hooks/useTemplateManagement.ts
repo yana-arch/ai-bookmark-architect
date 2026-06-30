@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { FolderTemplate, TemplateSettings, ApiConfig, ArchitectureStyle } from '@/types';
 import { DEFAULT_SYSTEM_PROMPT } from '@/src/constants';
 import { ARCHITECTURE_STYLES } from '@/src/architectureStyles';
-import * as db from '@db';
+import { settingsRepo } from '@/src/db/repositories/settings';
 
 export const useTemplateManagement = (
     folderTemplates: FolderTemplate[],
@@ -84,7 +84,7 @@ ${folderGuide}
     }, [generateSystemPrompt, templateSettings.selectedTemplateId, setNotifications]);
 
     const handleSaveFolderTemplate = useCallback(async (template: FolderTemplate) => {
-        await db.saveFolderTemplate(template);
+        await settingsRepo.saveTemplate(template);
         setFolderTemplates(prev => {
             const existingIndex = prev.findIndex(t => t.id === template.id);
             if (existingIndex > -1) {
@@ -97,7 +97,7 @@ ${folderGuide}
     }, [setFolderTemplates]);
 
     const handleDeleteFolderTemplate = useCallback(async (id: string) => {
-        await db.deleteFolderTemplate(id);
+        await settingsRepo.deleteTemplate(id);
         setFolderTemplates(prev => prev.filter(t => t.id !== id));
     }, [setFolderTemplates]);
 

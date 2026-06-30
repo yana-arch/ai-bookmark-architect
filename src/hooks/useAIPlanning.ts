@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
-import { Bookmark, Folder, ApiConfig, AppState, CategorizedBookmark, Notification, SmartClassifyRule } from '@/types';
+import { AppState, type Bookmark, type Folder, type ApiConfig, type CategorizedBookmark, type Notification, type SmartClassifyRule } from '@/types';
 import { normalizeURL } from '@/src/utils/urlUtils';
 import { DEFAULT_PLANNING_PROMPT } from '@/src/constants';
-import * as db from '@db';
+import { libraryRepo } from '@/src/db/repositories/library';
 import { GoogleGenAI } from '@google/genai';
 
 export const useAIPlanning = (
@@ -67,23 +67,20 @@ export const useAIPlanning = (
 
             if (currentKey.provider === 'gemini') {
                 const ai = new GoogleGenAI({ apiKey: currentKey.apiKey });
-                const model = currentKey.model || 'gemini-2.5-flash';
+                const modelName = currentKey.model || 'gemini-2.5-flash';
+                const model = ai.getGenerativeModel({ model: modelName }, { apiVersion: 'v1beta' });
 
-                const result = await ai.models.generateContent({
-                    model: model,
+                const result = await model.generateContent({
                     contents: [
                         { role: 'user', parts: [{ text: userPrompt }] }
                     ],
-                    config: {
-                        systemInstruction: planningPrompt,
+                    generationConfig: {
                         responseMimeType: 'application/json',
-                    }
+                    },
+                    systemInstruction: planningPrompt
                 });
 
-                const response = result;
-                content = typeof (response as any).text === 'function'
-                    ? (response as any).text()
-                    : (response as any).text || JSON.stringify((response as any));
+                content = result.response.text();
 
             } else if (currentKey.provider === 'custom-gemini') {
                 let endpoint = currentKey.apiUrl || '';
@@ -98,7 +95,6 @@ export const useAIPlanning = (
                     headers: {
                         'Content-Type': 'application/json',
                         'x-goog-api-key': currentKey.apiKey,
-                        'Authorization': `Bearer ${currentKey.apiKey}`,
                     },
                     body: JSON.stringify({
                         contents: [{ parts: [{ text: userPrompt }] }],
@@ -158,7 +154,7 @@ export const useAIPlanning = (
             }
 
             // Parse response - assuming the AI returns { "folders": [...] } or similar
-            let parsed;
+            let parsed: any;
             try {
                 // Clean markdown code blocks if present
                 const cleanedContent = content.replace(/```json\s*|\s*```/g, '').trim();
@@ -195,7 +191,7 @@ export const useAIPlanning = (
                 }
             }
 
-            setProposedStructure(parsed);
+            setProposedStructure(parsed as (Folder | Bookmark)[]);
             setLogs(prev => [...prev, 'Đã tạo cấu trúc gợi ý thành công.']);
         } catch (error: any) {
             console.error('Planning Error:', error);
@@ -207,7 +203,7 @@ export const useAIPlanning = (
     };
 
 
-    const getStructureGuide = useCallback((nodes: any[], path: string[] = []): string[] => {
+    const getStructureGuide = useCallback((nodes: (Folder | Bookmark)[], path: string[] = []): string[] => {
         if (!Array.isArray(nodes)) return [];
         let list: string[] = [];
         nodes.forEach(node => {
@@ -224,7 +220,7 @@ export const useAIPlanning = (
 
     const confirmProposedStructure = async () => {
         setFolders(proposedStructure);
-        await db.saveFolders(proposedStructure);
+        await libraryRepo.saveTree(proposedStructure);
 
         // Feed the confirmed structure into the system prompt as a rigid guide
         const availableFolders = getStructureGuide(proposedStructure);

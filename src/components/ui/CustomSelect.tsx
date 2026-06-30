@@ -15,7 +15,7 @@ interface CustomSelectProps {
     className?: string;
 }
 
-export const CustomSelect: React.FC<CustomSelectProps> = ({ label, options, value, onChange, className = "" }) => {
+export const CustomSelect: React.FC<CustomSelectProps> = ({ label, options, value, onChange, className = '' }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const selectedOption = options.find(opt => opt.id === value) || options[0];

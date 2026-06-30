@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { 
     Bookmark, Folder, ApiConfig, AppState as AppStateType, Notification, 
     InstructionPreset, FolderTemplate, SmartClassifyRule, CategorizedBookmark, UserCorrection,
@@ -100,22 +100,54 @@ interface ConfigContextType {
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 
+// --- UI Context (Local view state) ---
+interface UIContextType {
+    selectedFolderId: string | null;
+    setSelectedFolderId: React.Dispatch<React.SetStateAction<string | null>>;
+    isAnalyticsDashboardOpen: boolean;
+    setIsAnalyticsDashboardOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isLogModalOpen: boolean;
+    setIsLogModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isGlobalSettingsModalOpen: boolean;
+    setIsGlobalSettingsModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isAuthModalOpen: boolean;
+    setIsAuthModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    settingsTab: 'providers' | 'intelligence' | 'templates' | 'data' | 'health' | 'backup' | 'config';
+    setSettingsTab: React.Dispatch<React.SetStateAction<'providers' | 'intelligence' | 'templates' | 'data' | 'health' | 'backup' | 'config'>>;
+    openSettings: (tab?: 'providers' | 'intelligence' | 'templates' | 'data' | 'health' | 'backup' | 'config') => void;
+}
+
+const UIContext = createContext<UIContextType | undefined>(undefined);
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const appData = useAppData();
     const aiSettings = useAISettings();
     const smartClassify = useSmartClassify();
-    
+
     const apiConfig = useApiConfig(appData.apiConfigs, appData.setApiConfigs);
     const instructionPresets = useInstructionPresets(appData.instructionPresets, appData.setInstructionPresets, aiSettings.setCustomInstructions);
     const templateManagement = useTemplateManagement(
-        appData.folderTemplates, 
-        appData.setFolderTemplates, 
-        aiSettings.setSystemPrompt, 
+        appData.folderTemplates,
+        appData.setFolderTemplates,
+        aiSettings.setSystemPrompt,
         appData.setNotifications,
         aiSettings.tagDrivenMode
     );
-    
+
     const aiProfilesLogic = useAIProfiles(appData.aiProfiles, appData.setAiProfiles, appData.setNotifications);
+
+    // UI state lifted into context so App.tsx stays thin
+    const [selectedFolderId, setSelectedFolderId] = useState<string | null>('root');
+    const [isAnalyticsDashboardOpen, setIsAnalyticsDashboardOpen] = useState(false);
+    const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+    const [isGlobalSettingsModalOpen, setIsGlobalSettingsModalOpen] = useState(false);
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+    const [settingsTab, setSettingsTab] = useState<UIContextType['settingsTab']>('providers');
+
+    const openSettings = useCallback((tab: UIContextType['settingsTab'] = 'providers') => {
+        setSettingsTab(tab);
+        setIsGlobalSettingsModalOpen(true);
+    }, []);
 
     useEffect(() => {
         if (aiSettings.autoCleanupEmptyFolders && appData.folders.length > 0) {
@@ -184,10 +216,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         handleTemplateSettingsChange: templateManagement.handleTemplateSettingsChange,
     };
 
+    const uiValue: UIContextType = {
+        selectedFolderId, setSelectedFolderId,
+        isAnalyticsDashboardOpen, setIsAnalyticsDashboardOpen,
+        isLogModalOpen, setIsLogModalOpen,
+        isGlobalSettingsModalOpen, setIsGlobalSettingsModalOpen,
+        isAuthModalOpen, setIsAuthModalOpen,
+        settingsTab, setSettingsTab,
+        openSettings,
+    };
+
     return (
         <ConfigContext.Provider value={configValue}>
             <DataContext.Provider value={dataValue}>
-                {children}
+                <UIContext.Provider value={uiValue}>
+                    {children}
+                </UIContext.Provider>
             </DataContext.Provider>
         </ConfigContext.Provider>
     );
@@ -205,9 +249,16 @@ export const useAppConfig = () => {
     return context;
 };
 
+export const useAppUI = () => {
+    const context = useContext(UIContext);
+    if (!context) throw new Error('useAppUI must be used within an AppProvider');
+    return context;
+};
+
 // Legacy support with warning-less combination
 export const useApp = () => {
     const data = useAppDataContext();
     const config = useAppConfig();
-    return { ...data, ...config };
+    const ui = useAppUI();
+    return { ...data, ...config, ...ui };
 };
