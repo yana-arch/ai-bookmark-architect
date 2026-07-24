@@ -14,7 +14,7 @@ interface State {
 export class ErrorBoundary extends Component<Props, State> {
     state: State = { hasError: false, error: null, retryKey: 0 };
 
-    static getDerivedStateFromError(error: Error): State {
+    static getDerivedStateFromError(error: Error): Partial<State> {
         return { hasError: true, error };
     }
 
