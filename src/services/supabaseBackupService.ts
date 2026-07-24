@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient, type BackupData } from './apiClient';
 import { supabase } from './supabaseClient';
 import type { BackupMetadata, Bookmark, Folder } from '@/types';
 
@@ -63,7 +63,7 @@ class SupabaseBackupService {
         };
     }
 
-    async downloadBackup(backupId: string): Promise<{ data: { bookmarks: Bookmark[]; folders: Folder[] } }> {
+    async downloadBackup(backupId: string): Promise<{ data: BackupData }> {
         const result = await apiClient.getBackup(backupId);
         return { data: result.data };
     }
@@ -123,7 +123,7 @@ class SupabaseKeyBackupService {
     async downloadBackup(
         key: string,
         onProgress?: (progress: number) => void
-    ): Promise<{ metadata: BackupMetadata; data: { bookmarks: Bookmark[]; folders: Folder[] } }> {
+    ): Promise<{ metadata: BackupMetadata; data: BackupData }> {
         onProgress?.(10);
 
         const result = await apiClient.getBackup(key);

@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient';
 import type { Bookmark, Folder, BackupMetadata } from '@/types';
 
-interface BackupData {
+export interface BackupData {
     bookmarks: Bookmark[];
     folders: (Folder | Bookmark)[];
 }
