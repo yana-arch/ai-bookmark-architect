@@ -86,6 +86,7 @@ interface ConfigContextType {
     handleSaveInstructionPreset: (preset: InstructionPreset) => Promise<void>;
     handleDeleteInstructionPreset: (id: string) => Promise<void>;
     handleSelectPreset: (id: string | null) => void;
+    folderTemplates: FolderTemplate[];
     isFolderTemplateModalOpen: boolean;
     setIsFolderTemplateModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     templateSettings: TemplateSettings;
@@ -204,6 +205,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         handleSaveInstructionPreset: instructionPresets.handleSaveInstructionPreset,
         handleDeleteInstructionPreset: instructionPresets.handleDeleteInstructionPreset,
         handleSelectPreset: instructionPresets.handleSelectPreset,
+        folderTemplates: appData.folderTemplates,
         isFolderTemplateModalOpen: templateManagement.isFolderTemplateModalOpen,
         setIsFolderTemplateModalOpen: templateManagement.setIsFolderTemplateModalOpen,
         templateSettings: templateManagement.templateSettings,
