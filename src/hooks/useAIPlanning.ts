@@ -68,19 +68,19 @@ export const useAIPlanning = (
             if (currentKey.provider === 'gemini') {
                 const ai = new GoogleGenAI({ apiKey: currentKey.apiKey });
                 const modelName = currentKey.model || 'gemini-2.5-flash';
-                const model = ai.getGenerativeModel({ model: modelName }, { apiVersion: 'v1beta' });
 
-                const result = await model.generateContent({
+                const result = await ai.models.generateContent({
+                    model: modelName,
                     contents: [
                         { role: 'user', parts: [{ text: userPrompt }] }
                     ],
-                    generationConfig: {
+                    config: {
+                        systemInstruction: planningPrompt,
                         responseMimeType: 'application/json',
-                    },
-                    systemInstruction: planningPrompt
+                    }
                 });
 
-                content = result.response.text();
+                content = result.text ?? '';
 
             } else if (currentKey.provider === 'custom-gemini') {
                 let endpoint = currentKey.apiUrl || '';
