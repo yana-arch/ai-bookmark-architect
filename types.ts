@@ -96,7 +96,7 @@ export interface ProcessingResult<T> {
 export interface DetailedLog {
   id: string;
   timestamp: string;
-  type: 'info' | 'request' | 'response' | 'error';
+  type: 'info' | 'request' | 'response' | 'error' | 'success';
   title: string;
   content: string | object;
   usage?: {

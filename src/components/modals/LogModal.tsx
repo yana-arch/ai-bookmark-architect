@@ -11,11 +11,12 @@ interface LogModalProps {
 const LogEntry: React.FC<{ log: DetailedLog }> = ({ log }) => {
     const [copied, setCopied] = useState(false);
     
-    const typeClasses = {
+    const typeClasses: Record<DetailedLog['type'], string> = {
         info: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
         request: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
         response: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
         error: 'bg-red-500/20 text-red-300 border-red-500/30',
+        success: 'bg-green-500/20 text-green-300 border-green-500/30',
     };
 
     const handleCopy = () => {
@@ -98,6 +99,7 @@ const LogModal: React.FC<LogModalProps> = ({ logs, onClose }) => {
             request: 0,
             response: 0,
             error: 0,
+            success: 0,
             totalTokens: 0
         };
 
