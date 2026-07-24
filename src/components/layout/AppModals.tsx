@@ -13,7 +13,8 @@ import type {
     Notification,
     DuplicateStats,
     ExportOptions,
-    Bookmark
+    Bookmark,
+    BrokenLinkCheckState
 } from '@/types';
 
 const UnifiedSettingsModal = lazy(() => import('../modals/UnifiedSettingsModal'));
@@ -45,8 +46,8 @@ interface AppModalsProps {
     handleCleanDuplicates: () => void;
     brokenLinks: Bookmark[];
 
-    brokenLinkCheckState: 'idle' | 'checking' | 'completed' | 'error';
-    brokenLinkCheckProgress: number;
+    brokenLinkCheckState: BrokenLinkCheckState;
+    brokenLinkCheckProgress: { current: number; total: number };
     handleStartBrokenLinkCheck: () => void;
     handleCleanBrokenLinks: () => void;
     handleUploadData: (key: string) => Promise<void>;

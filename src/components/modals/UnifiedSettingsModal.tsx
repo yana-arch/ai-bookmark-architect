@@ -14,7 +14,8 @@ import type {
     ExportOptions,
     Notification,
     AIProfile,
-    PromptModifiers
+    PromptModifiers,
+    BrokenLinkCheckState
 } from '@/types';
 import {
     CogIcon, XIcon, AILogoIcon, TerminalIcon, LayersIcon,
@@ -114,8 +115,8 @@ interface UnifiedSettingsModalProps {
     duplicateStats: DuplicateStats;
     onCleanDuplicates: () => void;
     brokenLinks: Bookmark[];
-    brokenLinkCheckState: 'idle' | 'checking' | 'completed' | 'error';
-    brokenLinkCheckProgress: number;
+    brokenLinkCheckState: BrokenLinkCheckState;
+    brokenLinkCheckProgress: { current: number; total: number };
     onStartBrokenLinkCheck: () => void;
     onCleanBrokenLinks: () => void;
 
