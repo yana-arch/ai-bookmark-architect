@@ -33,3 +33,7 @@ plans/
 AGENTS.md
 coverage/*
 .opencode/
+
+# Graphify knowledge graph artifacts (generated, re-buildable)
+graphify-out/
+.planning/graphs/
