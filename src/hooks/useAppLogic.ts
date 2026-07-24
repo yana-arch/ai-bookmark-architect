@@ -36,6 +36,7 @@ export const useAppLogic = () => {
         isAnalyticsDashboardOpen, setIsAnalyticsDashboardOpen,
         isLogModalOpen, setIsLogModalOpen,
         isGlobalSettingsModalOpen, setIsGlobalSettingsModalOpen,
+        isAuthModalOpen, setIsAuthModalOpen,
         settingsTab, setSettingsTab,
         openSettings,
     } = context;
@@ -97,6 +98,7 @@ export const useAppLogic = () => {
             isAnalyticsDashboardOpen, setIsAnalyticsDashboardOpen,
             isLogModalOpen, setIsLogModalOpen,
             isGlobalSettingsModalOpen, setIsGlobalSettingsModalOpen,
+            isAuthModalOpen, setIsAuthModalOpen,
             settingsTab, setSettingsTab,
             openSettings,
             handleDismissNotification,
