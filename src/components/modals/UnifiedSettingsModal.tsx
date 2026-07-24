@@ -449,7 +449,7 @@ const UnifiedSettingsModal: React.FC<UnifiedSettingsModalProps> = (props) => {
                         {activeTab === 'data' && (
                             <DataTab
                                 bookmarks={bookmarks}
-                                folders={folders}
+                                folders={folders as Folder[]}
                                 onExport={onExport}
                                 importFile={importFile}
                                 previewBookmarks={previewBookmarks}
