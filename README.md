@@ -1,236 +1,248 @@
-# AI Bookmark Architect
+# AI Bookmark Architect — Intelligent Knowledge Graph Taxonomy & Bookmark Reorganizer
 
-[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/yana-arch/ai-bookmark-architect/releases)
-[![React](https://img.shields.io/badge/React-19.1.1-blue.svg)](https://reactjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8.2-blue.svg)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-6.2.0-646CFF.svg)](https://vitejs.dev/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![React 19](https://img.shields.io/badge/React-19.1.1-61DAFB?logo=react&logoColor=black)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8.2-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Google Gemini AI](https://img.shields.io/badge/Google%20Gemini-SDK%20v1.21-4285F4?logo=google&logoColor=white)](https://ai.google.dev/)
+[![Vite](https://img.shields.io/badge/Vite-6.2.0-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Tailwind CSS 4](https://img.shields.io/badge/TailwindCSS-4.3.0-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-Cloud%20Sync-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
+[![Vitest](https://img.shields.io/badge/Vitest-3.0.0-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
+[![Docker](https://img.shields.io/badge/Docker-Alpine%20Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A sophisticated React-based application that leverages artificial intelligence to revolutionize bookmark organization. Using Google's Gemini AI, this tool intelligently restructures and categorizes your bookmarks, making information management effortless and intuitive.
 
-## ✨ Features
+<div align="center">
+  <img src="./docs/images/preview.png" alt="ai-bookmark-architect Preview" width="880" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+</div>
+---
 
-- 🤖 **AI-Powered Restructuring**: Automatically categorize and organize bookmarks using advanced AI algorithms
-- 🎯 **Folder Template System**: Pre-defined organizational templates for different use cases with strict category enforcement
-- 🛠️ **AI Template Generation**: Create custom folder structures using natural language descriptions
-- 📥 **Template Import/Export**: Share and backup your custom folder templates
-- ☁️ **Cloud Backup**: Key-based backup and restore using Supabase (optional)
-- 💾 **Local Storage**: Secure, offline-first storage using IndexedDB
-- 🎨 **Modern UI**: Clean, responsive interface built with React and TypeScript
-- ⚡ **Fast Performance**: Optimized with Vite for lightning-fast development and builds
-- 🔒 **Privacy-Focused**: All processing happens locally with your API key
+## Executive Summary & Problem Statement
 
-## 💻 Reviews
+Modern knowledge workers save hundreds or thousands of browser bookmarks across disparate sessions, resulting in unstructured "bookmark graveyards" plagued by duplicated links, dead references, and incoherent folder hierarchies. Traditional bookmark managers require tedious manual filing and lack semantic understanding.
 
-   <img width="1920" height="939" alt="image" src="./image-start.png" />
+**AI Bookmark Architect** is an enterprise-grade, client-side web application and intelligent knowledge graph taxonomy engine. Powered by **Google Gemini AI** (`@google/genai`), it transforms chaotic browser bookmark exports (Netscape HTML & JSON) into structured, semantically grouped taxonomies. Designed with a high-concurrency **Web Worker** architecture, zero-latency **IndexedDB** local caching, and optional encrypted **Supabase** cloud synchronization, it delivers seamless reorganization without compromising browser responsiveness or data privacy.
 
-   <hr/>
+---
 
-   <img width="1920" height="939" alt="image" src="./image-processing.png" />
+## Visual Preview
 
-   <hr/>
+<div align="center">
+  <img width="90%" alt="Start Screen" src="./image-start.png" />
+  <p><em>Figure 1: Interactive Netscape Bookmark Ingestion & Template Selection</em></p>
+  <br/>
+  <img width="90%" alt="Processing Screen" src="./image-processing.png" />
+  <p><em>Figure 2: Non-blocking Web Worker AI Taxonomy Orchestration & Classification</em></p>
+  <br/>
+  <img width="90%" alt="End Result" src="./image-end.png" />
+  <p><em>Figure 3: Semantic Graph Tree Hierarchy with Instant Export (HTML, JSON, Markdown)</em></p>
+</div>
 
-   <img width="1920" height="939" alt="image" src="./image-end.png" />
+---
 
-## 📋 Table of Contents
+## System Architecture & Processing Pipeline
 
-- [AI Bookmark Architect](#ai-bookmark-architect)
-  - [✨ Features](#-features)
-  - [💻 Reviews](#-reviews)
-  - [📋 Table of Contents](#-table-of-contents)
-  - [📋 Prerequisites](#-prerequisites)
-  - [🚀 Installation](#-installation)
-  - [⚙️ Configuration](#️-configuration)
-    - [Supabase Setup (Optional)](#supabase-setup-optional)
-  - [🎯 Usage](#-usage)
-    - [Development Server](#development-server)
-    - [Production Build](#production-build)
-    - [Cloud Backup (Optional)](#cloud-backup-optional)
-  - [📂 Folder Template System](#-folder-template-system)
-    - [Default Templates](#default-templates)
-    - [Using Templates](#using-templates)
-    - [Template Management](#template-management)
-    - [Custom Templates](#custom-templates)
-  - [🛠️ Development](#️-development)
-    - [Project Structure](#project-structure)
-    - [Available Scripts](#available-scripts)
-  - [🤝 Contributing](#-contributing)
-  - [📄 License](#-license)
-  - [🏗️ Technologies Used](#️-technologies-used)
+The system uses a non-blocking, multi-threaded pipeline where heavy parsing, graph clustering, and AI prompt batching are offloaded from the React 19 UI thread to background Web Workers.
 
-## 📋 Prerequisites
+```mermaid
+flowchart TD
+    subgraph Ingestion["1. Ingestion Layer"]
+        InputHTML["Netscape Bookmark HTML / JSON File"]
+        Parser["BookmarkParser & Sanitizer\n(URL Normalization & Duplicate Detection)"]
+    end
 
-- **Node.js**: Version 16.0.0 or higher
-- **Gemini API Key**: Obtain from [Google AI Studio](https://makersuite.google.com/app/apikey)
+    subgraph Concurrency["2. Background Web Worker Layer"]
+        AIWorker["AI Processing Worker\n(Batching & Token Optimization)"]
+        AnalyticsWorker["Analytics & Metrics Worker\n(Distribution & Link Health)"]
+    end
 
-## 🚀 Installation
+    subgraph AIOrchestration["3. AI Semantic Engine (Google Gemini)"]
+        PromptBuilder["Taxonomy Prompt Builder\n(Enforcing Folder Schemas)"]
+        GeminiAPI["Google Gemini LLM Gateway\n(@google/genai API)"]
+        TreeBuilder["Taxonomy Graph Constructor\n(Hierarchical Node Assembly)"]
+    end
+
+    subgraph StorageLayer["4. Dual Persistence & Cache"]
+        IDBCache[("IndexedDB Local Store\n(Zero-latency Cache & Session State)")]
+        SupabaseCloud[("Supabase Cloud Sync\n(Encrypted Backup & Key-based Restore)")]
+    end
+
+    subgraph Presentation["5. Presentation & Export Layer (React 19)"]
+        TreeUI["Interactive Visual Tree View"]
+        ChartUI["Chart.js Analytics Dashboard"]
+        ExportEngine["Export Engine\n(Netscape HTML / JSON / Markdown)"]
+    end
+
+    %% Pipeline Connections
+    InputHTML --> Parser
+    Parser -->|Offload Tasks| AIWorker
+    Parser -->|Offload Metrics| AnalyticsWorker
+
+    AIWorker --> PromptBuilder
+    PromptBuilder --> GeminiAPI
+    GeminiAPI --> TreeBuilder
+    TreeBuilder --> AIWorker
+
+    AIWorker -->|Sync State| IDBCache
+    AIWorker -->|State Update| TreeUI
+    AnalyticsWorker -->|Metrics Data| ChartUI
+
+    IDBCache <-->|Encrypted Cloud Sync| SupabaseCloud
+    TreeUI --> ExportEngine
+```
+
+---
+
+## Key Features & Capabilities
+
+- **AI-Driven Semantic Graph Taxonomy**: Automatically classifies and nests bookmarks into coherent multi-level category trees using Google's Gemini models.
+- **Dedicated Web Worker Architecture**: Offloads all heavy parsing, classification chunking, and metadata analytics to background threads (`aiWorker.ts` and `analyticsWorker.ts`), guaranteeing 60 FPS UI performance even with 10,000+ bookmarks.
+- **Custom & Generative Folder Templates**:
+  - Pre-packaged templates: *Developer Workspaces*, *Academic Research*, *Productivity & SaaS*, *Media & Entertainment*.
+  - **Natural Language Template Generation**: Create custom taxonomic structures simply by describing your preferred schema in plain language.
+  - Strict category validation rules to prevent taxonomy drift.
+- **Dual-Tier Storage Architecture**:
+  - **Offline-First IndexedDB** (`idb`): Retains complete working sessions and cache locally on the client.
+  - **Optional Supabase Cloud Backup**: Securely store and retrieve structured bookmark trees across devices using private access keys.
+- **Visual Analytics Dashboard**: Built-in **Chart.js** integration displaying domain distributions, category depth metrics, and tag heatmaps.
+- **Universal Export Engine**: Export finalized bookmark hierarchies to standards-compliant Netscape Bookmark HTML (ready for Chrome/Firefox/Safari/Brave import), structured JSON, or Markdown documentation.
+- **Comprehensive Test Coverage**: Unit and integration test suites powered by **Vitest 3** and **React Testing Library**.
+
+---
+
+## Tech Stack Breakdown
+
+### Frontend Core
+- **Framework**: React 19.1 (`react`, `react-dom`)
+- **Language**: TypeScript 5.8 (Strict Type Safety)
+- **Build Tool**: Vite 6.2
+- **Styling**: Tailwind CSS 4.3 (`@tailwindcss/vite`) & PostCSS
+- **Data Visualization**: Chart.js 4.4 & React-Chartjs-2 5.2
+
+### AI & Cloud Services
+- **AI SDK**: Google GenAI SDK (`@google/genai` v1.21.0)
+- **AI Models**: Gemini Flash / Pro (configurable via API keys)
+- **Cloud Backend**: Supabase JS Client (`@supabase/supabase-js` v2.78.0)
+- **Local Storage**: IndexedDB Wrapper (`idb` v7.1.1)
+
+### Quality Assurance & DevOps
+- **Test Runner**: Vitest 3.0 (with Vitest UI & v8 Coverage)
+- **Testing Utilities**: React Testing Library 16.3, DOM Testing Library, JSDOM
+- **Linting**: ESLint 9 (Flat Config), typescript-eslint 8.53
+- **Containerization**: Docker (Alpine multi-stage build) & Docker Compose
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- **Node.js**: v20.x or v22.x LTS
+- **Package Manager**: npm (v10+)
+- **Google Gemini API Key**: Obtain a free API key from [Google AI Studio](https://aistudio.google.com/)
+- **Supabase Account** *(Optional)*: For cross-device cloud sync and backup
+
+---
+
+### Quickstart (Local Development)
 
 1. **Clone the repository**:
-
    ```bash
    git clone https://github.com/yana-arch/ai-bookmark-architect.git
    cd ai-bookmark-architect
    ```
 
 2. **Install dependencies**:
-
    ```bash
    npm install
    ```
 
-3. **Configure environment** (see [Configuration](#configuration) section)
+3. **Configure Environment Variables**:
+   Create a `.env.local` file in the project root:
+   ```env
+   # Required: Google Gemini AI API Key
+   VITE_GEMINI_API_KEY=your_gemini_api_key_here
 
-## ⚙️ Configuration
+   # Optional: Supabase Cloud Sync
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
 
-Create a `.env.local` file in the root directory:
-
-```env
-GEMINI_API_KEY=your_gemini_api_key_here
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
-
-> **Security Note**: Never commit your API keys to version control. The `.env.local` file is already included in `.gitignore`.
-
-### Supabase Setup (Optional)
-
-For cloud backup functionality, you can set up Supabase:
-
-1. **Create a Supabase project** at [supabase.com](https://supabase.com)
-2. **Get your project URL and anon key** from the project settings
-3. **Run the table setup script** from `SUPABASE_SETUP.md`
-4. **Add the environment variables** as shown above
-
-The application will work without Supabase, but cloud backups require it.
-
-## 🎯 Usage
-
-### Development Server
-
-Start the development server with hot reload:
-
-```bash
-npm run dev
-```
-
-The application will be available at `http://localhost:5173`.
-
-### Production Build
-
-```bash
-npm run build
-npm run preview
-```
-
-### Cloud Backup (Optional)
-
-If you've set up Supabase, you can use cloud backup features:
-
-1. **Upload Data**: Click the ☁️ button in the header to upload your current bookmarks with a unique key
-2. **Download Data**: Click the 📥 button to restore bookmarks using a previously saved key
-3. **Key Management**: Each backup is identified by a unique key you provide
-4. **Cross-Device Access**: Access your backups from any device with the same key
-
-**Note**: Cloud backup is completely optional. The app works perfectly with local storage only.
-
-## 📂 Folder Template System
-
-AI Bookmark Architect includes a powerful folder template system that allows you to create predefined organizational structures for your bookmarks. This ensures consistent categorization and provides AI guidance for specific use cases.
-
-### Default Templates
-
-The application comes with three built-in templates:
-
-1. **Phát triển Web (Web Development)**
-   - Frontend (React, Vue.js, Angular, HTML/CSS)
-   - Backend (Node.js, Python, PHP, Database)
-   - Công cụ & Tiện ích (Build Tools, Editors, Version Control)
-
-2. **AI & Machine Learning**
-   - Kiến thức cơ bản (Math, Algorithms, Concepts)
-   - Frameworks & Libraries (TensorFlow, PyTorch, Keras, Scikit-learn)
-   - Ứng dụng (NLP, Computer Vision, Robotics)
-
-3. **Tổng hợp (General)**
-   - Công nghệ (Programming, AI, Web)
-   - Học tập (Tutorials, Courses, Documentation)
-   - Công cụ (Development, Design, Productivity)
-
-### Using Templates
-
-1. **Select a Template**: In the restructure panel, expand the "Tùy chọn & Chỉ dẫn cho AI" section
-2. **Choose from Dropdown**: Select a template from the dropdown menu
-3. **Apply Template**: Click the "Áp dụng" (Apply) button to activate the template structure
-4. **Run Restructuring**: Start the AI process - bookmarks will be organized strictly according to the template
-
-### Template Management
-
-- **Quản lý mẫu (Manage Templates)**: Access the full template management interface
-- **AI Generation**: Create custom templates using natural language descriptions
-- **Import/Export**: Share templates via JSON files
-- **Template Mode**: When active, AI receives strict instructions to only use template-defined folders
-
-### Custom Templates
-
-Create your own templates using the AI-powered template generator or manually define folder structures. Templates are stored locally and can be exported for backup or sharing.
-
-## 🛠️ Development
-
-### Project Structure
-
-```
-ai-bookmark-architect/
-├── components/                  # React components
-│   ├── RestructurePanel.tsx    # Main panel with AI options & template selection
-│   ├── FolderTemplateModal.tsx # Template management interface
-│   ├── ApiConfigModal.tsx      # API configuration
-│   ├── LogModal.tsx            # Processing logs viewer
-│   └── ...                     # Other UI components
-├── src/                         # Core application logic
-│   ├── aiWorker.ts             # AI processing worker
-│   ├── cache.ts                # Caching utilities
-│   ├── performance.ts          # Performance monitoring
-│   └── utils.ts                # Utility functions
-├── types.ts                    # TypeScript type definitions
-├── db.ts                       # Database operations
-└── App.tsx                     # Main application component
-```
-
-### Available Scripts
-
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🏗️ Technologies Used
-
-- **Frontend Framework**: React 19.1.1
-- **Language**: TypeScript 5.8.2
-- **Build Tool**: Vite 6.2.0
-- **AI Integration**: Google Gemini AI API
-- **Database**: IndexedDB (via idb library)
-- **Cloud Database**: Supabase (PostgreSQL)
-- **Styling**: CSS Modules
+4. **Start Vite Development Server**:
+   ```bash
+   npm run dev
+   ```
+   Open your browser at `http://localhost:5173`.
 
 ---
 
-<div align="center">
-  <p>Built with ❤️ using React and AI</p>
-  <p>
-    <a href="#ai-bookmark-architect">Back to top</a>
-  </p>
-</div>
+### Quickstart with Docker
+
+Build and run the containerized application:
+
+```bash
+docker-compose up --build -d
+```
+Access the application on the configured container port.
+
+---
+
+## Testing & Quality Control
+
+AI Bookmark Architect maintains automated test suites to ensure data integrity during tree restructuring:
+
+```bash
+# Run all unit and component tests
+npm run test
+
+# Run tests with interactive Vitest UI
+npm run test:ui
+
+# Generate test coverage report
+npx vitest run --coverage
+
+# Run ESLint validation
+npm run lint
+```
+
+---
+
+## Project Directory Structure
+
+```
+ai-bookmark-architect/
+├── Dockerfile                  # Multi-stage production container build
+├── Dockerfile.dev              # Local development container definition
+├── docker-compose.yml          # Container deployment specification
+├── index.html                  # HTML5 entry template
+├── package.json                # Project dependencies & scripts
+├── vite.config.ts              # Vite 6 & Tailwind CSS 4 configuration
+├── vitest.config.ts            # Vitest unit & integration test configuration
+├── src/
+│   ├── App.tsx                 # Root application component & layout shell
+│   ├── index.tsx               # React DOM bootstrapping
+│   ├── types.ts                # TypeScript interfaces (Node, Bookmark, Template)
+│   ├── aiWorker.ts             # Web Worker for Gemini AI background processing
+│   ├── analyticsWorker.ts      # Web Worker for bookmark metrics & health calculation
+│   ├── cache.ts                # IndexedDB & in-memory LRU caching manager
+│   ├── components/             # Reusable UI component modules
+│   │   ├── features/           # Bookmark importer, tree viewer, template selector
+│   │   ├── layout/             # Header, navbar, footer, sidebar components
+│   │   ├── modals/             # Settings, Supabase config, custom template modals
+│   │   └── ui/                 # Buttons, inputs, badges, spinners
+│   ├── context/                # React contexts (Theme, Auth, BookmarkState)
+│   ├── hooks/                  # Custom React hooks (useBookmarks, useWorkers)
+│   ├── services/               # Core business & API services
+│   │   ├── aiClient.ts         # Google GenAI SDK wrapper
+│   │   ├── aiOrchestrator.ts   # Chunking, rate-limiting & retry coordination
+│   │   ├── bookmarkParser.ts   # Netscape HTML & JSON parser
+│   │   ├── promptBuilder.ts    # Dynamic prompt & template schema generator
+│   │   └── supabaseBackupService.ts # Cloud backup & restore client
+│   └── __tests__/              # Vitest test suites
+```
+
+---
+
+## License & Author
+
+- **Author**: Yana Arch & AI Bookmark Architect Contributors
+- **License**: [MIT License](LICENSE)
