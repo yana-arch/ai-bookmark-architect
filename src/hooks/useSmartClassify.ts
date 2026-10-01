@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import * as db from '@db';
+import { libraryRepo } from '@/src/db/repositories/library';
 import { Bookmark, SmartClassifyRule, CategorizedBookmark } from '@/types';
 
 export const useSmartClassify = () => {
@@ -11,12 +11,9 @@ export const useSmartClassify = () => {
     useEffect(() => {
         const loadRules = async () => {
             try {
-                // Check if db function exists before calling (for safety during migration)
-                if (typeof db.getSmartClassifyRules === 'function') {
-                    const savedRules = await db.getSmartClassifyRules();
-                    if (savedRules) {
-                        setSmartClassifyRules(savedRules);
-                    }
+                const savedRules = await libraryRepo.getRules();
+                if (savedRules) {
+                    setSmartClassifyRules(savedRules);
                 }
             } catch (error) {
                 console.error('Failed to load smart classify rules:', error);
@@ -34,7 +31,7 @@ export const useSmartClassify = () => {
             return;
         }
 
-        await db.saveSmartClassifyRule(rule);
+        await libraryRepo.saveRule(rule);
         setSmartClassifyRules(prev => {
             const existingIndex = prev.findIndex(r => r.id === rule.id);
             if (existingIndex > -1) {
@@ -47,7 +44,7 @@ export const useSmartClassify = () => {
     }, []);
 
     const deleteRule = useCallback(async (id: string) => {
-        await db.deleteSmartClassifyRule(id);
+        await libraryRepo.deleteRule(id);
         setSmartClassifyRules(prev => prev.filter(r => r.id !== id));
     }, []);
 

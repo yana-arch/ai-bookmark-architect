@@ -105,8 +105,8 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({
                                     onClick={() => onProcessingModeChange(m)}
                                     className={`flex-1 py-3 px-4 text-[10px] font-black rounded-xl transition-all uppercase tracking-widest ${
                                         processingMode === m 
-                                        ? 'bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.3)]' 
-                                        : 'text-gray-500 hover:text-gray-300'
+                                            ? 'bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.3)]' 
+                                            : 'text-gray-500 hover:text-gray-300'
                                     }`}
                                 >
                                     {m === 'sequential' ? 'Sequential' : 'Parallel Burst'}

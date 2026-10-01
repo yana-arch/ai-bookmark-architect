@@ -5,6 +5,7 @@ export interface SplitterOptions<T, R> {
     executeTask: (subBatch: T[]) => Promise<R[]>;
     onLog?: (message: string) => void;
     sequential?: boolean;
+    signal?: AbortSignal;
 }
 
 export class TokenAwareSplitter {
@@ -12,9 +13,13 @@ export class TokenAwareSplitter {
      * Recursively splits a batch of items if the calculated tokens exceed the limit.
      */
     static async splitAndExecute<T, R>(options: SplitterOptions<T, R>): Promise<R[]> {
-        const { batch, tokenLimit, calculateTokens, executeTask, onLog, sequential } = options;
+        const { batch, tokenLimit, calculateTokens, executeTask, onLog, sequential, signal } = options;
 
         const processSubBatch = async (subBatch: T[]): Promise<R[]> => {
+            if (signal?.aborted) {
+                throw new Error('Processing was aborted during splitting.');
+            }
+
             if (subBatch.length === 0) return [];
 
             const totalTokens = calculateTokens(subBatch);

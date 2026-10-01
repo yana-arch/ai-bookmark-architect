@@ -9,8 +9,8 @@ export enum AppState {
 }
 
 export const SYSTEM_FOLDERS = {
-  UNCATEGORIZED: '[Uncategorized]',
-  UNMAPPED_TAGS: '[Unmapped Tags]'
+    UNCATEGORIZED: '[Uncategorized]',
+    UNMAPPED_TAGS: '[Unmapped Tags]'
 };
 
 export enum BrokenLinkCheckState {
@@ -82,10 +82,21 @@ export interface AIProfile {
   updatedAt: number;
 }
 
+export interface AIUsage {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+}
+
+export interface ProcessingResult<T> {
+    data: T[];
+    usage: AIUsage;
+}
+
 export interface DetailedLog {
   id: string;
   timestamp: string;
-  type: 'info' | 'request' | 'response' | 'error';
+  type: 'info' | 'request' | 'response' | 'error' | 'success';
   title: string;
   content: string | object;
   usage?: {

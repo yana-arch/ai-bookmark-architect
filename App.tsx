@@ -8,8 +8,10 @@ import FileDropzone from './src/components/ui/FileDropzone';
 import Header from './src/components/layout/Header';
 import AppModals from './src/components/layout/AppModals';
 import NotificationToast from './src/components/ui/NotificationToast';
+import { ErrorBoundary } from './src/components/features/ErrorBoundary';
 
 import { useAppLogic } from './src/hooks/useAppLogic';
+import { useAuth } from './src/hooks/useAuth';
 
 const App: React.FC = () => {
     const {
@@ -24,19 +26,27 @@ const App: React.FC = () => {
         orchestration
     } = useAppLogic();
 
-    if (context.isLoading) {
+    const { isLoading: isAuthLoading } = useAuth();
+
+    if (context.isLoading || isAuthLoading) {
         return (
             <div className="flex h-screen w-full bg-[#1E2127] items-center justify-center">
-                <p className="text-white text-lg">Đang tải dữ liệu...</p>
+                <div className="flex flex-col items-center space-y-4">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-400"></div>
+                    <p className="text-gray-400 text-lg font-medium animate-pulse">Initializing Architecture...</p>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="flex h-screen w-full bg-[#1E2127] text-gray-300 font-sans">
-            <AppModals 
+        <ErrorBoundary>
+            <div className="flex h-screen w-full bg-[#1E2127] text-gray-300 font-sans">
+                <AppModals 
                 isGlobalSettingsModalOpen={ui.isGlobalSettingsModalOpen}
                 setIsGlobalSettingsModalOpen={ui.setIsGlobalSettingsModalOpen}
+                isAuthModalOpen={ui.isAuthModalOpen}
+                setIsAuthModalOpen={ui.setIsAuthModalOpen}
                 settingsTab={ui.settingsTab}
                 processImport={importExport.processImport}
                 handleExportBookmarks={importExport.handleExportBookmarks}
@@ -52,6 +62,7 @@ const App: React.FC = () => {
                 handleCleanBrokenLinks={brokenLinks.handleCleanBrokenLinks}
                 handleUploadData={importExport.handleUploadData}
                 handleImportData={importExport.handleImportData}
+                handleDeleteBackup={importExport.handleDeleteBackup}
                 isLogModalOpen={ui.isLogModalOpen}
                 setIsLogModalOpen={ui.setIsLogModalOpen}
                 detailedLogs={processing.detailedLogs}
@@ -95,6 +106,8 @@ const App: React.FC = () => {
                             onOpenBackup={() => ui.openSettings('backup')}
                             onOpenData={() => ui.openSettings('data')}
                             onOpenAnalytics={() => ui.setIsAnalyticsDashboardOpen(true)}
+                            onOpenSettings={() => ui.setIsGlobalSettingsModalOpen(true)}
+                            onOpenAuth={() => ui.setIsAuthModalOpen(true)}
                         />
                        
                         {context.appState === AppState.EMPTY && <FileDropzone onFileLoaded={importExport.handleFileLoaded} />}
@@ -135,8 +148,9 @@ const App: React.FC = () => {
                         )}
                     </div>
                 </main>
+                </div>
             </div>
-        </div>
+        </ErrorBoundary>
     );
 };
 

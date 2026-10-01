@@ -178,5 +178,7 @@ export const logPerformanceReport = () => {
     console.groupEnd();
 };
 
-// Auto-report performance every 5 minutes
-setInterval(logPerformanceReport, 5 * 60 * 1000);
+// Auto-report performance in development only
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
+    setInterval(logPerformanceReport, 5 * 60 * 1000);
+}

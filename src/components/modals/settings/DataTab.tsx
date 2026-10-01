@@ -59,9 +59,9 @@ export const DataTab: React.FC<DataTabProps> = ({
                                         key={f}
                                         onClick={() => setExportOptions(prev => ({ ...prev, format: f }))}
                                         className={`p-5 rounded-2xl border transition-all relative overflow-hidden group ${exportOptions.format === f
-                                                ? 'border-blue-500 bg-blue-500/10 text-white shadow-[0_0_20px_rgba(59,130,246,0.15)]'
-                                                : 'border-white/5 bg-[#121418] hover:border-white/10 text-gray-500'
-                                            }`}
+                                            ? 'border-blue-500 bg-blue-500/10 text-white shadow-[0_0_20px_rgba(59,130,246,0.15)]'
+                                            : 'border-white/5 bg-[#121418] hover:border-white/10 text-gray-500'
+                                        }`}
                                     >
                                         <div className="text-sm font-black uppercase tracking-widest relative z-10">{f}</div>
                                         <div className="text-[9px] opacity-60 mt-1 relative z-10">{formatDetails[f].name}</div>
@@ -84,7 +84,7 @@ export const DataTab: React.FC<DataTabProps> = ({
                                 <div className="bg-[#121418] border border-white/10 rounded-2xl p-4 h-72 overflow-y-auto custom-scrollbar space-y-1 shadow-inner">
                                     {folders.map(f => (
                                         <label key={f.id} className={`flex items-center space-x-3 p-3 rounded-xl cursor-pointer transition-colors ${exportOptions.selectedFolders.includes(f.id) ? 'bg-blue-500/10 border border-blue-500/20' : 'hover:bg-white/5 border border-transparent'
-                                            }`}>
+                                        }`}>
                                             <input
                                                 type="checkbox"
                                                 checked={exportOptions.selectedFolders.includes(f.id)}
@@ -121,9 +121,9 @@ export const DataTab: React.FC<DataTabProps> = ({
                                                     : [...prev.selectedTags, tag]
                                             }))}
                                             className={`px-3 py-2 rounded-xl text-[10px] font-bold transition-all uppercase tracking-tight ${exportOptions.selectedTags.includes(tag)
-                                                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
-                                                    : 'bg-white/5 text-gray-500 border border-white/5 hover:border-white/20'
-                                                }`}
+                                                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
+                                                : 'bg-white/5 text-gray-500 border border-white/5 hover:border-white/20'
+                                            }`}
                                         >
                                             {tag}
                                         </button>

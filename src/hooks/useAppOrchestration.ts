@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useApp } from '@/src/context/AppContext';
 import { AppState, type CategorizedBookmark, type Folder, type Bookmark } from '@/types';
-import * as db from '@db';
+import { libraryRepo } from '@/src/db/repositories/library';
 import { perfMonitor } from '@/src/performance';
 
 interface OrchestrationProps {
@@ -69,8 +69,8 @@ export const useAppOrchestration = ({
                 return categorized ? { ...bm, path: categorized.path, tags: categorized.tags } : bm;
             });
 
-            await db.saveBookmarks(finalBookmarks);
-            await db.saveFolders(folders);
+            await libraryRepo.syncBookmarks(finalBookmarks);
+            await libraryRepo.saveTree(folders);
             
             setBookmarks(finalBookmarks);
             setAppState(AppState.STRUCTURED);

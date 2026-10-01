@@ -18,7 +18,7 @@ export const PromptPlayground: React.FC<PromptPlaygroundProps> = ({
     customInstructions,
     onClose
 }) => {
-    const [testBookmarksText, setTestBookmarksText] = useState("https://reactjs.org - React Documentation\nhttps://tailwindcss.com/docs - Tailwind CSS");
+    const [testBookmarksText, setTestBookmarksText] = useState('https://reactjs.org - React Documentation\nhttps://tailwindcss.com/docs - Tailwind CSS');
     const [result, setResult] = useState<any>(null);
     const [rawText, setRawText] = useState<string>('');
     const [isLoading, setIsLoading] = useState(false);

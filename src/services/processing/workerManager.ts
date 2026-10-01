@@ -89,6 +89,23 @@ export class WorkerManager {
         });
     }
 
+    cancelWorker(worker: Worker) {
+        worker.postMessage({ type: 'cancel' });
+        const batchIndex = this.workerActiveBatches.get(worker);
+        if (batchIndex !== undefined) {
+            this.activeBatchIndices.delete(batchIndex);
+            this.workerActiveBatches.delete(worker);
+        }
+    }
+
+    cancelAll() {
+        this.workers.forEach(worker => {
+            worker.postMessage({ type: 'cancel' });
+        });
+        this.activeBatchIndices.clear();
+        this.workerActiveBatches.clear();
+    }
+
     terminateAll() {
         this.workers.forEach(worker => worker.terminate());
         this.workers = [];

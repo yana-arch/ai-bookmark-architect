@@ -9,10 +9,6 @@ export class NeonHttpClient {
         const url = new URL(connection.connectionString);
         if (url.hostname.includes('neon.tech') || url.hostname.includes('aws.neon.tech')) {
             this.baseUrl = `https://${url.hostname}/v1/sql`;
-            console.log('Neon HTTP connection details:', {
-                fullHostname: url.hostname,
-                baseUrl: this.baseUrl
-            });
         } else {
             this.baseUrl = `https://${url.hostname}/v1/sql`;
         }
@@ -42,13 +38,44 @@ export class NeonHttpClient {
     }
 }
 
-const generateUserHash = (username: string, host: string): string => {
+/** Pre-SHA-256 hash kept for reading existing cloud rows. */
+export function generateLegacyUserHash(username: string, host: string): string {
     return btoa(`${username}@${host}`).replace(/[+/=]/g, '').toLowerCase().slice(0, 10);
-};
+}
+
+export async function generateUserHash(username: string, host: string): Promise<string> {
+    const data = new TextEncoder().encode(`${username}@${host}`);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 10);
+}
+
+interface CloudBookmarkRow {
+    id: string;
+    title: string;
+    url: string;
+    parent_id: string | null;
+    path: string[];
+    tags: string[];
+}
+
+async function fetchCloudBookmarkRows(
+    client: NeonHttpClient,
+    username: string,
+    userHash: string
+): Promise<CloudBookmarkRow[]> {
+    const result = await client.query(
+        'SELECT * FROM bookmarks WHERE user_id = $1 AND db_connection_hash = $2 ORDER BY created_at',
+        [username, userHash]
+    ) as { rows?: CloudBookmarkRow[]; data?: CloudBookmarkRow[] };
+
+    return result.rows || result.data || [];
+}
 
 export const exportToCloud = async (connection: DbConnection): Promise<{ success: boolean; message: string }> => {
     const client = new NeonHttpClient(connection);
-    const userHash = generateUserHash(connection.username, connection.host);
+    const userHash = await generateUserHash(connection.username, connection.host);
+    const legacyHash = generateLegacyUserHash(connection.username, connection.host);
 
     try {
         await client.query(`
@@ -74,7 +101,11 @@ export const exportToCloud = async (connection: DbConnection): Promise<{ success
             return { success: false, message: 'Không có bookmark nào để export.' };
         }
 
-        await client.query('DELETE FROM bookmarks WHERE user_id = $1 AND db_connection_hash = $2', [connection.username, userHash]);
+        const hashesToClear = legacyHash === userHash ? [userHash] : [userHash, legacyHash];
+        await client.query(
+            'DELETE FROM bookmarks WHERE user_id = $1 AND db_connection_hash = ANY($2)',
+            [connection.username, hashesToClear]
+        );
 
         const BATCH_SIZE = 50;
         let successCount = 0;
@@ -108,6 +139,8 @@ export const exportToCloud = async (connection: DbConnection): Promise<{ success
                             'INSERT INTO bookmarks (id, user_id, db_connection_hash, title, url, path, tags, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
                             [
                                 bm.id,
+                                connection.username,
+                                userHash,
                                 bm.title,
                                 bm.url,
                                 bm.path || [],
@@ -138,26 +171,16 @@ export const exportToCloud = async (connection: DbConnection): Promise<{ success
     }
 };
 
-interface CloudBookmarkRow {
-    id: string;
-    title: string;
-    url: string;
-    parent_id: string | null;
-    path: string[];
-    tags: string[];
-}
-
 export const importFromCloud = async (connection: DbConnection, mode: 'merge' | 'replace' = 'merge'): Promise<{ success: boolean; message: string }> => {
     const client = new NeonHttpClient(connection);
-    const userHash = generateUserHash(connection.username, connection.host);
+    const userHash = await generateUserHash(connection.username, connection.host);
+    const legacyHash = generateLegacyUserHash(connection.username, connection.host);
 
     try {
-        const result = await client.query(
-            'SELECT * FROM bookmarks WHERE user_id = $1 AND db_connection_hash = $2 ORDER BY created_at',
-            [connection.username, userHash]
-        ) as { rows?: CloudBookmarkRow[]; data?: CloudBookmarkRow[] };
-
-        const rows = result.rows || result.data || [];
+        let rows = await fetchCloudBookmarkRows(client, connection.username, userHash);
+        if (rows.length === 0 && legacyHash !== userHash) {
+            rows = await fetchCloudBookmarkRows(client, connection.username, legacyHash);
+        }
 
         if (rows.length === 0) {
             return { success: false, message: 'Không tìm thấy bookmark nào trong cloud.' };

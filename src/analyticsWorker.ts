@@ -2,7 +2,8 @@
 // src/analyticsWorker.ts
 
 import type { Bookmark, Folder, AnalyticsData } from '@/types';
-import * as db from '@db';
+import { systemRepo } from '@/src/db/repositories/system';
+import { libraryRepo } from '@/src/db/repositories/library';
 
 // Helper function to count bookmarks in a folder iteratively
 function getBookmarksInFolder(folder: Folder, allBookmarks: Bookmark[]): Bookmark[] {
@@ -78,7 +79,7 @@ self.onmessage = async (e: MessageEvent<{ bookmarks: Bookmark[], folders: (Folde
         .map(([tag, count]) => ({ tag, count }));
 
     // Get AI performance data from logs
-    const logs = await db.getLogs();
+    const logs = await systemRepo.getLogs();
     const aiRequests = logs.filter(log => log.type === 'request' && log.title.includes('Request'));
     const aiResponses = logs.filter(log => log.type === 'response' && log.title.includes('Response'));
 
@@ -94,7 +95,7 @@ self.onmessage = async (e: MessageEvent<{ bookmarks: Bookmark[], folders: (Folde
         : 0;
 
     // Get user corrections for accuracy score
-    const corrections = await db.getUserCorrections();
+    const corrections = await libraryRepo.getCorrections();
     const accuracyScore = totalRequests > 0
         ? ((totalRequests - corrections.length) / totalRequests) * 100
         : 100;

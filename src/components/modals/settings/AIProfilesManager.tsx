@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import type { AIProfile, ApiConfig, Folder, Bookmark } from '@/types';
+import React, { useState } from 'react';
+import type { AIProfile, ApiConfig, Folder } from '@/types';
 import { CogIcon, TrashIcon, SparklesIcon, AILogoIcon, SuccessIcon } from '@/src/components/ui/Icons';
 import PromptPlayground from './PromptPlayground';
 
@@ -24,24 +24,29 @@ export const AIProfilesManager: React.FC<AIProfilesManagerProps> = ({
     currentTree,
     customInstructions
 }) => {
-    const [editingProfile, setEditingProfile] = useState<AIProfile | null>(null);
+    const [draftProfile, setDraftProfile] = useState<AIProfile | null>(null);
+    const [draftProfileId, setDraftProfileId] = useState<string | null>(null);
     const [showPlayground, setShowPlayground] = useState(false);
     const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
-    // Active or Default profile
     const currentProfile = aiProfiles.find(p => p.id === activeProfileId) || aiProfiles.find(p => p.isDefault) || aiProfiles[0];
+    const activeId = activeProfileId ?? currentProfile?.id ?? null;
 
-    useEffect(() => {
-        if (currentProfile && !editingProfile) {
-            setEditingProfile({ ...currentProfile });
-        }
-    }, [currentProfile, activeProfileId]);
+    const editingProfile = draftProfile && draftProfileId === activeId
+        ? draftProfile
+        : currentProfile ? { ...currentProfile } : null;
+
+    const setEditingProfile = (profile: AIProfile | null) => {
+        setDraftProfile(profile);
+        setDraftProfileId(profile?.id ?? activeId);
+    };
 
     const handleSelectProfile = (id: string) => {
         setActiveProfileId(id);
         const profile = aiProfiles.find(p => p.id === id);
         if (profile) {
-            setEditingProfile({ ...profile });
+            setDraftProfile({ ...profile });
+            setDraftProfileId(id);
         }
     };
 
@@ -100,9 +105,9 @@ export const AIProfilesManager: React.FC<AIProfilesManagerProps> = ({
                         key={profile.id}
                         onClick={() => handleSelectProfile(profile.id)}
                         className={`p-4 rounded-xl cursor-pointer border transition-all ${editingProfile.id === profile.id
-                                ? 'bg-emerald-500/10 border-emerald-500/50 ring-1 ring-emerald-500/20'
-                                : 'bg-[#121418] border-white/10 hover:border-white/20'
-                            }`}
+                            ? 'bg-emerald-500/10 border-emerald-500/50 ring-1 ring-emerald-500/20'
+                            : 'bg-[#121418] border-white/10 hover:border-white/20'
+                        }`}
                     >
                         <div className="flex justify-between items-start">
                             <div>

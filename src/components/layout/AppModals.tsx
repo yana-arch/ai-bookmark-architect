@@ -13,16 +13,20 @@ import type {
     Notification,
     DuplicateStats,
     ExportOptions,
-    Bookmark
+    Bookmark,
+    BrokenLinkCheckState
 } from '@/types';
 
 const UnifiedSettingsModal = lazy(() => import('../modals/UnifiedSettingsModal'));
 const LogModal = lazy(() => import('../modals/LogModal'));
 const AnalyticsDashboard = lazy(() => import('../features/AnalyticsDashboard'));
+const AuthModal = lazy(() => import('../modals/AuthModal'));
 
 interface AppModalsProps {
     isGlobalSettingsModalOpen: boolean;
     setIsGlobalSettingsModalOpen: (open: boolean) => void;
+    isAuthModalOpen: boolean;
+    setIsAuthModalOpen: (open: boolean) => void;
     settingsTab: 'providers' | 'intelligence' | 'templates' | 'data' | 'health' | 'backup' | 'config';
 
     // Logic for other modals that might not be in AppContext yet or specific to App UI
@@ -42,12 +46,13 @@ interface AppModalsProps {
     handleCleanDuplicates: () => void;
     brokenLinks: Bookmark[];
 
-    brokenLinkCheckState: 'idle' | 'checking' | 'completed' | 'error';
-    brokenLinkCheckProgress: number;
+    brokenLinkCheckState: BrokenLinkCheckState;
+    brokenLinkCheckProgress: { current: number; total: number };
     handleStartBrokenLinkCheck: () => void;
     handleCleanBrokenLinks: () => void;
     handleUploadData: (key: string) => Promise<void>;
     handleImportData: (key: string) => Promise<void>;
+    handleDeleteBackup: (id: string) => Promise<void>;
     planningPrompt?: string;
     onPlanningPromptChange?: (prompt: string) => void;
 }
@@ -56,6 +61,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
     const {
         bookmarks,
         folders, setFolders,
+        handleClearData,
         apiConfigs,
         instructionPresets,
         folderTemplates,
@@ -69,7 +75,6 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
         tagLanguage, setTagLanguage,
         autoCleanupEmptyFolders, setAutoCleanupEmptyFolders,
         smartClassifyRules,
-        handleClearData,
         handleSaveApiConfig,
         handleDeleteApiConfig,
         handleToggleApiConfigStatus,
@@ -186,6 +191,20 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     // Cloud
                     onUploadCloudData={props.handleUploadData}
                     onImportCloudData={props.handleImportData}
+                    onDeleteBackup={props.handleDeleteBackup}
+                    onOpenAuth={() => props.setIsAuthModalOpen(true)}
+                />
+            )}
+            {props.isAuthModalOpen && (
+                <AuthModal 
+                    isOpen={props.isAuthModalOpen}
+                    onClose={() => props.setIsAuthModalOpen(false)}
+                    onAuthSuccess={() => {
+                        // Success is handled by state change, but we can add a notification
+                    }}
+                    onAuthError={(err) => {
+                        // Error is handled inside modal mostly
+                    }}
                 />
             )}
             {props.isLogModalOpen && (

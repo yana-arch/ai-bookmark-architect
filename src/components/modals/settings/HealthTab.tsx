@@ -1,18 +1,22 @@
 import React from 'react';
 import { CopyIcon, LinkIcon, ShieldCheckIcon } from '@/src/components/ui/Icons';
-import type { DuplicateStats } from '@/types';
+import { BrokenLinkCheckState, type DuplicateStats } from '@/types';
 
 interface HealthTabProps {
     duplicateStats: DuplicateStats;
     onCleanDuplicates: () => void;
-    brokenLinkCheckState: 'idle' | 'checking' | 'completed' | 'error';
-    brokenLinkCheckProgress: number;
+    brokenLinkCheckState: BrokenLinkCheckState;
+    brokenLinkCheckProgress: { current: number; total: number };
     onStartBrokenLinkCheck: () => void;
 }
 
 export const HealthTab: React.FC<HealthTabProps> = ({
     duplicateStats, onCleanDuplicates, brokenLinkCheckState, brokenLinkCheckProgress, onStartBrokenLinkCheck
 }) => {
+    const isChecking = brokenLinkCheckState === BrokenLinkCheckState.CHECKING;
+    const progressPercent = brokenLinkCheckProgress.total > 0
+        ? Math.round((brokenLinkCheckProgress.current / brokenLinkCheckProgress.total) * 100)
+        : 0;
     return (
         <div className="space-y-10 animate-slideIn pb-10">
             <header className="flex items-center space-x-3 mb-6">
@@ -53,17 +57,17 @@ export const HealthTab: React.FC<HealthTabProps> = ({
                     </div>
                     <h4 className="text-lg font-black text-white uppercase tracking-wider mb-2">Link Validation</h4>
                     <p className="text-[11px] text-gray-500 mb-8 font-medium max-w-[200px]">
-                        {brokenLinkCheckState === 'idle' ? 'Scan bookmark registry for dead or unreachable endpoints.' : `Diagnostic Progress: ${brokenLinkCheckProgress}%`}
+                        {!isChecking ? 'Scan bookmark registry for dead or unreachable endpoints.' : `Diagnostic Progress: ${progressPercent}%`}
                     </p>
                     <button 
                         onClick={onStartBrokenLinkCheck}
                         className="w-full py-4 bg-red-600 hover:bg-red-500 text-white text-[10px] font-black rounded-2xl transition-all shadow-xl shadow-red-500/10 uppercase tracking-[0.2em] active:scale-[0.97]"
                     >
-                        {brokenLinkCheckState === 'checking' ? 'Running Diagnostics...' : 'Initialize Scan'}
+                        {isChecking ? 'Running Diagnostics...' : 'Initialize Scan'}
                     </button>
 
-                    {brokenLinkCheckState === 'checking' && (
-                        <div className="absolute bottom-0 left-0 h-1 bg-red-500 transition-all duration-500" style={{ width: `${brokenLinkCheckProgress}%` }}></div>
+                    {isChecking && (
+                        <div className="absolute bottom-0 left-0 h-1 bg-red-500 transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
                     )}
                 </div>
             </div>

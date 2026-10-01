@@ -350,7 +350,7 @@ export const generateHash = (data: any): string => {
     for (let i = 0; i < str.length; i++) {
         const char = str.charCodeAt(i);
         hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32-bit integer
+        hash = hash & hash;
     }
     return Math.abs(hash).toString(36);
 };
@@ -369,40 +369,30 @@ export const cacheStats = {
     }
 };
 
-// Global cache instances
-const memoryApiResponseCache = new MemoryCache<any>(50);
-const memoryFolderCache = new MemoryCache<any>(20);
-const memorySearchCache = new MemoryCache<any>(30);
+/**
+ * Factory: create a real cache-aside CachedOperation backed by memory +
+ * sessionStorage + IndexedDB layers. The caller provides the fetch operation
+ * so the cache-aside pattern is complete — callers just call .get(key).
+ */
+export function createCache<T>(
+    name: string,
+    operation: () => Promise<T>,
+    ttl?: number
+): CachedOperation<T> {
+    return new CachedOperation<T>(
+        [
+            new MemoryCache<T>(50),
+            new SessionStorageCache<T>(name),
+            new IndexedDBCache<T>(name, 'entries'),
+        ],
+        operation,
+        ttl
+    );
+}
 
-// Session storage caches
-const apiResponseSessionCache = new SessionStorageCache<any>('api_responses');
-const folderSessionCache = new SessionStorageCache<any>('folders');
-const searchSessionCache = new SessionStorageCache<any>('search');
-
-// IndexedDB caches
-const apiResponseIndexedDBCache = new IndexedDBCache<any>('ApiResponses', 'responses');
-const folderIndexedDBCache = new IndexedDBCache<any>('Folders', 'structures');
-const searchIndexedDBCache = new IndexedDBCache<any>('Search', 'results');
-
-export const apiResponseCache = new CachedOperation(
-    [memoryApiResponseCache, apiResponseSessionCache, apiResponseIndexedDBCache],
-    async () => { throw new Error('Operation not provided for apiResponseCache'); },
-    5 * 60 * 1000 // Default TTL 5 minutes
-);
-export const folderCache = new CachedOperation(
-    [memoryFolderCache, folderSessionCache, folderIndexedDBCache],
-    async () => { throw new Error('Operation not provided for folderCache'); },
-    20 * 60 * 1000 // Default TTL 20 minutes
-);
-export const searchCache = new CachedOperation(
-    [memorySearchCache, searchSessionCache, searchIndexedDBCache],
-    async () => null, // Return null on cache miss instead of throwing
-    10 * 60 * 1000 // Default TTL 10 minutes
-);
-
-// Periodic cleanup for IndexedDB caches
+// Periodic cleanup for IndexedDB caches — runs globally once
 setInterval(() => {
-    apiResponseIndexedDBCache.cleanup();
-    folderIndexedDBCache.cleanup();
-    searchIndexedDBCache.cleanup();
-}, 60 * 60 * 1000); // Clean up every 1 hour
+    new IndexedDBCache('ApiResponses', 'entries').cleanup?.();
+    new IndexedDBCache('Folders', 'entries').cleanup?.();
+    new IndexedDBCache('Search', 'entries').cleanup?.();
+}, 60 * 60 * 1000);
